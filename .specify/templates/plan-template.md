@@ -31,7 +31,24 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+Read `.specify/memory/constitution.md` and record a pass/fail result for each principle
+before continuing. A plan that violates any principle is blocked.
+
+| Principle | Gate question | Result |
+|-----------|---------------|--------|
+| I. Tenant Isolation | Which tables gain `organization_id` and composite FKs, and where does tenant scope enter the request context? | |
+| II. Server-Enforced Authority | Which permission does each new endpoint declare, and which state transitions are validated server-side? | |
+| III. Transactional Integrity | Which operations are multi-record, require an `Idempotency-Key`, or produce immutable posted records? | |
+| IV. Exact Decimals | What are the column precisions, and where does half-up rounding occur? | |
+| V. Test-First | Which failing test is written first, and which critical-path coverage does this change reach? | |
+| VI. Modular Boundaries | Which modules are touched, and does any module write another module's tables? | |
+| VII. Honest Boundaries | Does anything here risk implying tax compliance or complete accounting? | |
+| VIII. Design System & A11y | Which design tokens and PRD 7.3 UX rules apply, and what is the WCAG 2.1 AA impact? | |
+| IX. Scope Discipline | What is this feature's P0/P1/P2 classification, and is the preceding phase's exit criteria met for P1 work? |
+
+Constraints that must appear in Technical Context: real-PostgreSQL integration tests,
+no floating-point money or quantities, no microservices/Redis/Kubernetes in v1, and the
+Phase 4 build order for the modules involved.
 
 ## Project Structure
 

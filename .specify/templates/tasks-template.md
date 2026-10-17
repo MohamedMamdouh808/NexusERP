@@ -8,7 +8,22 @@ description: "Task list template for feature implementation"
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Tests**: Test tasks are MANDATORY for this project (Constitution Principle V). Every user
+story MUST include its tests, written before the implementation and observed failing. Tests
+run against a real PostgreSQL instance; SQLite, in-memory substitutes, and mocked
+persistence layers are not acceptable substitutes for critical-path tests.
+
+**Mandatory task types** (Constitution Principles I-VI, VIII, IX):
+
+- **Tenant isolation test** for every endpoint, report, and export added (Principle I)
+- **Permission declaration** plus default-deny test for every endpoint (Principle II)
+- **Idempotency test** for every posting endpoint, plus duplicate-request and 422 tests (Principle III)
+- **Transaction rollback test** for every multi-record operation (Principle III)
+- **Concurrency test** for stock reservation, shipment, and payment allocation (Principles III, V)
+- **Decimal calculation test vectors** with half-up rounding for money and quantities (Principle IV)
+- **Immutability test** proving posted records cannot be updated or deleted (Principle III)
+- **Audit-record test** proving the audit row commits with the business change (Principle III)
+- **UX and accessibility tasks** for design-system tokens, PRD 7.3 states, and WCAG 2.1 AA (Principle VIII)
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -62,12 +77,14 @@ description: "Task list template for feature implementation"
 
 Examples of foundational tasks (adjust based on your project):
 
-- [ ] T004 Setup database schema and migrations framework
-- [ ] T005 [P] Implement authentication/authorization framework
-- [ ] T006 [P] Setup API routing and middleware structure
+- [ ] T004 Setup database schema and migrations framework, with `organization_id` on every organization-owned table
+- [ ] T005 [P] Implement authentication/authorization framework with default-deny guards
+- [ ] T006 [P] Setup API routing and middleware structure, including the global tenant-context guard
 - [ ] T007 Create base models/entities that all stories depend on
-- [ ] T008 Configure error handling and logging infrastructure
+- [ ] T008 Configure error handling and logging infrastructure (request ID, organization ID, user ID, latency)
 - [ ] T009 Setup environment configuration management
+- [ ] T009a [P] Implement the idempotency-key layer for posting endpoints (Principle III)
+- [ ] T009b [P] Implement the append-only audit writer that commits with the business change (Principle III)
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -79,7 +96,7 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 1 (OPTIONAL - only if tests requested) ⚠️
+### Tests for User Story 1 (MANDATORY - write first, observe failure) ⚠️
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
@@ -105,7 +122,7 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 2 (OPTIONAL - only if tests requested) ⚠️
+### Tests for User Story 2 (MANDATORY - write first, observe failure) ⚠️
 
 - [ ] T018 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
 - [ ] T019 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
@@ -127,7 +144,7 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 3 (OPTIONAL - only if tests requested) ⚠️
+### Tests for User Story 3 (MANDATORY - write first, observe failure) ⚠️
 
 - [ ] T024 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
 - [ ] T025 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
@@ -153,8 +170,12 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX [P] Documentation updates in docs/
 - [ ] TXXX Code cleanup and refactoring
 - [ ] TXXX Performance optimization across all stories
-- [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
+- [ ] TXXX [P] Additional unit tests in tests/unit/
 - [ ] TXXX Security hardening
+- [ ] TXXX [P] Tenant-isolation sweep across every endpoint, report, and export added in this feature (Principle I)
+- [ ] TXXX [P] Concurrency, rollback, and idempotency regression run against real PostgreSQL (Principle III)
+- [ ] TXXX Verify critical-path coverage is at least 80% in the CI report (Principle V)
+- [ ] TXXX [P] Accessibility and UX-rule review against PRD 7.3 and WCAG 2.1 AA (Principle VIII)
 - [ ] TXXX Run quickstart.md validation
 
 ---
@@ -178,7 +199,7 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Within Each User Story
 
-- Tests (if included) MUST be written and FAIL before implementation
+- Tests MUST be written first and observed to FAIL before implementation (Principle V)
 - Models before services
 - Services before endpoints
 - Core implementation before integration
@@ -198,7 +219,7 @@ Examples of foundational tasks (adjust based on your project):
 ## Parallel Example: User Story 1
 
 ```bash
-# Launch all tests for User Story 1 together (if tests requested):
+# Launch all tests for User Story 1 together (tests are mandatory):
 Task: "Contract test for [endpoint] in tests/contract/test_[name].py"
 Task: "Integration test for [user journey] in tests/integration/test_[name].py"
 

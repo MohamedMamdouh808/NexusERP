@@ -3,6 +3,7 @@
 **Feature Branch**: `[###-feature-name]`  
 **Created**: [DATE]  
 **Status**: Draft  
+**MoSCoW Priority**: [P0 | P1 | P2] (P3 is never implemented in v1 — Principle IX)  
 **Input**: User description: "$ARGUMENTS"
 
 ## User Scenarios & Testing *(mandatory)*
@@ -99,6 +100,24 @@
 
 - **[Entity 1]**: [What it represents, key attributes without implementation]
 - **[Entity 2]**: [What it represents, relationships to other entities]
+
+## Constitution Compliance *(mandatory)*
+
+<!--
+  ACTION REQUIRED: Declare how this feature satisfies the project constitution at
+  .specify/memory/constitution.md. Write "N/A" only where a principle genuinely does not
+  apply, and justify the reason. Undeclared constitution coverage blocks the plan.
+-->
+
+- **I. Tenant isolation:** [Which tables gain `organization_id` and composite FKs; how tenant scope resolves; the isolation test to be written]
+- **II. Server-enforced authority:** [Required permission per endpoint; state transitions validated server-side; default-deny behavior]
+- **III. Transactional integrity:** [Multi-record operations; `Idempotency-Key` endpoints; records that become immutable and the compensating procedure]
+- **IV. Exact decimals:** [Column precisions; where half-up rounding happens; JSON string transport]
+- **V. Test-first:** [The failing test written before implementation; critical-path coverage target]
+- **VI. Module boundaries:** [Modules touched; the owning service called for cross-module work; circular dependencies avoided]
+- **VII. Honest boundaries:** [Confirmation that no tax-compliance or accounting claim is implied]
+- **VIII. Design system and accessibility:** [Design system tokens used; PRD 7.3 UX rules in scope; WCAG 2.1 AA impact]
+- **IX. Scope discipline:** [P0/P1/P2 classification and why; whether preceding phase exit criteria are met]
 
 ## Success Criteria *(mandatory)*
 
