@@ -25,6 +25,12 @@ COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 
+# The root `postinstall` hook runs as part of `npm ci`, so the script it points at has
+# to be in the dependency layer. It finds no schema here and exits without generating
+# anything, which is the behaviour the hook is designed for; without the file present,
+# however, the install itself fails and the image cannot be built at all.
+COPY scripts/postinstall.mjs ./scripts/postinstall.mjs
+
 RUN npm ci --workspace @nexuserp/web --workspace @nexuserp/shared --include-workspace-root
 
 # ---------------------------------------------------------------------------

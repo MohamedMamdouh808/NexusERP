@@ -27,6 +27,13 @@ COPY apps/web/package.json ./apps/web/
 
 # `npm ci` needs every workspace manifest to exist before it runs, which is why the
 # manifests are copied but not the sources.
+#
+# The root `postinstall` hook runs as part of `npm ci`, so the script it points at has
+# to be in the dependency layer. It finds no schema here and exits without generating
+# anything, which is the behaviour the hook is designed for; without the file present,
+# however, the install itself fails and the image cannot be built at all.
+COPY scripts/postinstall.mjs ./scripts/postinstall.mjs
+
 RUN npm ci --workspace @nexuserp/shared --workspace @nexuserp/api --include-workspace-root
 
 # ---------------------------------------------------------------------------

@@ -12,6 +12,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "postinstall": "node scripts/postinstall.mjs",
     "dev": "concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "npm run dev --workspace @nexuserp/api",
     "dev:web": "npm run dev --workspace @nexuserp/web",
