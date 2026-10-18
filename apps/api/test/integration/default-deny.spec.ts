@@ -5,6 +5,7 @@ import request from 'supertest';
 import { ERROR_CODES } from '@nexuserp/shared';
 import { ProbeModule } from '../fixtures/probe.controllers';
 import { createTestApp, HEALTH_URL, type TestApp } from '../fixtures/app';
+import { RequestIdMiddleware } from '../../src/common/logging/request-id.middleware';
 
 /**
  * T106, Constitution Principle II: "An endpoint without a declared permission MUST fail
@@ -26,6 +27,15 @@ describe('default deny (T106, Constitution Principle II)', () => {
     const moduleRef = await Test.createTestingModule({ imports: [ProbeModule] }).compile();
     const app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api/v1');
+
+    // The probe assembles its own wiring, so it must reproduce the part under test.
+    // AppModule registers RequestIdMiddleware as middleware precisely so that a guard
+    // rejection carries an identifier (T057). Omitting it here would leave the
+    // assertions below vacuous - they would pass because the harness had no
+    // identifier to lose, not because the product provides one.
+    const middleware = new RequestIdMiddleware();
+    app.use(middleware.use.bind(middleware));
+
     await app.init();
     return app;
   }
@@ -68,9 +78,45 @@ describe('default deny (T106, Constitution Principle II)', () => {
     expect(response.status).not.toBe(404);
   });
 
-  it('returns the standard envelope for the denial (FR-021)', async () => {
+it('returns the standard envelope for the denial (FR-021)', async () => {
     const response = await request(server).get('/api/v1/undeclared').expect(403);
     expect(Object.keys(response.body).sort()).toEqual(['code', 'details', 'message', 'requestId']);
+  });
+
+  /**
+   * T057. The reason RequestIdMiddleware is registered as MIDDLEWARE rather than as an
+   * interceptor: an interceptor runs AFTER guards, so a request the guard rejects would
+   * carry no identifier at all, and its 403 could not be correlated with the server log
+   * (FR-028). Asserting the shape of the envelope above is not enough - an envelope can
+   * have the right four keys and an empty `requestId`, which traces nothing.
+   */
+  it('carries a usable request identifier on a guard rejection (FR-028)', async () => {
+    const response = await request(server).get('/api/v1/undeclared').expect(403);
+
+    expect(response.headers['x-request-id']).toMatch(/^[A-Za-z0-9._-]{1,128}$/);
+    expect(response.body.requestId).toBe(response.headers['x-request-id']);
+    expect(response.body.requestId).not.toBe('');
+  });
+
+  it('adopts a client-supplied identifier through a guard rejection (FR-028)', async () => {
+    const response = await request(server)
+      .get('/api/v1/undeclared')
+      .set('x-request-id', 'guard-trace-001')
+      .expect(403);
+
+    expect(response.body.requestId).toBe('guard-trace-001');
+  });
+
+  it('sanitizes an unusable client identifier on a guard rejection', async () => {
+    // A hostile or careless identifier must not reach the log verbatim.
+    const response = await request(server)
+      .get('/api/v1/undeclared')
+      .set('x-request-id', 'bad identifier with spaces and <script>')
+      .expect(403);
+
+    expect(response.headers['x-request-id']).toMatch(/^[A-Za-z0-9._-]{1,128}$/);
+    expect(response.headers['x-request-id']).not.toContain(' ');
+    expect(response.headers['x-request-id']).not.toContain('<script>');
   });
 });
 
