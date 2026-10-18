@@ -1,0 +1,292 @@
+openapi: 3.1.0
+info:
+  title: NexusERP API
+  version: 0.1.0
+  description: |
+    Public HTTP contract for the NexusERP platform foundation.
+
+    This document is GENERATED from the service source and committed to the repository.
+    Regenerating it must produce no diff; the CI `contract-check` job fails when it does
+    (see research.md R-009). Edit the decorators on the code, never this file.
+
+    Conventions that apply to every endpoint in every release:
+      - All routes are served under `/api/v1`.
+      - Every response carries an `x-request-id` header.
+      - Every failing response uses the single ErrorEnvelope shape.
+      - Decimal values are transported as strings, never as JSON numbers.
+servers:
+  - url: /api/v1
+    description: Version 1 of the NexusERP API
+
+tags:
+  - name: Platform
+    description: Health and service status
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Report application and database health
+      description: |
+        Reports whether the application is serving and whether its database connection is
+        reachable. This is the only unauthenticated endpoint in the foundation; it is declared
+        explicitly as public rather than being public by omission.
+
+        It is intended for infrastructure probes. It never returns a version string, hostname,
+        connection string, driver version, or exception message, so a probe response cannot be
+        used to fingerprint the deployment.
+
+        The checks are reported separately so a failure can be attributed to the application or
+        to the database rather than to the service as a whole.
+      tags: [Platform]
+      security: []
+      responses:
+        '200':
+          description: The application is serving and the database is reachable.
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReport'
+              examples:
+                healthy:
+                  summary: Application serving, database reachable
+                  value:
+                    status: ok
+                    uptimeSeconds: 4820
+                    checks:
+                      application:
+                        status: ok
+                      database:
+                        status: ok
+                        latencyMs: 2
+        '503':
+          description: |
+            The application is serving but at least one check failed, or the application itself
+            cannot serve. Returned in the standard error envelope so that every failing
+            response in the product has the same shape; `details` identifies which check failed.
+          headers:
+            x-request-id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                databaseDown:
+                  summary: Database unreachable
+                  value:
+                    code: SERVICE_UNAVAILABLE
+                    message: The service is temporarily unavailable. Please try again shortly.
+                    details:
+                      - check: database
+                        status: unavailable
+                    requestId: 3f6c1d2e-9a4b-4c1f-8e77-2b5d9a0c1e33
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  headers:
+    XRequestId:
+      description: |
+        Identifier for this request. Echoes the client's `x-request-id` when the supplied value
+        is usable, otherwise a generated one. The same value appears in the server log records
+        for this request, so a user can quote it in a support request.
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: '^[A-Za-z0-9._-]{1,128}$'
+
+  responses:
+    InternalError:
+      description: |
+        An unexpected internal failure. The message is fixed and carries no stack trace, file
+        path, query, or other internal detail; the `requestId` is the only handle on the
+        underlying failure, and it is sufficient to find the full record in the server logs.
+      headers:
+        x-request-id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            unhandled:
+              value:
+                code: INTERNAL_ERROR
+                message: Something went wrong. No changes were saved. Reference: 3f6c1d2e-9a4b-4c1f-8e77-2b5d9a0c1e33
+                details: []
+                requestId: 3f6c1d2e-9a4b-4c1f-8e77-2b5d9a0c1e33
+
+  schemas:
+    HealthReport:
+      type: object
+      required: [status, uptimeSeconds, checks]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          description: Present only on a healthy response; a failing response uses the error envelope.
+        uptimeSeconds:
+          type: integer
+          minimum: 0
+          description: Whole seconds since the application started serving.
+        checks:
+          type: object
+          required: [application, database]
+          additionalProperties: false
+          properties:
+            application:
+              $ref: '#/components/schemas/CheckResult'
+            database:
+              allOf:
+                - $ref: '#/components/schemas/CheckResult'
+                - type: object
+                  required: [latencyMs]
+                  properties:
+                    latencyMs:
+                      type: integer
+                      minimum: 0
+                      description: Round-trip time of the database reachability query.
+          description: Each dependency is reported separately so a failure can be attributed.
+
+    CheckResult:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+          description: |
+            `unavailable` never carries a reason, a message, or an error object. The failure is
+            recorded in the server logs under the request identifier instead.
+
+    ErrorEnvelope:
+      type: object
+      required: [code, message, details, requestId]
+      additionalProperties: false
+      description: |
+        The single shape used by every failing response in the product, for every failure class
+        including validation, authentication, authorization, missing records, conflicts, rate
+        limiting, idempotency mismatch, and unexpected internal failures.
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: string
+          description: |
+            Human-readable and safe to display to the user. Never contains a stack trace, file
+            path, query, hostname, or credential.
+        details:
+          type: array
+          description: |
+            Field-level or check-level detail. Always present, an empty array when there is
+            nothing to add. Never omitted.
+          items:
+            type: object
+            additionalProperties: true
+            properties:
+              field:
+                type: string
+                nullable: true
+                description: |
+                  Dotted path of the offending input field for validation failures, for example
+                  `lines.2.quantity`. Absent for failures that are not tied to a field.
+              code:
+                type: string
+                nullable: true
+                description: Machine-readable reason for this specific detail.
+              message:
+                type: string
+                nullable: true
+                description: Message for this specific detail.
+            examples:
+              - field: lines.2.quantity
+                code: OUT_OF_RANGE
+                message: Quantity must be greater than zero.
+        requestId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: '^[A-Za-z0-9._-]{1,128}$'
+          description: |
+            Identifier for this request, identical to the `x-request-id` response header, so a
+            user-visible failure can be traced to the server record that explains it.
+
+    ErrorCode:
+      type: string
+      description: |
+        Stable machine-readable failure code. A code's meaning is fixed once published and is
+        never reused for a different failure, so clients may branch on it safely.
+
+        Emitted by the platform foundation:
+          VALIDATION_ERROR      400  input failed server-side validation
+          MALFORMED_REQUEST     400  body or query could not be parsed
+          UNAUTHENTICATED       401  no valid session
+          FORBIDDEN             403  authenticated but the required permission is absent
+          MODULE_DISABLED       403  the endpoint's module is disabled for the organization
+          NOT_FOUND             404  no such record in the caller's organization
+          METHOD_NOT_ALLOWED    405  route exists but not for this method
+          CONFLICT              409  the request contradicts current state
+          DUPLICATE_RECORD      409  a unique value already exists in the organization
+          INVALID_STATE_TRANSITION 409  the document is not in a state that allows this action
+          PAYLOAD_TOO_LARGE     413  request body exceeds the documented limit
+          IDEMPOTENCY_KEY_REUSED 422  key reused with a different request body
+          VALIDATION_FAILED     422  semantic validation failed after parsing
+          TOO_MANY_REQUESTS     429  rate limit exceeded; carries Retry-After
+          INTERNAL_ERROR        500  unexpected internal failure
+          NOT_IMPLEMENTED       501  route reserved but not implemented in this release
+          SERVICE_UNAVAILABLE   503  application or a dependency cannot serve the request
+
+        Reserved for later features (documented now so the catalog is complete, not emitted yet):
+          INSUFFICIENT_STOCK    409  confirm or ship exceeded available stock
+          OVER_RECEIPT          400  receipt exceeded the outstanding ordered quantity
+          OVER_ALLOCATION       400  payment allocation exceeded the invoice balance
+          PRODUCT_IN_USE        409  product referenced by open documents or reserved stock
+          CONTACT_IN_USE        409  contact referenced by open documents or unpaid invoices
+          LAST_ADMINISTRATOR    409  action would remove the last administrator
+          INVOICE_HAS_PAYMENTS  409  invoice cannot be voided while allocations exist
+          IDEMPOTENCY_KEY_REQUIRED 400  a posting endpoint was called without a key
+          STALE_VERSION         409  record changed since the caller loaded it
+      enum:
+        - VALIDATION_ERROR
+        - MALFORMED_REQUEST
+        - UNAUTHENTICATED
+        - FORBIDDEN
+        - MODULE_DISABLED
+        - NOT_FOUND
+        - METHOD_NOT_ALLOWED
+        - CONFLICT
+        - DUPLICATE_RECORD
+        - INVALID_STATE_TRANSITION
+        - PAYLOAD_TOO_LARGE
+        - IDEMPOTENCY_KEY_REUSED
+        - VALIDATION_FAILED
+        - TOO_MANY_REQUESTS
+        - INTERNAL_ERROR
+        - NOT_IMPLEMENTED
+        - SERVICE_UNAVAILABLE
+        - INSUFFICIENT_STOCK
+        - OVER_RECEIPT
+        - OVER_ALLOCATION
+        - PRODUCT_IN_USE
+        - CONTACT_IN_USE
+        - LAST_ADMINISTRATOR
+        - INVOICE_HAS_PAYMENTS
+        - IDEMPOTENCY_KEY_REQUIRED
+        - STALE_VERSION
+
+    DecimalString:
+      type: string
+      description: |
+        An exact decimal value transported as a string so no precision is lost through a
+        binary floating-point value. Money carries two decimal places, unit prices four, and
+        quantities three. A client MUST NOT parse this into a JSON number.
+      pattern: '^-?\d+(\.\d{1,4})?$'
+      examples: ['1250.00', '19.9900', '3.125']
