@@ -63,17 +63,17 @@ of each story.
 **Purpose**: Workspace scaffolding so three packages can install, build, and run independently.
 No behavior yet.
 
-- [ ] T001 Create npm workspaces root manifest with `workspaces: ["apps/*", "packages/*"]` and orchestration scripts in `package.json`
-- [ ] T002 Add Node 24 pin in `.nvmrc` and `engines` in `package.json`; add `.gitignore` and `.dockerignore` at repository root
-- [ ] T003 [P] Create formatting config at `.prettierrc` and `.prettierignore`
-- [ ] T004 Create `apps/api/package.json` with NestJS, Prisma, `@nestjs/swagger`, `pino`, `cookie-parser`, `class-validator`, and dev dependencies in `apps/api/package.json`
-- [ ] T005 Create `apps/api/tsconfig.json` and `apps/api/tsconfig.build.json` targeting ES2023 with decorator metadata
-- [ ] T006 [P] Create `apps/api/nest-cli.json` and `apps/api/eslint.config.mjs`
-- [ ] T007 Create `apps/web/package.json` with React 18, Vite, Tailwind CSS 4, React Router, TanStack Query, React Hook Form, and Zod in `apps/web/package.json`
-- [ ] T008 Create `apps/web/tsconfig.json` and `apps/web/vite.config.ts`
-- [ ] T009 [P] Create `apps/api/eslint.config.mjs` flat config and `apps/web/eslint.config.mjs` flat config
-- [ ] T010 Create `packages/shared/package.json` and `packages/shared/tsconfig.json` with Zod as its only runtime dependency
-- [ ] T011 Create `.env.example` listing every required variable with safe development defaults and no real secrets
+- [X] T001 Create npm workspaces root manifest with `workspaces: ["apps/*", "packages/*"]` and orchestration scripts in `package.json`
+- [X] T002 Add Node 24 pin in `.nvmrc` and `engines` in `package.json`; add `.gitignore` and `.dockerignore` at repository root
+- [X] T003 [P] Create formatting config at `.prettierrc` and `.prettierignore`
+- [X] T004 Create `apps/api/package.json` with NestJS, Prisma, `@nestjs/swagger`, `pino`, `cookie-parser`, `class-validator`, and dev dependencies in `apps/api/package.json`
+- [X] T005 Create `apps/api/tsconfig.json` and `apps/api/tsconfig.build.json` targeting ES2023 with decorator metadata
+- [X] T006 [P] Create `apps/api/nest-cli.json` and `apps/api/eslint.config.mjs`
+- [X] T007 Create `apps/web/package.json` with React 18, Vite, Tailwind CSS 4, React Router, TanStack Query, React Hook Form, and Zod in `apps/web/package.json`
+- [X] T008 Create `apps/web/tsconfig.json` and `apps/web/vite.config.ts`
+- [X] T009 [P] Create `apps/api/eslint.config.mjs` flat config and `apps/web/eslint.config.mjs` flat config
+- [X] T010 Create `packages/shared/package.json` and `packages/shared/tsconfig.json` with Zod as its only runtime dependency
+- [X] T011 Create `.env.example` listing every required variable with safe development defaults and no real secrets
 
 **Checkpoint**: `npm install` completes and all three workspaces resolve; nothing runs yet.
 
@@ -86,24 +86,24 @@ story work can begin until this phase is complete.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T012 [P] Define error-code constants and the error envelope type in `packages/shared/src/errors/index.ts`
-- [ ] T013 [P] Define Zod schemas for the error envelope, decimal string, health report, and check result in `packages/shared/src/schemas/index.ts`
-- [ ] T014 [P] Define the permission catalog and the five default role templates in `packages/shared/src/permissions/index.ts`
-- [ ] T015 [P] Write FAILING unit test rejecting JavaScript numbers and accepting decimal strings in `packages/shared/src/__tests__/decimal-string.spec.ts`
-- [ ] T016 [P] Write FAILING unit test asserting the envelope has exactly four keys and always carries a details array in `packages/shared/src/__tests__/error-envelope.spec.ts`
-- [ ] T017 [P] Write FAILING unit test asserting every permission code is well formed and every role template's permissions exist in the catalog in `packages/shared/src/__tests__/permissions.spec.ts`
-- [ ] T018 Build `packages/shared` with `tsc` and add it as a workspace dependency in `apps/api/package.json` and `apps/web/package.json`
-- [ ] T019 Create the Prisma schema with `Permission`, `RoleTemplate`, and `RoleTemplatePermission` in `apps/api/prisma/schema.prisma` per `data-model.md`, with `code` and `key` unique and a composite primary key on the join; document the numeric conventions in a header comment — money `NUMERIC(14,2)`, unit price and unit cost `NUMERIC(14,4)`, quantity `NUMERIC(14,3)`, all mapped as `Prisma.Decimal`, with no monetary or quantity column permitted to use `Float` (verified by T107 and T108)
+- [X] T012 [P] Define error-code constants and the error envelope type in `packages/shared/src/errors/index.ts`
+- [X] T013 [P] Define Zod schemas for the error envelope, decimal string, health report, and check result in `packages/shared/src/schemas/index.ts`
+- [X] T014 [P] Define the permission catalog and the five default role templates in `packages/shared/src/permissions/index.ts`
+- [X] T015 [P] Write FAILING unit test rejecting JavaScript numbers and accepting decimal strings in `packages/shared/src/__tests__/decimal-string.spec.ts`
+- [X] T016 [P] Write FAILING unit test asserting the envelope has exactly four keys and always carries a details array in `packages/shared/src/__tests__/error-envelope.spec.ts`
+- [X] T017 [P] Write FAILING unit test asserting every permission code is well formed and every role template's permissions exist in the catalog in `packages/shared/src/__tests__/permissions.spec.ts`
+- [X] T018 Build `packages/shared` with `tsc` and add it as a workspace dependency in `apps/api/package.json` and `apps/web/package.json`
+- [X] T019 Create the Prisma schema with `Permission`, `RoleTemplate`, and `RoleTemplatePermission` in `apps/api/prisma/schema.prisma` per `data-model.md`, with `code` and `key` unique and a composite primary key on the join; document the numeric conventions in a header comment — money `NUMERIC(14,2)`, unit price and unit cost `NUMERIC(14,4)`, quantity `NUMERIC(14,3)`, all mapped as `Prisma.Decimal`, with no monetary or quantity column permitted to use `Float` (verified by T107 and T108)
 - [ ] T020 Author the initial migration and `apps/api/prisma/migrations_lock.toml` in `apps/api/prisma/migrations/`
-- [ ] T021 Create the two-project Jest configuration and the database reset helper in `apps/api/jest.config.ts` and `apps/api/test/fixtures/database.ts`
-- [ ] T022 [P] Write FAILING unit test asserting startup configuration errors name the missing or invalid variable, and that an already-bound port fails startup with a message naming that port in `apps/api/src/config/__tests__/config.spec.ts` (FR-009)
+- [X] T021 Create the two-project Jest configuration and the database reset helper in `apps/api/jest.config.ts` and `apps/api/test/fixtures/database.ts`
+- [X] T022 [P] Write FAILING unit test asserting startup configuration errors name the missing or invalid variable, and that an already-bound port fails startup with a message naming that port in `apps/api/src/config/__tests__/config.spec.ts` (FR-009)
 - [ ] T023 [P] Write FAILING integration test asserting a thrown error inside the unit of work rolls back every write in `apps/api/test/integration/unit-of-work.spec.ts`
 - [ ] T024 [P] Write FAILING integration test asserting the **idempotency guarantee** that two consecutive seed runs leave no duplicate permission, role template, or role-to-permission grant in `apps/api/test/integration/seed-idempotency.spec.ts` (distinct from T032, which proves what a single load's content must be)
-- [ ] T107 [P] Write FAILING unit test asserting the schema numeric-type checker rejects a sample schema containing a `Float` column and accepts one using `Decimal` with the documented precisions in `apps/api/scripts/__tests__/schema-numeric-types.spec.ts` (depends on T019, which must exist for the checker to have a real file to read; Constitution Principle IV)
-- [ ] T025 Create the configuration module with a validated environment schema that fails fast naming the offending variable, and surfaces a bound-port conflict as a startup error naming the port, in `apps/api/src/config/configuration.ts` and `apps/api/src/config/configuration.module.ts`
-- [ ] T026 Create the Prisma service lifecycle and the `AsyncLocalStorage` transaction unit of work in `apps/api/src/platform/prisma/prisma.service.ts` and `apps/api/src/platform/transaction/transaction.service.ts`
+- [X] T107 [P] Write FAILING unit test asserting the schema numeric-type checker rejects a sample schema containing a `Float` column and accepts one using `Decimal` with the documented precisions in `apps/api/scripts/__tests__/schema-numeric-types.spec.ts` (depends on T019, which must exist for the checker to have a real file to read; Constitution Principle IV)
+- [X] T025 Create the configuration module with a validated environment schema that fails fast naming the offending variable, and surfaces a bound-port conflict as a startup error naming the port, in `apps/api/src/config/configuration.ts` and `apps/api/src/config/configuration.module.ts`
+- [X] T026 Create the Prisma service lifecycle and the `AsyncLocalStorage` transaction unit of work in `apps/api/src/platform/prisma/prisma.service.ts` and `apps/api/src/platform/transaction/transaction.service.ts`
 - [ ] T027 Create the idempotent seed entry point upserting on natural keys inside one transaction in `apps/api/prisma/seed.ts`
-- [ ] T110 Create the schema numeric-type checker that fails when `apps/api/prisma/schema.prisma` declares a `Float` column, and wire it into the lint command in `apps/api/scripts/check-schema-numeric-types.ts` and `package.json` (depends on T107; Constitution Principle IV — without it, a later feature can introduce floating-point storage undetected)
+- [X] T110 Create the schema numeric-type checker that fails when `apps/api/prisma/schema.prisma` declares a `Float` column, and wire it into the lint command in `apps/api/scripts/check-schema-numeric-types.ts` and `package.json` (depends on T107; Constitution Principle IV — without it, a later feature can introduce floating-point storage undetected)
 - [ ] T028 Create the application root module and bootstrap with the `/api/v1` prefix, global validation pipe, cookie parser, and shutdown hooks in `apps/api/src/app.module.ts` and `apps/api/src/main.ts`
 - [ ] T029 Run `npm run db:migrate`, `npm run db:seed`, and `npm test` to confirm the foundational tests now pass
 
