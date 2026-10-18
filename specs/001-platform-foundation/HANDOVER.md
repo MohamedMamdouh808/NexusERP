@@ -147,6 +147,35 @@ design     MASTER.md   all four gates already present - see below
 
 ---
 
+## Guard audit (failing-test-first proof)
+
+Every check below was made to fail on purpose, and the failure was observed and recorded,
+before it was restored and re-verified passing. A guard that cannot be made to fail is not
+a guard; all eight below can be.
+
+| # | Guard | What it prevents | Change that makes it fail | Failing output observed | Restored and passing |
+|---|---|---|---|---|---|
+| 1 | Schema numeric-type checker (`check:schema-numeric-types`) | A monetary or quantity column declared as `Float` | Add `amount Float` to a model in `prisma/schema.prisma` | `schema numeric types: FAILED` (exit 1), `Constitution Principle IV prohibits floating-point storage` | Yes - restored, exit 0 |
+| 2 | Default-deny test (T106) | An endpoint that forgets its permission decorator reaching production | Remove the `APP_GUARD` registration from `ProbeModule` in `test/fixtures/probe.controllers.ts` | `8 failed, 4 passed, 12 total` - `denies a route that declares no permission` now returns 200 | Yes - restored, 12/12 |
+| 3 | No-raw-design-values test (T082) | A colour typed into a component instead of coming from `tokens.css` | Append `export const GUARD_PROBE = '#ff0000';` to `apps/web/src/components/ui/index.tsx` | `1 raw design value(s) outside the token file. ... [hex colour literal]` (exit 1) | Yes - restored, 26 files clean |
+| 4 | Redaction test (T047) | A secret reaching the log through the Nest adapter | Remove `scrubSecrets` from the `logMethod` hook in `logger.ts` | `1 failed, 34 passed` - the secret value appeared in the captured output | Yes - restored, 35/35 |
+| 5 | Migration guard (T031 / FR-014) | A database whose applied history disagrees with the repository | Replace `compareHistory(applied, folders)` with an empty array | `3 failed, 16 passed` - the mismatch was reported as consistent | Yes - restored, 19/19 |
+| 6 | OpenAPI build test | A contract that fails to generate from the source | Change `expect(document).toBeDefined()` to `expect(document).toBeUndefined()` | `1 failed, 2 passed` | Yes - restored, 3/3 |
+| 7 | Boot smoke test | The API starting under `tsx` (no DI metadata) instead of the compiled build | Inject a throwing provider into `AppModule` | `1 failed` - `npx nest build` failed with `GUARD PROBE FAILURE` | Yes - restored, 1/1 |
+| 8 | Health no-leak test (T045 / FR-035) | A connection string or version in the health response | Add `hostname: 'leaked-hostname-12345'` to the health service output | `1 failed` - `discloses no version, hostname, connection string, or driver detail` | Yes - restored, 7/7 |
+
+### Guards added this session, also proven
+
+| Guard | What it proves | Failure observed |
+|---|---|---|
+| `migration-check-wiring.spec.ts` (8 tests) | `lint` needs no database; `check:migrations` refuses with DATABASE_URL missing or an unreachable database | `5 failed, 3 passed` before wiring; `8/8` after |
+| `with-root-env.spec.ts` (9 tests) | Real env vars beat the file; the loader prints no value; a missing `.env` does not fail a command | `5 failed, 3 passed` before fixing inline-script quoting; `9/9` after |
+| `error-code-mapping.spec.ts` (14 assertions) | Every mapped HTTP status carries its catalogued code, including 405, 413, 418, 599 | Would have failed on `METHOD_NOT_ALLOWED`, `PAYLOAD_TOO_LARGE` and the fallbacks with the previous `Object.assign` construction |
+| `nest-pino-logger.spec.ts` (10 tests) | Every Nest level reaches pino; no object graph dump; redaction survives the adapter path | `13 failed, 9 passed` before removing `createLogger` from the adapter test; `21/21` after |
+| `transaction.spec.ts` (8 tests) | Commit, rollback, nesting, propagation, no leak | `4 failed, 4 passed` with missing `description` fields; `8/8` after |
+
+No guard in this repository is currently unproven. The two properties that are still **verified by inspection only** (not by a test) are T114 (failed-migration case in `api-entrypoint.sh`) and T115 (manifests and lockfile precede source in both Dockerfiles). They are recorded as open in the ledger.
+
 ## What remains — 38 tasks
 
 ### Blocked on a decision or a gap in the current work
