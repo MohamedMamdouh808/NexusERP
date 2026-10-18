@@ -1,0 +1,79 @@
+/*
+ * Design tokens - the single value source for the web interface (T083).
+ *
+ * Transcribed from design-system/nexuserp/MASTER.md. This file is the ONLY place
+ * under apps/web/src permitted to contain a raw design value: a hex colour, a raw
+ * px/rem measure, or a shadow literal. Every component reads these custom
+ * properties through var(), and `scripts/check-no-raw-design-values.ts` (T082)
+ * enforces that by failing on a raw value anywhere else.
+ *
+ * Adding a value here without adding it to MASTER.md is a bug: the design system
+ * is the source of truth, not this transcription of it.
+ *
+ * The token names are deliberately Tailwind 4 theme namespaces (--color-*,
+ * --spacing-*, --font-*, --shadow-*), so `app.css` can register them as a theme
+ * without renaming anything (see T084 and research.md R-014).
+ */
+
+:root {
+  /* Colour palette (MASTER.md "Color Palette") */
+  --color-primary: #1e40af;
+  --color-on-primary: #ffffff;
+  --color-secondary: #3b82f6;
+  --color-on-secondary: #000000;
+  --color-accent: #d97706;
+  --color-on-accent: #000000;
+  --color-background: #f8fafc;
+  --color-foreground: #1e3a8a;
+  --color-card: #ffffff;
+  --color-card-foreground: #1e3a8a;
+  --color-muted: #e9eef6;
+  --color-muted-foreground: #475569;
+  --color-border: #dbeafe;
+  --color-destructive: #dc2626;
+  --color-on-destructive: #ffffff;
+  --color-ring: #1e40af;
+
+  /*
+   * Form controls only - never cards or dividers. Carries a minimum 3:1 contrast
+   * ratio against --color-card (4.76:1) and --color-background (4.56:1).
+   */
+  --color-input-border: #64748b;
+
+  /* Semantic status tokens (MASTER.md "Semantic Status Tokens") */
+  --color-success: #15803d;
+  --color-on-success: #ffffff;
+  --color-success-tint: #dcfce7;
+  --color-warning: #b45309;
+  --color-on-warning: #ffffff;
+  --color-warning-tint: #fef3c7;
+  --color-info: #1d4ed8;
+  --color-on-info: #ffffff;
+  --color-info-tint: #dbeafe;
+  --color-destructive-tint: #fee2e2;
+  --color-on-destructive-tint: #b91c1c;
+  --color-neutral-tint: var(--color-muted);
+
+  /* Typography (MASTER.md "Typography") */
+  --font-ui: "Fira Sans", system-ui, sans-serif;
+  --font-mono: "Fira Code", ui-monospace, monospace;
+
+  /* Spacing scale (MASTER.md "Spacing Variables") */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
+
+  /* Shadow depths (MASTER.md "Shadow Depths") */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+
+  /* Shell geometry (MASTER.md "Page Pattern" .app-shell) */
+  --shell-sidebar-width: 256px;
+  --shell-topbar-height: 64px;
+}

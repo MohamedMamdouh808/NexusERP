@@ -1,0 +1,333 @@
+/*
+ * Theme bridge and shell styles (T084).
+ *
+ * Two jobs, in this order:
+ *
+ *  1. Register the tokens from tokens.css as a Tailwind 4 theme, so utility
+ *     classes resolve to the design system rather than to a private palette
+ *     (research.md R-014). `theme(inline)` keeps the value as a var() reference
+ *     instead of copying it, so there is exactly one place a colour is written.
+ *
+ *  2. Express the shell from MASTER.md "Page Pattern" as the documented class
+ *     names. The design system publishes .app-shell, .app-shell__topbar,
+ *     .app-shell__sidebar and .app-shell__content, and the implementation uses
+ *     those names rather than inventing a parallel vocabulary.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+
+@import 'tailwindcss';
+@import './tokens.css' theme(inline);
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body,
+  input,
+  select,
+  textarea,
+  button {
+    font-family: var(--font-ui);
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  /* Keyboard operation needs a visible focus ring on every control (T102). */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Identifiers and figures use the monospace face (MASTER.md "Font Usage Rules"). */
+.mono,
+.sku,
+.doc-number,
+.numeric-cell {
+  font-family: var(--font-mono);
+}
+
+.numeric-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-areas:
+    'topbar topbar'
+    'sidebar content';
+  grid-template-columns: var(--shell-sidebar-width) 1fr;
+  grid-template-rows: var(--shell-topbar-height) 1fr;
+  height: 100vh;
+  background: var(--color-background);
+}
+
+.app-shell__topbar {
+  grid-area: topbar;
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--spacing-lg);
+}
+
+.app-shell__sidebar {
+  grid-area: sidebar;
+  background: var(--color-card);
+  border-right: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  overflow-y: auto;
+  padding: var(--spacing-md);
+}
+
+.app-shell__content {
+  grid-area: content;
+  overflow-y: auto;
+  padding: var(--spacing-xl);
+}
+
+/* Sidebar navigation. The active item carries --color-primary plus
+   aria-current="page" (MASTER.md "Page Pattern"). */
+.sidebar-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.sidebar-nav__group-label {
+  padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-xs);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+.sidebar-nav__link {
+  display: block;
+  padding: var(--spacing-sm) var(--spacing-sm);
+  border-radius: 6px;
+  color: var(--color-foreground);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.sidebar-nav__link:hover {
+  background: var(--color-muted);
+}
+
+.sidebar-nav__link[aria-current='page'] {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: 600;
+}
+
+/* A control that is deliberately inert - the organization and user placeholders.
+   Rendered as a labelled status, not as a button that would appear to work. */
+.shell-placeholder {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px dashed var(--color-input-border);
+  border-radius: 6px;
+  color: var(--color-muted-foreground);
+  font-size: 0.875rem;
+}
+
+.shell-placeholder__label {
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+/* Visually hidden but available to assistive technology. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.card {
+  background: var(--color-card);
+  color: var(--color-card-foreground);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-lg);
+}
+
+.card__title {
+  margin: 0 0 var(--spacing-md);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+/* Status badge. The tone attribute selects a token pair from MASTER.md
+   "Status Badge Mapping"; the anti-pattern list forbids using
+   --color-destructive as badge text on a tint. */
+.badge {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.badge[data-tone='success'] {
+  background: var(--color-success-tint);
+  color: var(--color-success);
+}
+
+.badge[data-tone='warning'] {
+  background: var(--color-warning-tint);
+  color: var(--color-warning);
+}
+
+.badge[data-tone='info'] {
+  background: var(--color-info-tint);
+  color: var(--color-info);
+}
+
+.badge[data-tone='neutral'] {
+  background: var(--color-neutral-tint);
+  color: var(--color-muted-foreground);
+}
+
+.badge[data-tone='destructive'] {
+  background: var(--color-destructive-tint);
+  color: var(--color-on-destructive-tint);
+}
+
+/* Skeleton: a pulsing bar shown while a request is in flight. */
+.skeleton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.skeleton__bar {
+  display: inline-block;
+  width: 12rem;
+  height: 1rem;
+  border-radius: 4px;
+  background: var(--color-muted);
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton__bar {
+    animation: none;
+  }
+}
+
+/* Top bar internals. */
+.top-bar__brand {
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--color-foreground);
+}
+
+.top-bar__placeholders {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* Health panel states. The failure state is deliberately quiet: it states what
+   happened and offers the identifier, without exposing a cause. */
+.health-panel__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.health-panel__checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.health-panel__check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.health-panel__check:last-child {
+  border-bottom: none;
+}
+
+.health-panel__error {
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-destructive);
+  border-radius: 8px;
+  background: var(--color-destructive-tint);
+  color: var(--color-on-destructive-tint);
+}
+
+.health-panel__retry-after {
+  font-weight: 600;
+}
+
+.health-panel__request-id {
+  margin-top: var(--spacing-sm);
+  font-size: 0.875rem;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-input-border);
+  border-radius: 6px;
+  background: var(--color-card);
+  color: var(--color-foreground);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button--primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
