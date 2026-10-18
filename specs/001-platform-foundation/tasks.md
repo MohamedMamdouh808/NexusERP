@@ -94,15 +94,15 @@ story work can begin until this phase is complete.
 - [X] T017 [P] Write FAILING unit test asserting every permission code is well formed and every role template's permissions exist in the catalog in `packages/shared/src/__tests__/permissions.spec.ts`
 - [X] T018 Build `packages/shared` with `tsc` and add it as a workspace dependency in `apps/api/package.json` and `apps/web/package.json`
 - [X] T019 Create the Prisma schema with `Permission`, `RoleTemplate`, and `RoleTemplatePermission` in `apps/api/prisma/schema.prisma` per `data-model.md`, with `code` and `key` unique and a composite primary key on the join; document the numeric conventions in a header comment — money `NUMERIC(14,2)`, unit price and unit cost `NUMERIC(14,4)`, quantity `NUMERIC(14,3)`, all mapped as `Prisma.Decimal`, with no monetary or quantity column permitted to use `Float` (verified by T107 and T108)
-- [ ] T020 Author the initial migration and `apps/api/prisma/migrations_lock.toml` in `apps/api/prisma/migrations/`
+- [X] T020 Author the initial migration and `apps/api/prisma/migrations_lock.toml` in `apps/api/prisma/migrations/`
 - [X] T021 Create the two-project Jest configuration and the database reset helper in `apps/api/jest.config.ts` and `apps/api/test/fixtures/database.ts`
 - [X] T022 [P] Write FAILING unit test asserting startup configuration errors name the missing or invalid variable, and that an already-bound port fails startup with a message naming that port in `apps/api/src/config/__tests__/config.spec.ts` (FR-009)
-- [ ] T023 [P] Write FAILING integration test asserting a thrown error inside the unit of work rolls back every write in `apps/api/test/integration/unit-of-work.spec.ts`
-- [ ] T024 [P] Write FAILING integration test asserting the **idempotency guarantee** that two consecutive seed runs leave no duplicate permission, role template, or role-to-permission grant in `apps/api/test/integration/seed-idempotency.spec.ts` (distinct from T032, which proves what a single load's content must be)
+- [X] T023 [P] Write FAILING integration test asserting a thrown error inside the unit of work rolls back every write in `apps/api/test/integration/unit-of-work.spec.ts`
+- [X] T024 [P] Write FAILING integration test asserting the **idempotency guarantee** that two consecutive seed runs leave no duplicate permission, role template, or role-to-permission grant in `apps/api/test/integration/seed-idempotency.spec.ts` (distinct from T032, which proves what a single load's content must be)
 - [X] T107 [P] Write FAILING unit test asserting the schema numeric-type checker rejects a sample schema containing a `Float` column and accepts one using `Decimal` with the documented precisions in `apps/api/scripts/__tests__/schema-numeric-types.spec.ts` (depends on T019, which must exist for the checker to have a real file to read; Constitution Principle IV)
 - [X] T025 Create the configuration module with a validated environment schema that fails fast naming the offending variable, and surfaces a bound-port conflict as a startup error naming the port, in `apps/api/src/config/configuration.ts` and `apps/api/src/config/configuration.module.ts`
 - [X] T026 Create the Prisma service lifecycle and the `AsyncLocalStorage` transaction unit of work in `apps/api/src/platform/prisma/prisma.service.ts` and `apps/api/src/platform/transaction/transaction.service.ts`
-- [ ] T027 Create the idempotent seed entry point upserting on natural keys inside one transaction in `apps/api/prisma/seed.ts`
+- [X] T027 Create the idempotent seed entry point upserting on natural keys inside one transaction in `apps/api/prisma/seed.ts`
 - [X] T110 Create the schema numeric-type checker that fails when `apps/api/prisma/schema.prisma` declares a `Float` column, and wire it into the lint command in `apps/api/scripts/check-schema-numeric-types.ts` and `package.json` (depends on T107; Constitution Principle IV — without it, a later feature can introduce floating-point storage undetected)
 - [X] T028 Create the application root module and bootstrap with the `/api/v1` prefix, global validation pipe, cookie parser, and shutdown hooks in `apps/api/src/app.module.ts` and `apps/api/src/main.ts`
 - [ ] T029 Run `npm run db:migrate`, `npm run db:seed`, and `npm test` to confirm the foundational tests now pass
@@ -125,18 +125,18 @@ templates are queryable. Deliverable value: a working, reproducible development 
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T030 [P] [US1] Write FAILING integration test asserting the migration history applies cleanly to an empty database, that re-applying it changes no data, that the applied history shows no drift from `apps/api/prisma/schema.prisma`, and that a named volume preserves existing rows across a re-run in `apps/api/test/integration/migrations-from-empty.spec.ts` (merged from the former T061; FR-006, FR-008, FR-012, FR-013, FR-048)
-- [ ] T031 [P] [US1] Write FAILING integration test asserting an out-of-order or missing migration history is refused and names the offending migration in `apps/api/test/integration/migrations-history.spec.ts`
-- [ ] T032 [P] [US1] Write FAILING integration test asserting the **content invariants** of the seed — exactly five role templates, every catalog permission granted by the administrator template, no duplicate grant within a template — in `apps/api/test/integration/seed-content.spec.ts` (distinct from T024, which proves the idempotency guarantee that repeated loads create nothing twice)
+- [X] T030 [P] [US1] Write FAILING integration test asserting the migration history applies cleanly to an empty database, that re-applying it changes no data, that the applied history shows no drift from `apps/api/prisma/schema.prisma`, and that a named volume preserves existing rows across a re-run in `apps/api/test/integration/migrations-from-empty.spec.ts` (merged from the former T061; FR-006, FR-008, FR-012, FR-013, FR-048)
+- [X] T031 [P] [US1] Write FAILING integration test asserting an out-of-order or missing migration history is refused and names the offending migration in `apps/api/test/integration/migrations-history.spec.ts`
+- [X] T032 [P] [US1] Write FAILING integration test asserting the **content invariants** of the seed — exactly five role templates, every catalog permission granted by the administrator template, no duplicate grant within a template — in `apps/api/test/integration/seed-content.spec.ts` (distinct from T024, which proves the idempotency guarantee that repeated loads create nothing twice)
 
 ### Implementation for User Story 1
 
-- [ ] T033 [P] [US1] Create the multi-stage service image that installs with the lockfile, builds, and runs migrations before serving in `docker/api.Dockerfile`
+- [X] T033 [P] [US1] Create the multi-stage service image that installs with the lockfile, builds, and runs migrations before serving in `docker/api.Dockerfile`
 - [ ] T034 [P] [US1] Create the multi-stage web image that builds static assets and serves them in `docker/web.Dockerfile`
-- [ ] T035 [US1] Create the Compose environment with a healthchecked database pinned to the same PostgreSQL major version used in production, a named volume so data survives a re-run, a service gated on database health, and the web app in `docker-compose.yml` (FR-006, FR-007, FR-008)
+- [X] T035 [US1] Create the Compose environment with a healthchecked database pinned to the same PostgreSQL major version used in production, a named volume so data survives a re-run, a service gated on database health, and the web app in `docker-compose.yml` (FR-006, FR-007, FR-008)
 - [ ] T036 [US1] Add the database, seed, development, and build scripts to `package.json` so migrations and seeding run as documented commands
 - [ ] T037 [P] [US1] Configure the development server to proxy `/api` to the service in `apps/web/vite.config.ts`
-- [ ] T038 [US1] Wire the Compose services so `docker compose up -d --wait` returns only after all three report healthy in `docker-compose.yml` (depends on T035)
+- [X] T038 [US1] Wire the Compose services so `docker compose up -d --wait` returns only after all three report healthy in `docker-compose.yml` (depends on T035)
 - [ ] T039 [US1] Document the one-command startup, every available command, and the failure modes in `README.md`
 
 **Checkpoint**: A clean checkout reaches a running environment with one command; re-running it
@@ -157,17 +157,17 @@ API behavior.
 
 ### Tests for User Story 2 (MANDATORY - write first, observe failure) ⚠️
 
-- [ ] T040 [P] [US2] Write FAILING integration test asserting every failing response carries exactly code, message, details, and request identifier, that a validation failure carries a dotted path naming the offending field, and that an internal-error message includes the request identifier in `apps/api/test/integration/error-envelope.spec.ts` (FR-021, FR-023, FR-024, FR-031)
-- [ ] T041 [P] [US2] Write FAILING integration test asserting no error response contains a stack trace, file path, query, hostname, or driver version in `apps/api/test/integration/error-leakage.spec.ts`
-- [ ] T042 [P] [US2] Write FAILING integration test asserting a supplied request identifier is echoed, an absent one is generated, and a malformed one is replaced rather than rejected in `apps/api/test/integration/request-id.spec.ts`
-- [ ] T043 [P] [US2] Write FAILING integration test asserting the envelope identifier matches the `x-request-id` response header in `apps/api/test/integration/request-id-correlation.spec.ts`
-- [ ] T044 [P] [US2] Write FAILING integration test asserting health reports healthy with a reachable database and 503 in the envelope when the database is stopped mid-run in `apps/api/test/integration/health.spec.ts`
-- [ ] T045 [P] [US2] Write FAILING integration test asserting health fails closed when a check cannot be measured and leaks no version, hostname, or connection string in `apps/api/test/integration/health-fail-closed.spec.ts`
-- [ ] T046 [P] [US2] Write FAILING integration test asserting request handling and the failure path produce zero outbound calls to any third party in `apps/api/test/integration/no-third-party-egress.spec.ts`
+- [X] T040 [P] [US2] Write FAILING integration test asserting every failing response carries exactly code, message, details, and request identifier, that a validation failure carries a dotted path naming the offending field, and that an internal-error message includes the request identifier in `apps/api/test/integration/error-envelope.spec.ts` (FR-021, FR-023, FR-024, FR-031)
+- [X] T041 [P] [US2] Write FAILING integration test asserting no error response contains a stack trace, file path, query, hostname, or driver version in `apps/api/test/integration/error-leakage.spec.ts`
+- [X] T042 [P] [US2] Write FAILING integration test asserting a supplied request identifier is echoed, an absent one is generated, and a malformed one is replaced rather than rejected in `apps/api/test/integration/request-id.spec.ts`
+- [X] T043 [P] [US2] Write FAILING integration test asserting the envelope identifier matches the `x-request-id` response header in `apps/api/test/integration/request-id-correlation.spec.ts`
+- [X] T044 [P] [US2] Write FAILING integration test asserting health reports healthy with a reachable database and 503 in the envelope when the database is stopped mid-run in `apps/api/test/integration/health.spec.ts`
+- [X] T045 [P] [US2] Write FAILING integration test asserting health fails closed when a check cannot be measured and leaks no version, hostname, or connection string in `apps/api/test/integration/health-fail-closed.spec.ts`
+- [X] T046 [P] [US2] Write FAILING integration test asserting request handling and the failure path produce zero outbound calls to any third party in `apps/api/test/integration/no-third-party-egress.spec.ts`
 - [X] T047 [P] [US2] Write FAILING unit test asserting passwords, tokens, cookies, and secrets never appear in log output in `apps/api/src/common/logging/__tests__/redaction.spec.ts`
 - [X] T048 [P] [US2] Write FAILING unit test asserting each request log record carries the identifier, route, status, and elapsed time in `apps/api/src/common/logging/__tests__/request-log-record.spec.ts`
 - [ ] T049 [P] [US2] Write FAILING unit test asserting a rate-limit response is renderable from the standard shape alone, including `Retry-After`, in `apps/web/src/lib/__tests__/api-client.spec.ts`
-- [ ] T106 [P] [US2] Write FAILING integration test asserting an endpoint that declares no permission is denied with 403 by default, and that `GET /api/v1/health` is reachable only because it carries an explicit public marker — removing that marker must make the health route return 403 in `apps/api/test/integration/default-deny.spec.ts` (depends on T055 and T056, so it is written as soon as the decorator and guard exist; Constitution Principle II requires an undeclared endpoint to fail the suite)
+- [X] T106 [P] [US2] Write FAILING integration test asserting an endpoint that declares no permission is denied with 403 by default, and that `GET /api/v1/health` is reachable only because it carries an explicit public marker — removing that marker must make the health route return 403 in `apps/api/test/integration/default-deny.spec.ts` (depends on T055 and T056, so it is written as soon as the decorator and guard exist; Constitution Principle II requires an undeclared endpoint to fail the suite)
 
 ### Implementation for User Story 2
 
@@ -220,7 +220,7 @@ Deliverable value: a merge gate nobody can bypass.
 - [ ] T073 [US3] Create the image build job that builds both images without publishing them in `.github/workflows/ci.yml`
 - [ ] T109 [P] [US3] Install dependencies in every pipeline job with `npm ci --frozen-lockfile`, and add a check that `package-lock.json` is committed and is byte-identical after each install in `.github/workflows/ci.yml` (FR-049; depends on T067 through T073 — the jobs it modifies must exist first)
 - [ ] T111 [P] [US3] Write FAILING test asserting registry and release semantics rather than raw substrings, in `.github/workflows/__tests__/ci-no-deploy.spec.ts`: the workflow MUST contain no step that pushes an image to a registry (no `docker push`, no registry login step, no build-and-push action with push enabled), no job named or behaving as deploy or release, and no output of a deployed environment URL; building an image without pushing it, `actions/checkout`, and cache steps MUST pass. The same test MUST assert that a skipped integration job fails the pipeline (depends on T067 through T073 — the workflow definition must exist first; SC-011, SC-019)
-- [ ] T108 [US3] Run the built service image in a clean environment configured only from `.env.example`, confirm it starts, and confirm `GET /api/v1/health` responds, in `.github/workflows/ci.yml` or a local script under `scripts/verify-image-portability.sh` (SC-020, depends on T073)
+- [X] T108 [US3] Run the built service image in a clean environment configured only from `.env.example`, confirm it starts, and confirm `GET /api/v1/health` responds, in `.github/workflows/ci.yml` or a local script under `scripts/verify-image-portability.sh` (SC-020, depends on T073)
 - [ ] T074 [US3] Declare the mandatory checks as required status checks and document the setup in `README.md`
 - [ ] T075 [US3] Verify each mandatory check fails when deliberately broken and passes when fixed, recording the result in `README.md`
 

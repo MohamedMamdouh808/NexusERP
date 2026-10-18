@@ -1,129 +1,250 @@
 # Handover: Platform Foundation — implementation status
 
 **Feature**: 001-platform-foundation
-**Written**: 2026-10-18, mid-implementation
+**Updated**: 2026-10-18 (session 2, after the Docker reinstall)
 **Branch**: `001-platform-foundation`
+**Ledger**: **54 of 110 tasks verified** in this session
 
-## What was blocked, and why this document exists
+## What changed since the last session
 
-Implementation ran with this machine's toolchain, which cannot execute roughly a quarter of
-the task list. No task was marked complete that was not actually run.
+Nothing from the failed session was trusted. Every previously checked task was reset to
+unchecked and re-executed from a clean state. This session also found four problems the failed
+session had masked.
 
-| Requirement | State on this machine |
-|---|---|
-| Node.js | v22.13.0 — the plan pins Node 24 LTS |
-| npm registry | reachable |
-| Docker + Compose v2 | **not installed** |
-| Any container runtime | **not installed** |
-| PostgreSQL (client, server, or port 5432) | **not present** |
+### Pre-flight (mandatory, both passed)
 
-Consequence: the Docker image, Compose environment, pipeline, seed execution, migration
-execution, and every integration test are authored-or-not-yet, never verified. Everything
-verifiable on Node alone was implemented and verified.
-
-## Verified work — 35 of 110 tasks
-
-All of the following were executed and observed passing, not merely written.
-
-| Phase | Tasks | Verification evidence |
-|---|---|---|
-| 1 Setup | T001–T011 | `npm install` completed (908 packages); all three workspaces resolve; all binaries present on PATH |
-| 2 Foundational (part) | T012–T019, T021, T022, T107, T110, T025, T026 | see below |
-
-| Task | Verification |
-|---|---|
-| T012, T013, T014 | Shared contracts authored; exercised by 39 passing Vitest tests |
-| T015, T016, T017 | 39 tests pass in `packages/shared` |
-| T018 | `tsc` build produces `packages/shared/dist/index.js`; both workspaces depend on it |
-| T019 | `prisma validate` → "The schema at prisma\prisma\schema.prisma is valid"; `prisma generate` succeeds |
-| T021 | `jest --selectProjects unit` runs both configured projects |
-| T022 | 16 config tests pass, including the bound-port case that names the port |
-| T107 | 8 schema-checker tests pass |
-| T110 | Checker verified with **both** controls: injected `Float` → exit 1 with the offending line; valid `Decimal(14,3)` → exit 0 |
-| T025 | Config module implemented and covered by T022 |
-| T026 | PrismaService and TransactionService author; whole package type-checks with exit 0 |
-| T047, T048, T050, T051, T052, T054 | Unit-tested: redaction, log record, request-ID adopt/generate/sanitize, envelope classification, health fail-closed |
-| T053, T055, T056, T028 | Authored and type-check clean; their HTTP-level proofs (T040-T045, T106) are integration tests and remain blocked |
-
-### Defects the test-first discipline caught
-
-Two real bugs were found by writing the tests before the code, which is the intended
-behaviour of Constitution Principle V and worth recording:
-
-1. **The numeric-type checker rejected every approved precision.** It normalised to
-   `Decimal(14, 3)` while the allow-list held `Decimal(14,3)`. The earlier manual
-   negative-control check passed only because the real schema contains no decimal column
-   yet, so the bug was masked. T107 exposed it.
-2. **The decimal schema produced an unhelpful message for a JavaScript number.** Zod
-   reports a type mismatch before evaluating a pattern, so callers received
-   "Expected string, received number" and learned nothing about why the number was
-   refused. Fixed with `invalid_type_error`.
-
-## Not implemented — 75 tasks
-
-### Blocked on Docker or PostgreSQL (need an environment, not code)
-
-T020, T023, T024, T027, T030, T031, T032, T033, T034, T035, T038, T044, T045, T046, T059,
-T067–T075, T108, T109, T111, T104
-
-- **Every integration test** needs a live database (Constitution Principle V, FR-047).
-- **Migrations** (`T020`) — `prisma migrate dev` needs a shadow database. The schema is
-  valid and the client generates; only application to a database is outstanding. Migration
-  SQL can be produced without a database via `prisma migrate diff --from-empty
-  --to-schema-datamodel prisma/schema.prisma --script`.
-- **Docker, Compose, image builds** (T033–T035, T038, T108).
-- **Pipeline runs** (T067–T075, T109, T111) — the workflow YAML is not yet written.
-- **The seed was authored but never executed** (T027), so its idempotency guarantee is
-  unproven.
-
-### Not yet authored (no blocker, simply remaining work)
-
-T028, T029, T036, T037, T039, T040–T043, T047–T058, T062, T063–T066, T076–T094, T095–T103,
-T112
-
-The application bootstrap, the error envelope, request identifiers, structured logging,
-the health endpoint, the permission guard, the CI workflow, the web application shell, and
-the documentation all remain to be written.
-
-## Resume procedure
-
-```bash
-# 1. Install Docker Desktop (Compose v2) and start it.
-# 2. Confirm the toolchain
-node --version          # expect v22+; .nvmrc pins 24 for CI and images
-docker compose version
-
-# 3. Bring up the database
-docker compose up -d --wait db
-
-# 4. Complete Phase 2, then resume from Phase 3
-npm run db:migrate      # T020
-npm run db:seed         # T027, then verify T024 and T032
-npm run test:integration
+```
+docker version   -> client=29.8.2 server=29.8.2
+docker run --rm hello-world -> "Hello from Docker!"  exit 0
+docker compose version -> v5.6.0 (bundled)
 ```
 
-Node 22.13.0 is installed locally while `.nvmrc` and the Docker base image target Node 24.
-`engines` was set to `>=22.13.0` so local installation works; the discrepancy is
-deliberate and documented here. Align on Node 24 before the first pipeline run.
+Installed Docker only: `C:\Users\toshiba\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe`.
+The temporary standalone CLI and the `DOCKER_CONFIG` redirect are confirmed deleted, and no file
+in the repository references either. Nothing was downloaded this session.
 
-## Deliberate deviations from the plan
+---
 
-| Deviation | Reason |
+## Root cause of the previous session's failure
+
+The disk was full (`ENOSPC`). That, not a Docker defect, caused the layer-extraction error and the
+`Docker Desktop is unable to start` message. `vitest` had also been silently reporting
+"no tests" for the same reason — writing its cache failed. Disk now: C: 12 GB, D: 60 GB free.
+
+---
+
+## Verified this session — command and result
+
+| Task | Command | Result |
+|---|---|---|
+| T035 | `docker compose config -q` then `docker compose up -d --wait db` | Valid; `nexuserp-db` **Healthy**. `postgres:17-alpine` reports **PostgreSQL 17.11**, matching the pin's major version |
+| T038 | `docker compose up -d --wait db` | Returns only after `Container nexuserp-db Healthy` |
+| T020 | `docker compose down -v`, `up -d --wait db`, confirm **0 tables**, then `prisma migrate deploy` | `0` tables before; `Applying migration 20261018100057_init_reference_tables`; created `permissions`, `role_templates`, `role_template_permissions` |
+| T020 (repeat) | Full `down -v` / `up` / `deploy` cycle, twice | Identical result both times |
+| T030 | `prisma migrate deploy` again, then `prisma migrate diff --exit-code` | `No pending migrations to apply.` / `No difference detected.` exit **0** |
+| T031 | `npm run check:migration-history` | `1 migration folder(s) found`. Now **wired into `npm run lint`** — it was authored but not reachable from any script before |
+| T023 | Transaction unit-of-work integration tests | Rollback leaves row counts unchanged; a nested `runInTransaction` joins the outer transaction rather than opening a second commit boundary |
+| T024 / T027 | `npm run db:seed` run twice | `Seeded 25 permissions and 5 role templates`; `25 permissions, 5 role templates, 68 grants` after both runs |
+| T032 | Direct SQL invariants | `permissions 25 rows / 25 distinct code`; `role_templates 5 / 5 distinct key`; `role_template_permissions 68 rows / 68 distinct pairs` — **no duplicates**. `administrator` = 25 grants, `manager` = 22. `organization_id` columns = **0** |
+| T033 | `docker build -f docker/api.Dockerfile` | Built. Then proven against a **fresh** database: 0 tables → entrypoint logged `Applying migration` → 3 tables → health 200 |
+| T040–T043 | Error-envelope integration suite | Envelope has exactly four fields; `details` always an array; supplied id echoed, malformed id replaced, envelope id matches `x-request-id`; no `/app/`, `node_modules`, `at Object.`, or `postgresql://` in any body |
+| T044 | `node dist/main.js` + `GET /api/v1/health` | **HTTP 200** `{"status":"ok",...,"database":{"status":"ok","latencyMs":51}}` |
+| T045 | `docker compose stop db`, then request | **HTTP 503**, body captured (255 bytes): `{"code":"SERVICE_UNAVAILABLE","message":"The service is temporarily unavailable. Please try again shortly.","details":[{"field":null,"code":"CHECK_FAILED","message":"The database check is unavailable."}],"requestId":"..."}` |
+| T045 leakage | grep the 503 body | `postgresql://`, `localhost`, `127.0.0.1`, `5432`, `node_modules`, `PostgreSQL 17`, `prisma`, `.ts`, `stack`, `Error:`, `ECONNREFUSED` — **all absent**. Recovers to 200 when the database restarts |
+| T046 | Default-deny egress describe | Zero outbound calls on success and failure paths |
+| T106 | Default-deny spec | Undeclared route → 403; `@Public()` → 200; declared permission without a session → 403; non-catalog permission → 403; never 404 |
+| T108 | `sh scripts/verify-image-portability.sh nexuserp-api:portability` in **Git Bash** | **PASS**. Image started on an isolated network with a PostgreSQL container alongside it, configured only from `.env.example`; health returned `{"status":"ok",...,"database":{"status":"ok","latencyMs":2}}` |
+
+### Whole-suite results
+
+| Suite | Count |
 |---|---|
-| `engines.node = ">=22.13.0"` rather than pinned 24 | The local machine has Node 22.13.0. Pinning 24 would block `npm install` here. `.nvmrc` and the Docker image still target 24. |
-| `@nestjs/terminus` removed from dependencies | Research R-008 decided against it in favour of a hand-rolled health service, because its default payload leaks version and error detail that FR-035 forbids. The initial manifest included it by mistake. |
-| `ts-node` added as a dev dependency | Jest cannot parse `jest.config.ts` without it. |
-| API package authored as CommonJS, `packages/shared` as ESM | Jest's default runtime is CommonJS. The shared package remains ESM; a Jest `moduleNameMapper` strips its `.js` specifiers. `import.meta` is avoided in API code for the same reason. |
-| Dependency versions use caret ranges | Research R-018 asked for exact pins. With no ability to resolve-and-verify the full dependency tree offline, exact pins would be guesses. The committed `package-lock.json` provides the reproducibility FR-049 requires, and CI will verify the lockfile is unchanged after install. Tighten to exact pins once the tree is installed and green. |
-| `prisma` config still declared in `package.json` | Prisma 6 deprecates `package.json#prisma` in favour of `prisma.config.ts`. Migrating now would change how migrations are invoked — commands that cannot be tested without a database. Deferred deliberately rather than changed blind. |
+| Shared (`vitest`) | 3 files, 39 tests |
+| API unit (`jest --selectProjects unit`) | 6 suites, **78 tests** |
+| API integration (real PostgreSQL) | 5 suites, **48 tests** |
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors, exit 0 |
 
-## Notes for whoever resumes
+### Clean-state commands (all exit 0)
 
-- The Prisma schema currently contains **no decimal columns**; the three tables are global
-  reference data. The numeric-type checker is therefore proven by its unit tests and by
-  injected-schema controls, not by a real money column. It will be exercised for the first
-  time by the first business table.
-- `jest.config.ts` keeps `coverageThreshold` and `testTimeout` at the top level. Jest does
-  not accept them per project, despite `InitialProjectOptions` implying otherwise.
-- `maxWorkers` is likewise not a per-project option; integration serialisation is enforced
-  by `--runInBand` in the npm script instead.
+| Command | Result |
+|---|---|
+| `npm ci` | 921 packages installed from the committed lockfile |
+| `npx prisma generate` | Required after `npm ci` (see below) |
+| `npm run typecheck` | 0 errors |
+| `npm run lint` | 0 errors + numeric check + migration history guard |
+
+---
+
+## Four bugs found by executing rather than assuming
+
+### 1. `npm ci` silently breaks the type check
+
+After `npm ci`, `node_modules/.prisma` is gone, so every Prisma query is typed `any` and `tsc`
+reported **8 phantom errors** (`TS7006` implicit any, `TS2347` untyped call). `prisma generate`
+resolves all 8 with no code change. This will break CI the same way. Documented in `AGENTS.md`
+and `README.md`.
+
+### 2. Lint had never been run — 30 errors
+
+`npm run lint` had not been executed before. 30 violations across 20 files: a `jest.config.ts`
+parsing error (not in the tsconfig project), 12 unsafe enum comparisons in the exception filter,
+6 `require()` imports in an integration spec, 5 unused variables, 2 `require-await`, 2 unsafe
+calls, 1 unsafe member access, 1 unsafe return. All fixed; lint now exits 0.
+
+Two were worth fixing properly rather than suppressing:
+
+- `codeForStatus` now takes `HttpStatus` and the comparison uses `HttpStatus.INTERNAL_SERVER_ERROR`
+  instead of a bare `500`, so the switch is type-checked against the same enum.
+- `reference-data.spec.ts` no longer uses `require()`; it imports the migration-history helpers at
+  the top level, which is safe because that script guards its `main()` behind `invokedDirectly`.
+
+**A latent bug appeared en route:** the `require()` calls were hiding that the real
+`AppliedMigration` type requires `finished_at`, which the looser inline type annotation had
+omitted. The integration fixtures were asserting against a weaker shape than the code uses.
+
+### 3. T033 was marked done on an image that did not do what the task says
+
+The task requires the image to **run migrations before serving**. The Dockerfile's `CMD` was
+plain `node dist/main.js`, and a comment deferred migrations to compose — so the image alone, which
+is what a hosting platform receives, would have served against an empty database.
+
+Fixed by adding `docker/api-entrypoint.sh`, which runs `prisma migrate deploy` under `set -e` and
+then `exec node dist/main.js`. Proven against a fresh database: 0 tables → migration applied → 3
+tables → health 200. I had already ticked T033 and un-ticked it when I noticed.
+
+### 4. `docker-compose.yml` bound the database to every interface
+
+The comment promised "Bound to loopback only" but the mapping was `'${POSTGRES_HOST_PORT:-5432}:5432'`,
+which publishes on `0.0.0.0` and `[::]`. Changed to `127.0.0.1:...`; `docker compose ps` now shows
+`127.0.0.1:5432->5432/tcp`. Host port 5432 was free, so no override was needed.
+
+### Also fixed
+
+- `verify-image-portability.sh` never removed its ephemeral database container, had no readiness
+  wait before starting the API, and hardcoded credentials instead of reading `.env.example`.
+  All three fixed.
+- `check:migration-history` existed as a file but was not a script and was not in `lint`. Wired in.
+
+---
+
+## The two requested bugs and their tests
+
+### Bug A — `HealthReportDto.checks` circular reference
+
+**Test added:** `apps/api/src/common/dto/__tests__/openapi-document.spec.ts` — 3 tests that
+`compile()` the real `AppModule`, call `SwaggerModule.createDocument`, and assert the document
+builds, that `/api/v1/health` and both DTO schemas are present, and that `checks` resolves to a
+`$ref` on `DependencyChecksDto` rather than an inlined type. No port is opened, so it stays a unit
+test.
+
+**Honest caveat on "fails first":** I could **not** reproduce a red-to-green cycle for the original
+defect. The original self-referential code no longer exists, and my two attempts to recreate it —
+an inline intersection with an explicit `type:` decorator, and an inline intersection with no
+decorator at all — both built the document without error in this Swagger version. So I have
+demonstrated that the test catches a *schema-shape* regression, but not that it reproduces the
+original crash. Claiming otherwise would be false.
+
+The test did earn its keep immediately: it failed three separate times during authoring for reasons
+unrelated to the circular dependency — missing config, an incorrect `/api/v1/health` path (the
+global prefix is applied in `main.ts`, not in `AppModule`), and a wrong assertion about how
+`@nestjs/swagger` emits a `type: () => X` property (it wraps it in `allOf`, not a bare `$ref`).
+
+### Bug B — `tsx` breaks dependency injection
+
+**Verified mechanism.** The same probe, run both ways:
+
+| Boot method | `Reflect.getMetadata('design:paramtypes', PermissionGuard)` |
+|---|---|
+| `tsx` (esbuild) | `undefined` |
+| `tsc` / `nest build` | present |
+
+And observed behaviour: under `tsx` the process boots, logs
+`Nest application successfully started`, and **connects to the database** — but the port never
+answers a request. Under `node dist/main.js` the same endpoint returns 200.
+
+**Test added:** `apps/api/test/integration/boot-smoke.spec.ts` — runs `nest build`, asserts
+`dist/main.js` exists, spawns it on a dedicated port, polls `/api/v1/health`, and requires 200 with
+`status: "ok"`. It **fails** if the process exits before serving, and surfaces the captured stdout
+and stderr rather than timing out blindly.
+
+**Demonstrated failing:** with the fix in place the test passes. After removing the constructor
+parameter that `PermissionGuard` depends on — simulating an unresolvable injection — the test
+fails. Restored, it passes again.
+
+**Documented in** `README.md`, `specs/001-platform-foundation/quickstart.md` (new section, with
+the measurement table), and `AGENTS.md` (a new "Never run the API with `tsx`" section).
+
+**Script audit** — the permitted forms are confirmed and unchanged:
+
+| Script | Command | Verdict |
+|---|---|---|
+| `dev` | `nest start --watch` | ok |
+| `build` | `nest build` | ok |
+| `start` | `node dist/main.js` | ok |
+| `db:seed` | `tsx prisma/seed.ts` | ok — no DI container |
+| `check:schema-numeric-types` | `tsx scripts/check-schema-numeric-types.ts` | ok — no DI container |
+| `openapi:generate` | `tsx scripts/generate-openapi.ts` | **dangling** — the file does not exist yet (T089). When written it must build first and require `dist` |
+
+---
+
+## Still unchecked, with reasons
+
+| Task | Reason |
+|---|---|
+| **T034** | The web UI was never authored. `apps/web` contains only `eslint.config.mjs`, `package.json`, `tsconfig.json`, `vite.config.ts` — there is no `index.html`. `docker/web.Dockerfile` and `docker/static-server.mjs` exist but the build fails at `Could not resolve entry module "index.html"`. Blocked on T076–T088 |
+| T029, T036, T037, T039 | Not authored |
+| T047+ | See the task ledger |
+| T057–T066 | Web shell and API client, not authored |
+| T089–T094 | OpenAPI generation scripts; CI workflow |
+| T095–T105 | Documentation and remaining coverage |
+
+---
+
+## Still needs GitHub Actions to verify
+
+None of the following can be proven locally.
+
+| Check | What CI must run | Why local proof is insufficient |
+|---|---|---|
+| Lint | `npm ci && npm run lint` | Passes locally now; never run on a clean checkout |
+| Typecheck | `npm run typecheck` | Passes locally; must prove the `prisma generate` ordering in a fresh CI container |
+| Unit + integration | `npm test`, `npm run test:integration` with a `postgres:17-alpine` service container | Locally verified against Compose; CI must prove the service-container path |
+| Migration validation | `migrate deploy` from empty, re-apply, `migrate diff --exit-code`, `check:migration-history` | Verified locally against a Compose volume |
+| **Lockfile reproducibility (FR-049)** | `npm ci --frozen-lockfile` in **every** job | Never implemented |
+| **Contract drift (FR-044)** | Regenerate `openapi.json`, diff against the committed file, fail on difference | T089 not authored |
+| **Image build (FR-050)** | `docker build` both Dockerfiles | API passes locally; **web fails** until the UI exists |
+| **Image portability (SC-020)** | Run `verify-image-portability.sh` on a Linux runner | Passes locally in Git Bash |
+| **No deploy stage (SC-019)** | Assert the workflow has no registry push, deploy job, or environment URL | No workflow authored yet |
+| Required status checks (FR-051) | Repository settings | Not code |
+
+### Coverage
+
+`jest.config.ts` declares thresholds: **80%** for `src/common/`, `src/platform/` and `scripts/`
+(Constitution Principle V, SC-014), with global thresholds at 0 because `main.ts` and modules are
+excluded. These have **not** been run with `--coverage` in this session, so the 80% figure is
+configured but unproven. T059 remains unchecked on that basis.
+
+---
+
+## Disk hygiene (T-pruning requirement)
+
+`docker system df` before pruning:
+
+```
+Images        3   1   1.435GB   1.011GB reclaimable
+Local Volumes 4   1   192.1MB   143.7MB reclaimable
+Build Cache  38   0   3.21GB    3.21GB reclaimable
+```
+
+After `docker builder prune -af`, `docker image prune -f`, and removing the unused volumes:
+
+```
+Images        3   1   1.435GB
+Local Volumes 1   1   48.37MB   (the live nexuserp-postgres-data, preserved)
+Build Cache   0   0   0B
+```
+
+**3.21 GB of build cache and 143.7 MB of stale volumes reclaimed.** Three anonymous volumes left
+by the failed session were removed. No dangling images remained. The live database volume was
+preserved and the API image was kept so T108 remains reproducible.
