@@ -80,6 +80,10 @@ describe('health endpoint when the database is unreachable', () => {
     await context?.close();
   });
 
+  // Stopping and starting a real container is inherently slower than an in-process
+  // assertion: `docker compose stop db` must let PostgreSQL shut down cleanly before
+  // the port closes, and the restart afterwards waits for the healthcheck. The global
+  // 30s budget is right for every other test in the suite and wrong for this one.
   it('reports unhealthy in the standard envelope when the database is down (FR-034, FR-022)', async () => {
     const { execFileSync } = await import('node:child_process');
     const dockerPath =
@@ -115,9 +119,10 @@ describe('health endpoint when the database is unreachable', () => {
       });
       // Waits for the database to answer again before the suite continues, so a later
       // test cannot fail for a reason that has nothing to do with that test.
-      await waitForDatabase();
+await waitForDatabase();
     }
-  });
+  // Generous for the same reason: it owns the container stop AND the restart.
+  }, 300_000);
 
   it('recovers to healthy once the database is back', async () => {
     await waitForDatabase();
