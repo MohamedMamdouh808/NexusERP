@@ -83,6 +83,30 @@ export class CheckResultDto {
   status!: 'ok' | 'unavailable';
 }
 
+/**
+ * The database check, which additionally reports its round-trip time.
+ *
+ * A named class rather than an inline intersection type. The inline form
+ * (`CheckResultDto & { latencyMs: number }`) made Swagger's schema generator walk back into
+ * `CheckResultDto` and throw "A circular dependency has been detected (property key:
+ * \"checks\")" when the document is built. That failure only appears when
+ * `SwaggerModule.createDocument` runs - never in a unit test, an integration test, or
+ * `tsc` - so the app failed to start with no test failing.
+ */
+export class DatabaseCheckResultDto extends CheckResultDto {
+  @ApiProperty({ type: Number, description: 'Round-trip time of the database reachability query.' })
+  latencyMs!: number;
+}
+
+/** Every dependency, reported separately so a failure can be attributed. */
+export class DependencyChecksDto {
+  @ApiProperty({ type: () => CheckResultDto, description: 'The application process itself.' })
+  application!: CheckResultDto;
+
+  @ApiProperty({ type: () => DatabaseCheckResultDto, description: 'The PostgreSQL connection.' })
+  database!: DatabaseCheckResultDto;
+}
+
 /** The health report returned when the service is healthy. */
 export class HealthReportDto {
   @ApiProperty({ enum: ['ok'], description: 'Present only on a healthy response (HTTP 200).' })
@@ -92,14 +116,12 @@ export class HealthReportDto {
   uptimeSeconds!: number;
 
   @ApiProperty({
+    type: () => DependencyChecksDto,
     description: 'Each dependency reported separately, so a failure can be attributed.',
     example: {
       application: { status: 'ok' },
       database: { status: 'ok', latencyMs: 2 },
     },
   })
-  checks!: {
-    application: CheckResultDto;
-    database: CheckResultDto & { latencyMs: number };
-  };
+  checks!: DependencyChecksDto;
 }

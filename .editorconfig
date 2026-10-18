@@ -1,0 +1,28 @@
+# EditorConfig: consistent line endings and encoding across editors and tools.
+#
+# This exists mainly to stop Windows tooling from silently rewriting files as CRLF or
+# re-encoding them. Both problems have bitten this repository: PowerShell 5.1's default
+# ANSI round-trip corrupted multi-byte characters, and CRLF churn produced noisy diffs.
+#
+# .gitattributes enforces the same rules in the repository itself; this file covers
+# editors and tools that never touch git.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.md]
+# Trailing double-space is a hard line break in Markdown, so it must be preserved.
+trim_trailing_whitespace = false
+
+[*.{yml,yaml,json,prisma}]
+indent_size = 2
+
+[Makefile]
+indent_style = tab

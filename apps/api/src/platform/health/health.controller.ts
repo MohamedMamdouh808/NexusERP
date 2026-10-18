@@ -50,7 +50,7 @@ export class HealthController {
       'response has the same shape.',
     type: ErrorEnvelopeDto,
   })
-  async getHealth(@Res({ passthrough: true }) response: Response): Promise<HealthReportDto> {
+  async getHealth(@Res({ passthrough: true }) _response: Response): Promise<HealthReportDto> {
     const report = await this.health.check();
 
     if (!this.health.isHealthy(report)) {
@@ -60,7 +60,7 @@ export class HealthController {
         ERROR_CODES.SERVICE_UNAVAILABLE,
         Object.entries(report.checks)
           .filter(([, value]) => value.status !== 'ok')
-          .map(([check, value]) => ({
+          .map(([check]) => ({
             field: null,
             code: 'CHECK_FAILED',
             message: `The ${check} check is unavailable.`,

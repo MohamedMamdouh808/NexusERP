@@ -2,7 +2,6 @@ import { Writable } from 'node:stream';
 import { describe, expect, it } from '@jest/globals';
 import {
   REDACTION_PATHS,
-  SENSITIVE_FIELD_NAMES,
   buildRequestLogRecord,
   createLogger,
   scrubSecrets,
@@ -55,11 +54,128 @@ describe('scrubSecrets', () => {
     expect(scrubSecrets(null)).toBeNull();
   });
 
-  it('covers every credential field the product handles', () => {
-    for (const name of ['password', 'token', 'sessionToken', 'csrfToken', 'authorization', 'cookie']) {
-      expect(SENSITIVE_FIELD_NAMES).toContain(name);
-      expect(REDACTION_PATHS).toContain(name);
+  /**
+   * The required coverage set, asserted key by key.
+   *
+   * Written as an explicit table rather than a loop over SENSITIVE_FIELD_NAMES: a test
+   * derived from the implementation proves nothing, because deleting an entry would
+   * delete the assertion with it.
+   */
+  const REQUIRED_KEYS: readonly string[] = [
+    'password',
+    'passwordHash',
+    'token',
+    'accessToken',
+    'refreshToken',
+    'secret',
+    'apiKey',
+    'authorization',
+    'cookie',
+    'set-cookie',
+    'x-csrf-token',
+    'sessionId',
+    'sessionToken',
+    'sid',
+  ];
+
+  it.each(REQUIRED_KEYS)('redacts the required key %s at any depth', (key) => {
+    const scrubbed = scrubSecrets({ outer: { inner: { [key]: 'LEAK-ME' } } });
+    expect(JSON.stringify(scrubbed)).not.toContain('LEAK-ME');
+    expect((scrubbed as { outer: { inner: Record<string, unknown> } }).outer.inner[key]).toBe(
+      '[redacted]',
+    );
+  });
+
+  it('covers header-style spellings and casing variants', () => {
+    const variants = ['X-CSRF-Token', 'x_csrf_token', 'ApiKey', 'API_KEY', 'api-key', 'PASSWORD'];
+    for (const key of variants) {
+      const scrubbed = scrubSecrets({ [key]: 'VARIANT-SECRET' });
+      expect(JSON.stringify(scrubbed)).not.toContain('VARIANT-SECRET');
     }
+  });
+
+  it('redacts a credential-bearing header bag', () => {
+    const scrubbed = scrubSecrets({
+      req: {
+        headers: {
+          authorization: 'Bearer header-secret',
+          cookie: 'sid=header-cookie',
+          'x-csrf-token': 'header-csrf',
+          'user-agent': 'Mozilla/5.0',
+        },
+      },
+    });
+    const serialised = JSON.stringify(scrubbed);
+    expect(serialised).not.toContain('header-secret');
+    expect(serialised).not.toContain('header-cookie');
+    expect(serialised).not.toContain('header-csrf');
+    // A benign header survives: redaction that eats everything makes logs useless.
+    expect(serialised).toContain('Mozilla/5.0');
+  });
+});
+
+/**
+ * The scrubber must not mutate what it is given.
+ *
+ * A logger that redacted in place would corrupt the caller's object. The concrete harm:
+ * a request body whose password was redacted for the log would also have lost the password
+ * before any validation handler could read it, and a shared config object would be
+ * rewritten for the rest of the process. These tests prove the copy semantics rather than
+ * trusting the implementation to be non-destructive.
+ */
+describe('scrubSecrets does not mutate its input', () => {
+  it('leaves the original object exactly as it was', () => {
+    const original = {
+      password: 'original-secret',
+      nested: { token: 'original-token', keep: 'visible' },
+      list: [{ apiKey: 'original-key' }],
+    };
+    const snapshot = JSON.parse(JSON.stringify(original)) as unknown;
+
+    const scrubbed = scrubSecrets(original);
+
+    expect(original).toEqual(snapshot);
+    expect(original.password).toBe('original-secret');
+    expect(original.nested.token).toBe('original-token');
+    expect(original.list[0]?.apiKey).toBe('original-key');
+    // ...and the returned copy IS redacted.
+    expect(JSON.stringify(scrubbed)).not.toContain('original-secret');
+  });
+
+  it('does not mutate nested objects or arrays', () => {
+    const list = [{ password: 'a' }, { password: 'b' }];
+    const original = { items: list };
+    scrubSecrets(original);
+
+    expect(list).toHaveLength(2);
+    expect(list[0]?.password).toBe('a');
+    expect(list[1]?.password).toBe('b');
+    expect(original.items).toBe(list);
+  });
+
+  it('returns a new reference rather than the same object', () => {
+    const original = { password: 'x' };
+    const scrubbed = scrubSecrets(original);
+    expect(scrubbed).not.toBe(original);
+  });
+
+  it('throws no error on a deeply frozen object', () => {
+    // A frozen input is the strongest available proof that nothing is assigned to.
+    const original = Object.freeze({
+      password: 'frozen-secret',
+      nested: Object.freeze({ token: 'frozen-token' }),
+    });
+    expect(() => scrubSecrets(original)).not.toThrow();
+    expect(original.password).toBe('frozen-secret');
+    expect(original.nested.token).toBe('frozen-token');
+  });
+
+  it('leaves the original untouched when a later field is processed', () => {
+    const original: Record<string, unknown> = { keep: 'a' };
+    const scrubbed = scrubSecrets({ ...original, password: 'x' });
+    expect(original).toEqual({ keep: 'a' });
+    expect('password' in original).toBe(false);
+    expect((scrubbed as Record<string, unknown>).password).toBe('[redacted]');
   });
 });
 

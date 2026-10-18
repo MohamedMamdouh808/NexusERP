@@ -51,7 +51,7 @@ export class TransactionService {
       return work(ambient);
     }
 
-    return this.prisma.$transaction(async (tx) => this.storage.run(tx, () => work(tx)), {
+    return this.prisma.$transaction(async (tx: TransactionClient) => this.storage.run(tx, () => work(tx)), {
       // A transaction that runs longer than this is a bug, not a slow request; failing
       // is better than holding locks against concurrent stock mutations.
       timeout: 10_000,

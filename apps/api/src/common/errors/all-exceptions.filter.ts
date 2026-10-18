@@ -85,10 +85,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const { status, code, message, details } = this.classify(exception);
 
-    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+    if (status >= Number(HttpStatus.INTERNAL_SERVER_ERROR)) {
       // The stack lives here and ONLY here (FR-040). It is never returned.
+      const request = http.getRequest<{ url?: string }>();
       this.logger.error(
-        `${code} ${status} on ${http.getRequest()?.url ?? 'unknown route'}`,
+        `${code} ${status} on ${request?.url ?? 'unknown route'}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
     }
@@ -145,7 +146,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
   }
 
   /** Chooses the catalogued code that matches an HTTP status. */
-  private codeForStatus(status: number): ErrorCode {
+  private codeForStatus(status: HttpStatus): ErrorCode {
     switch (status) {
       case HttpStatus.BAD_REQUEST:
         return ERROR_CODES.VALIDATION_ERROR;
@@ -170,7 +171,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       case HttpStatus.SERVICE_UNAVAILABLE:
         return ERROR_CODES.SERVICE_UNAVAILABLE;
       default:
-        return status >= 500 ? ERROR_CODES.INTERNAL_ERROR : ERROR_CODES.CONFLICT;
+        return status >= HttpStatus.INTERNAL_SERVER_ERROR
+          ? ERROR_CODES.INTERNAL_ERROR
+          : ERROR_CODES.CONFLICT;
     }
   }
 

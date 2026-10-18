@@ -52,8 +52,11 @@ function assertCatalogIsWellFormed(): void {
   }
 }
 
-async function upsertPermission(permission: PermissionDefinition): Promise<string> {
-  const record = await prisma.permission.upsert({
+async function upsertPermission(
+  target: PrismaClient,
+  permission: PermissionDefinition,
+): Promise<string> {
+  const record = await target.permission.upsert({
     where: { code: permission.code },
     update: {
       module: permission.module,
@@ -69,10 +72,11 @@ async function upsertPermission(permission: PermissionDefinition): Promise<strin
 }
 
 async function upsertRoleTemplate(
+  target: PrismaClient,
   role: RoleTemplateDefinition,
   permissionIdByCode: ReadonlyMap<string, string>,
 ): Promise<string> {
-  const record = await prisma.roleTemplate.upsert({
+  const record = await target.roleTemplate.upsert({
     where: { key: role.key },
     update: {
       name: role.name,
@@ -94,7 +98,7 @@ async function upsertRoleTemplate(
     if (!permissionId) {
       throw new Error(`Permission "${code}" granted by "${role.key}" was not loaded.`);
     }
-    await prisma.roleTemplatePermission.upsert({
+    await target.roleTemplatePermission.upsert({
       where: {
         roleTemplateId_permissionId: { roleTemplateId: record.id, permissionId },
       },
@@ -106,42 +110,69 @@ async function upsertRoleTemplate(
   return record.id;
 }
 
-async function main(): Promise<void> {
+/**
+ * Loads the reference catalog. Safe to call repeatedly.
+ *
+ * Exported so an integration test can seed the SAME code path in-process, rather than
+ * spawning `npx tsx prisma/seed.ts` as a subprocess. Running the identical function is
+ * what makes the idempotency test meaningful: a test that exercised a copy of the logic
+ * would prove nothing about the script that ships.
+ */
+export async function seed(target: PrismaClient = prisma): Promise<SeedSummary> {
   assertCatalogIsWellFormed();
 
   // One transaction: a partial seed is impossible (Constitution Principle III).
-  await prisma.$transaction(async (tx) => {
+  await target.$transaction(async () => {
     const permissionIdByCode = new Map<string, string>();
 
     for (const permission of PERMISSION_CATALOG) {
-      permissionIdByCode.set(permission.code, await upsertPermission(permission));
+      permissionIdByCode.set(permission.code, await upsertPermission(target, permission));
     }
 
     for (const role of ROLE_TEMPLATES) {
-      await upsertRoleTemplate(role, permissionIdByCode);
+      await upsertRoleTemplate(target, role, permissionIdByCode);
     }
-
-    console.log(
-      `Seeded ${PERMISSION_CATALOG.length} permissions and ${ROLE_TEMPLATES.length} role templates.`,
-    );
   });
 
   const [permissionCount, roleCount, grantCount] = await Promise.all([
-    prisma.permission.count(),
-    prisma.roleTemplate.count(),
-    prisma.roleTemplatePermission.count(),
+    target.permission.count(),
+    target.roleTemplate.count(),
+    target.roleTemplatePermission.count(),
   ]);
+
+  return { permissionCount, roleCount, grantCount };
+}
+
+export interface SeedSummary {
+  permissionCount: number;
+  roleCount: number;
+  grantCount: number;
+}
+
+async function main(): Promise<void> {
+  const summary = await seed();
   console.log(
-    `Reference data now contains ${permissionCount} permissions, ${roleCount} role templates, ` +
-      `and ${grantCount} grants.`,
+    `Seeded ${PERMISSION_CATALOG.length} permissions and ${ROLE_TEMPLATES.length} role templates.`,
+  );
+  console.log(
+    `Reference data now contains ${summary.permissionCount} permissions, ` +
+      `${summary.roleCount} role templates, and ${summary.grantCount} grants.`,
   );
 }
 
-main()
-  .catch((error: unknown) => {
-    console.error('Seeding failed:', error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  })
-  .finally(() => {
-    void prisma.$disconnect();
-  });
+// Only run when invoked directly. Importing this module from a test must NOT seed.
+const invokedDirectly = (() => {
+  const entry = process.argv[1] ?? '';
+  return entry.endsWith('seed.ts') || entry.endsWith('seed.js');
+})();
+
+if (invokedDirectly) {
+  main()
+    .catch((error: unknown) => {
+      console.error('Seeding failed:', error instanceof Error ? error.message : error);
+      process.exitCode = 1;
+    })
+    .finally(() => {
+      void prisma.$disconnect();
+    });
+}

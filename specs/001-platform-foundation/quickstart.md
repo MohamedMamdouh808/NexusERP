@@ -79,6 +79,39 @@ npm run dev
 
 `npm run dev` starts the service and the web app together with hot reload.
 
+### Never start the API with `tsx`
+
+**The API must always be started from compiled output. `npx tsx src/main.ts` is forbidden.**
+
+`tsx` transpiles through esbuild, which does **not** emit `design:parammetadata` — the
+`design:paramtypes` decorator metadata Nest uses to resolve constructor injection. Verified on
+this machine:
+
+| Boot method | `Reflect.getMetadata('design:paramtypes', PermissionGuard)` | Serves requests |
+|---|---|---|
+| `tsx` (esbuild) | `undefined` | No — the port never answers |
+| `tsc` / `nest build` | present | Yes, HTTP 200 |
+
+Because the metadata is absent, `Reflector` arrives as `undefined` inside the permission guard and
+the process fails at request time rather than at boot time. The failure is easy to misdiagnose,
+because everything else still looks healthy: `tsc` is clean, the unit tests pass, the integration
+tests pass, the application logs `Nest application successfully started`, and the database connects.
+Only the request handling is broken.
+
+Only these three forms are permitted:
+
+| Script | Command |
+|---|---|
+| `npm run dev` | `nest start --watch` |
+| `npm run build` | `nest build` |
+| `npm start` | `node dist/main.js` |
+
+`tsx` remains correct for the two scripts that construct **no** Nest DI container — the seed
+(`tsx prisma/seed.ts`) and the schema checker (`tsx scripts/check-schema-numeric-types.ts`). Any
+future script that boots the application, including OpenAPI generation, must build first and
+require `dist`. `test/integration/boot-smoke.spec.ts` enforces this by running `nest build`,
+launching `node dist/main.js`, and asserting a real request returns 200.
+
 ---
 
 ## Commands

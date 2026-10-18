@@ -1,6 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import { execFileSync } from 'node:child_process';
-import { join } from 'node:path';
+
+
+/** npx is 
+px.cmd on Windows and is not spawnable as a bare name. */
+export function npxCommand(): string { return process.platform === 'win32' ? 'npx.cmd' : 'npx'; }
 
 /**
  * Database helpers for integration tests.
@@ -43,7 +47,8 @@ export async function disconnectTestPrisma(): Promise<void> {
  */
 export function applyMigrations(): void {
   const apiRoot = '.';
-  execFileSync('npx', ['prisma', 'migrate', 'deploy'], {
+  execFileSync(npxCommand(), ['prisma', 'migrate', 'deploy'], {
+    shell: true,
     cwd: apiRoot,
     stdio: 'inherit',
     env: { ...process.env },
@@ -67,12 +72,16 @@ export async function resetDatabase(): Promise<void> {
   `);
 }
 
-/** Loads the reference catalog into the test database. Safe to call repeatedly. */
+/**
+ * Loads the reference catalog into the test database. Safe to call repeatedly.
+ *
+ * Calls the SHIPPED seed function in-process rather than spawning `npx tsx prisma/seed.ts`.
+ * Running the identical code path is what makes the idempotency test meaningful, and it
+ * avoids a subprocess per assertion. It also removes a dependency on `npx` being spawnable,
+ * which it is not on Windows without an explicit shell - a real portability bug that this
+ * test would otherwise have been blamed for.
+ */
 export async function seedTestDatabase(): Promise<void> {
-  const apiRoot = '.';
-  execFileSync('npx', ['tsx', 'prisma/seed.ts'], {
-    cwd: apiRoot,
-    stdio: 'inherit',
-    env: { ...process.env },
-  });
+  const { seed } = await import('../../prisma/seed');
+  await seed(getTestPrisma());
 }

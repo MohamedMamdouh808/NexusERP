@@ -23,22 +23,67 @@ import { getRequestContext } from './request-context';
  * at each call site - there is no call site to forget. It covers credential material by
  * name rather than by value, because a value-based rule would need to know every secret
  * in advance.
+ *
+ * Matching is case-insensitive AND separator-insensitive (see `normalizeKey`), so
+ * `apiKey`, `api_key`, `api-key`, and `APIKEY` are all covered by one entry, and the
+ * `x-csrf-token` header is covered by listing it. Without that, a variant is one missed
+ * entry away from being written to the log in plaintext.
+ *
+ * Deliberately NOT listed: a bare `session`. A field named `session` is often benign
+ * diagnostic state, and over-redaction destroys diagnosability. Session IDENTIFIERS
+ * (`sessionId`, `sessionToken`, `sid`) are listed, which is what actually leaks.
  */
 export const SENSITIVE_FIELD_NAMES: readonly string[] = [
+  // Passwords
   'password',
   'passwordHash',
   'newPassword',
   'currentPassword',
+  'passphrase',
+
+  // Generic secret material
+  'secret',
+  'clientSecret',
+  'privateKey',
+
+  // Tokens
   'token',
   'accessToken',
   'refreshToken',
   'idempotencyKey',
+  'bearerToken',
+
+  // API keys
+  'apiKey',
+  'x-api-key',
+
+  // CSRF: the body field and the header name are different keys
   'csrfToken',
+  'x-csrf-token',
+  'csrf-token',
+
+  // Session identifiers
+  'sessionId',
   'sessionToken',
+  'sid',
+
+  // Authorization material
   'authorization',
+  'proxy-authorization',
   'cookie',
   'set-cookie',
 ];
+
+/**
+ * Case- and separator-insensitive form used for comparison.
+ *
+ * Strips every non-alphanumeric character, so `X-CSRF-Token`, `x_csrf_token`, and
+ * `xCsrfToken` all collapse to `xcsrftoken`. A list keyed by one canonical spelling
+ * cannot then miss a variant that appears in a different codebase style.
+ */
+export function normalizeKey(key: string): string {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
 
 /**
  * Explicit redact paths for fast-redact.
@@ -56,13 +101,14 @@ export const REDACTION_PATHS: readonly string[] = [
   'res.headers["set-cookie"]',
 ];
 
-const SENSITIVE = new Set(SENSITIVE_FIELD_NAMES.map((name) => name.toLowerCase()));
+const SENSITIVE = new Set(SENSITIVE_FIELD_NAMES.map(normalizeKey));
 const CENSOR = '[redacted]';
 /** Guards against a cyclic or pathologically deep object. */
 const MAX_SCRUB_DEPTH = 12;
 
 /**
- * Recursively replaces the value of every sensitive-named field, at any depth.
+ * Recursively returns a COPY with the value of every sensitive-named field replaced, at
+ * any depth.
  *
  * This is what actually satisfies FR-039. `scrubSecrets({ body: { password: 'x' } })`
  * returns `{ body: { password: '[redacted]' } }` - a fast-redact path of `*.password`
@@ -70,6 +116,18 @@ const MAX_SCRUB_DEPTH = 12;
  *
  * Arrays are walked too, because a credentials array nested in a payload is as likely as
  * a nested object and redaction that skips arrays leaks just as effectively.
+ *
+ * The input is NEVER MUTATED. A logger that redacted in place would corrupt the caller's
+ * object - so a validation error that was scrubbed for logging would also lose its
+ * password before any handler could read it, and a shared config object would be silently
+ * rewritten for the rest of the process. Every container is rebuilt; only leaf values are
+ * replaced. Non-plain values (Date, Buffer, class instances) are passed through by
+ * reference, which is safe because they are not walked and so cannot be mutated.
+ *
+ * Beyond `MAX_SCRUB_DEPTH` the original reference is returned unchanged. That is a
+ * deliberate trade: the guard prevents a stack overflow on a hostile payload, and a
+ * structure nested more than twelve levels deep is not one this product logs. If that
+ * assumption is ever wrong, raise the constant rather than removing the guard.
  */
 export function scrubSecrets<T>(value: T, depth = 0): T {
   if (depth > MAX_SCRUB_DEPTH || value === null || typeof value !== 'object') {
@@ -77,12 +135,12 @@ export function scrubSecrets<T>(value: T, depth = 0): T {
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => scrubSecrets(item, depth + 1)) as unknown as T;
+    return (value as unknown[]).map((item) => scrubSecrets(item, depth + 1)) as unknown as T;
   }
 
   const result: Record<string, unknown> = {};
   for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
-    result[key] = SENSITIVE.has(key.toLowerCase()) ? CENSOR : scrubSecrets(entry, depth + 1);
+    result[key] = SENSITIVE.has(normalizeKey(key)) ? CENSOR : scrubSecrets(entry, depth + 1);
   }
   return result as T;
 }

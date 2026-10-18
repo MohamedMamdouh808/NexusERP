@@ -27,6 +27,12 @@
     "isolatedModules": true,
     "types": ["node", "jest"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "prisma/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "scripts/**/*.ts",
+    "prisma/**/*.ts",
+    "jest.config.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

@@ -15,7 +15,7 @@ import type { PrismaService } from '../../prisma/prisma.service';
 
 /** Minimal PrismaService double returning a scripted reachability result. */
 function prismaDouble(result: { status: 'ok' | 'unavailable'; latencyMs: number }) {
-  return { checkReachability: async () => result } as unknown as PrismaService;
+  return { checkReachability: () => Promise.resolve(result) } as unknown as PrismaService;
 }
 
 describe('HealthService', () => {
