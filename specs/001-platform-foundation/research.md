@@ -47,6 +47,8 @@ and production or a migration that passes CI can still fail in production.
 naming one now — rejected because the plan must state a target; the exact patch is resolved at
 install time and recorded in the committed lockfile (see R-018).
 
+**Locale**: Database locale is C (ASCII-only lower() and byte-order sorting); revisit collation when Arabic support is decided.
+
 ---
 
 ## R-003 — Unit of work: one transaction boundary per request

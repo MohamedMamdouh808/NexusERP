@@ -105,7 +105,7 @@ story work can begin until this phase is complete.
 - [X] T027 Create the idempotent seed entry point upserting on natural keys inside one transaction in `apps/api/prisma/seed.ts`
 - [X] T110 Create the schema numeric-type checker that fails when `apps/api/prisma/schema.prisma` declares a `Float` column, and wire it into the lint command in `apps/api/scripts/check-schema-numeric-types.ts` and `package.json` (depends on T107; Constitution Principle IV — without it, a later feature can introduce floating-point storage undetected)
 - [X] T028 Create the application root module and bootstrap with the `/api/v1` prefix, global validation pipe, cookie parser, and shutdown hooks in `apps/api/src/app.module.ts` and `apps/api/src/main.ts`
-- [ ] T029 Run `npm run db:migrate`, `npm run db:seed`, and `npm test` to confirm the foundational tests now pass
+- [X] T029 Run `npm run db:migrate`, `npm run db:seed`, and `npm test` to confirm the foundational tests now pass
 
 **Checkpoint**: Foundation ready — the service boots against a real database, the shared contracts
 compile, and the unit-of-work and seed tests pass. User story work can begin.
@@ -132,10 +132,10 @@ templates are queryable. Deliverable value: a working, reproducible development 
 ### Implementation for User Story 1
 
 - [X] T033 [P] [US1] Create the multi-stage service image that installs with the lockfile, builds, and runs migrations before serving in `docker/api.Dockerfile`
-- [ ] T034 [P] [US1] Create the multi-stage web image that builds static assets and serves them in `docker/web.Dockerfile`
+- [X] T034 [P] [US1] Create the multi-stage web image that builds static assets and serves them in `docker/web.Dockerfile`
 - [X] T035 [US1] Create the Compose environment with a healthchecked database pinned to the same PostgreSQL major version used in production, a named volume so data survives a re-run, a service gated on database health, and the web app in `docker-compose.yml` (FR-006, FR-007, FR-008)
-- [ ] T036 [US1] Add the database, seed, development, and build scripts to `package.json` so migrations and seeding run as documented commands
-- [ ] T037 [P] [US1] Configure the development server to proxy `/api` to the service in `apps/web/vite.config.ts`
+- [X] T036 [US1] Add the database, seed, development, and build scripts to `package.json` so migrations and seeding run as documented commands
+- [X] T037 [P] [US1] Configure the development server to proxy `/api` to the service in `apps/web/vite.config.ts`
 - [X] T038 [US1] Wire the Compose services so `docker compose up -d --wait` returns only after all three report healthy in `docker-compose.yml` (depends on T035)
 - [ ] T039 [US1] Document the one-command startup, every available command, and the failure modes in `README.md`
 
@@ -166,7 +166,7 @@ API behavior.
 - [X] T046 [P] [US2] Write FAILING integration test asserting request handling and the failure path produce zero outbound calls to any third party in `apps/api/test/integration/no-third-party-egress.spec.ts`
 - [X] T047 [P] [US2] Write FAILING unit test asserting passwords, tokens, cookies, and secrets never appear in log output in `apps/api/src/common/logging/__tests__/redaction.spec.ts`
 - [X] T048 [P] [US2] Write FAILING unit test asserting each request log record carries the identifier, route, status, and elapsed time in `apps/api/src/common/logging/__tests__/request-log-record.spec.ts`
-- [ ] T049 [P] [US2] Write FAILING unit test asserting a rate-limit response is renderable from the standard shape alone, including `Retry-After`, in `apps/web/src/lib/__tests__/api-client.spec.ts`
+- [X] T049 [P] [US2] Write FAILING unit test asserting a rate-limit response is renderable from the standard shape alone, including `Retry-After`, in `apps/web/src/lib/__tests__/api-client.spec.ts`
 - [X] T106 [P] [US2] Write FAILING integration test asserting an endpoint that declares no permission is denied with 403 by default, and that `GET /api/v1/health` is reachable only because it carries an explicit public marker — removing that marker must make the health route return 403 in `apps/api/test/integration/default-deny.spec.ts` (depends on T055 and T056, so it is written as soon as the decorator and guard exist; Constitution Principle II requires an undeclared endpoint to fail the suite)
 
 ### Implementation for User Story 2
@@ -178,8 +178,8 @@ API behavior.
 - [X] T054 [US2] Create the health service running the reachability query with timing and failing closed on an unmeasured result in `apps/api/src/platform/health/health.service.ts`
 - [X] T055 [US2] Create the health controller declared explicitly public with contract annotations in `apps/api/src/platform/health/health.controller.ts`
 - [X] T056 [US2] Create the permission declaration decorator and the guard chain that denies every request lacking a declared permission in `apps/api/src/common/decorators/require-permission.decorator.ts` and `apps/api/src/common/guards/permission.guard.ts`
-- [ ] T057 [US2] Mount the middleware, filters, and guards in the correct order in `apps/api/src/app.module.ts` and `apps/api/src/main.ts` so a guard failure still carries an identifier
-- [ ] T058 [US2] Create the web API client mapping every response into the envelope and honoring `Retry-After` in `apps/web/src/lib/api-client.ts`
+- [X] T057 [US2] Mount the middleware, filters, and guards in the correct order in `apps/api/src/app.module.ts` and `apps/api/src/main.ts` so a guard failure still carries an identifier
+- [X] T058 [US2] Create the web API client mapping every response into the envelope and honoring `Retry-After` in `apps/web/src/lib/api-client.ts`
 - [ ] T059 [US2] Verify unit and integration suites are green and critical-path coverage is at least 80% by running `npm test` and `npm run test:integration`
 
 **Checkpoint**: Every failure path produces the same shape with a traceable identifier; health
@@ -207,8 +207,8 @@ Deliverable value: a merge gate nobody can bypass.
 
 ### Implementation for User Story 3
 
-- [ ] T063 [P] [US3] Wire the coverage thresholds that fail below 80% on critical paths in `apps/api/jest.config.ts`
-- [ ] T064 [P] [US3] Configure the web test runner with component tests and coverage thresholds in `apps/web/vitest.config.ts`
+- [X] T063 [P] [US3] Wire the coverage thresholds that fail below 80% on critical paths in `apps/api/jest.config.ts`
+- [X] T064 [P] [US3] Configure the web test runner with component tests and coverage thresholds in `apps/web/vitest.config.ts`
 - [ ] T065 [P] [US3] Configure the end-to-end runner as an advisory check in `apps/web/playwright.config.ts`
 - [ ] T066 [US3] Add the repository rule and type check commands to `package.json` so both workspaces are covered
 - [ ] T067 [US3] Create the lint and type check pipeline job in `.github/workflows/ci.yml`
@@ -242,22 +242,22 @@ coherent, documented project.
 
 ### Tests for User Story 4 (MANDATORY - write first, observe failure) ⚠️
 
-- [ ] T076 [P] [US4] Write FAILING component test asserting the shell renders sidebar, top bar, and content area on first load in `apps/web/src/components/shell/__tests__/app-shell.spec.tsx`
-- [ ] T077 [P] [US4] Write FAILING component test asserting the organization switcher and user menu state that none is available rather than presenting a working control in `apps/web/src/components/shell/__tests__/top-bar.spec.tsx`
-- [ ] T078 [P] [US4] Write FAILING component test asserting no navigation entry or control implying a business action is present in `apps/web/src/components/shell/__tests__/no-business-controls.spec.tsx`
-- [ ] T079 [P] [US4] Write FAILING component test asserting the health panel shows a skeleton while fetching in `apps/web/src/features/health/__tests__/health-panel-loading.spec.tsx`
-- [ ] T080 [P] [US4] Write FAILING component test asserting the health panel shows the failure with a retry action when the service is unreachable in `apps/web/src/features/health/__tests__/health-panel-error.spec.tsx`
-- [ ] T081 [P] [US4] Write FAILING component test asserting the health panel shows the service report with no sign-in screen anywhere in `apps/web/src/features/health/__tests__/health-panel-healthy.spec.tsx`
-- [ ] T082 [P] [US4] Write FAILING test asserting no raw design value appears anywhere under `apps/web/src` in `apps/web/scripts/__tests__/no-raw-design-values.spec.ts` (single home for this check; the former duplicate T060 is deleted)
+- [X] T076 [P] [US4] Write FAILING component test asserting the shell renders sidebar, top bar, and content area on first load in `apps/web/src/components/shell/__tests__/app-shell.spec.tsx`
+- [X] T077 [P] [US4] Write FAILING component test asserting the organization switcher and user menu state that none is available rather than presenting a working control in `apps/web/src/components/shell/__tests__/top-bar.spec.tsx`
+- [X] T078 [P] [US4] Write FAILING component test asserting no navigation entry or control implying a business action is present in `apps/web/src/components/shell/__tests__/no-business-controls.spec.tsx`
+- [X] T079 [P] [US4] Write FAILING component test asserting the health panel shows a skeleton while fetching in `apps/web/src/features/health/__tests__/health-panel-loading.spec.tsx`
+- [X] T080 [P] [US4] Write FAILING component test asserting the health panel shows the failure with a retry action when the service is unreachable in `apps/web/src/features/health/__tests__/health-panel-error.spec.tsx`
+- [X] T081 [P] [US4] Write FAILING component test asserting the health panel shows the service report with no sign-in screen anywhere in `apps/web/src/features/health/__tests__/health-panel-healthy.spec.tsx`
+- [X] T082 [P] [US4] Write FAILING test asserting no raw design value appears anywhere under `apps/web/src` in `apps/web/scripts/__tests__/no-raw-design-values.spec.ts` (single home for this check; the former duplicate T060 is deleted)
 
 ### Implementation for User Story 4
 
-- [ ] T083 [US4] Transcribe the persisted design system tokens as the single value source in `apps/web/src/styles/tokens.css`
-- [ ] T084 [US4] Map the theme to those tokens so utility classes resolve to them in `apps/web/src/styles/app.css`
-- [ ] T085 [P] [US4] Create the reusable interface components built from the design system in `apps/web/src/components/ui/`
-- [ ] T086 [US4] Create the sidebar, top bar with organization switcher and user menu placeholders, and content area in `apps/web/src/components/shell/`
-- [ ] T087 [US4] Create the health status panel wired to the health endpoint with loading, healthy, and failure states in `apps/web/src/features/health/`
-- [ ] T088 [P] [US4] Create the router, query client, and error boundary in `apps/web/src/app/` and `apps/web/src/main.tsx`
+- [X] T083 [US4] Transcribe the persisted design system tokens as the single value source in `apps/web/src/styles/tokens.css`
+- [X] T084 [US4] Map the theme to those tokens so utility classes resolve to them in `apps/web/src/styles/app.css`
+- [X] T085 [P] [US4] Create the reusable interface components built from the design system in `apps/web/src/components/ui/`
+- [X] T086 [US4] Create the sidebar, top bar with organization switcher and user menu placeholders, and content area in `apps/web/src/components/shell/`
+- [X] T087 [US4] Create the health status panel wired to the health endpoint with loading, healthy, and failure states in `apps/web/src/features/health/`
+- [X] T088 [P] [US4] Create the router, query client, and error boundary in `apps/web/src/app/` and `apps/web/src/main.tsx`
 - [ ] T089 [US4] Add the contract generation command and commit the generated document in `apps/api/package.json` and `apps/api/openapi.json`
 - [ ] T090 [US4] Add the contract comparison command that fails on drift in `apps/api/package.json`
 - [ ] T062 [P] [US4] Write FAILING integration test asserting the generated contract matches the committed artifact and that a changed endpoint produces a diff in `apps/api/test/integration/contract-drift.spec.ts` (depends on T089 — it cannot be written before the committed artifact exists)
@@ -279,6 +279,10 @@ tokens; the contract is generated and drift is impossible to merge silently.
 - [ ] T096 Documentation of the schema conventions later features inherit — tenant scoping with composite keys, exact decimals, append-only immutability, transaction boundary — in `README.md` and `specs/001-platform-foundation/data-model.md`
 - [ ] T097 [P] Verification that the implemented error codes, the status mapping, and the 403-versus-404 rule match the published catalog in `specs/001-platform-foundation/contracts/error-catalog.md`
 - [ ] T112 [P] Audit every documentation file this feature produces for any availability, backup, or recovery claim, and remove or reword any found, so the product claims no uptime or recovery target (FR-034b, SC-025; depends on T039 and T095 — the documents it audits must exist first)
+- [ ] T113 Add a `postinstall` hook that runs `prisma generate`, and prove it from a clean `node_modules` so `npm ci` followed by `npm run typecheck` passes on a clean clone — `npm ci` replaces `node_modules` including the generated client in `node_modules/.prisma`, leaving every Prisma model typed `any` and the type checker reporting phantom errors in correct code; verify in `package.json` and `scripts/postinstall.mjs`, with a test that removes the generated client and asserts a subsequent install restores it (depends on T019, the schema the generator reads, and on T036 for the workspace script wiring; Constitution Principle V and SC-014 — a clean clone must reproduce a green type check, not a type check that depends on stale generated files)
+- [ ] T114 Verify `docker/api-entrypoint.sh` runs `prisma migrate deploy` under `set -e`, fails fast with a non-zero exit when a migration fails, and ends with `exec node`, and add a test for the failed-migration case where it is feasible — a service that boots against an un-migrated database serves requests against tables that do not exist (SC-020, T108 portability; depends on T033, the image that runs this entrypoint)
+- [ ] T115 Verify both Dockerfiles copy the package manifests and the lockfile and run `npm ci` before copying source, and fix either if it does not — building after the source copy throws away the cached dependency layer and lets an image diverge from the committed lockfile (FR-049; depends on T033 and T034, the two images, and on T109 for the lockfile-reproducibility expectation)
+- [ ] T116 Add the research note "Database locale is C (ASCII-only `lower()` and byte-order sorting); revisit collation when Arabic support is decided" to `research.md` (Principle IX, Scope Discipline — record the assumption now so the P1 foundation does not silently prejudge a later Arabic requirement)
 - [ ] T098 [P] Statement in the documentation that the product makes no tax-compliance, e-invoicing, or complete-accounting claim in `README.md`
 - [ ] T099 Documentation of what each mandatory pipeline check covers and how to reproduce a failure locally in `README.md`
 - [ ] T100 [P] Code cleanup and refactoring across `apps/api/src/` and `apps/web/src/`
