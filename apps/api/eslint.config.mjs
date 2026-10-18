@@ -18,6 +18,10 @@ export default tseslint.config(
       'eslint.config.mjs',
       // Prisma schema is validated by Prisma and by the numeric-type checker, not ESLint.
       'prisma/schema.prisma',
+      // Plain-ESM operational scripts with no TypeScript project behind them. They are
+      // covered by their own tests (scripts/__tests__/env-loading.spec.ts) rather than
+      // by a type-aware lint pass, which cannot type a file outside tsconfig.json.
+      'scripts/**/*.mjs',
     ],
   },
   js.configs.recommended,
