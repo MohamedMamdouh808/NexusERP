@@ -23,6 +23,20 @@ export default defineConfig({
   preview: {
     port: 4173,
     strictPort: true,
+    // Bound to IPv4 explicitly. Vite's default is `localhost`, which on this machine
+    // resolves to the IPv6 loopback, so `http://127.0.0.1:4173` is not reachable and the
+    // end-to-end suite's readiness check times out even though the server is up.
+    host: '127.0.0.1',
+    // `vite preview` does not honour `server.proxy`, so the end-to-end suite would get no
+    // API and the health panel would only ever show its failure state. Mirroring the
+    // development proxy here is what lets the smoke test actually read the report.
+    proxy: {
+      '/api': {
+        target: API_TARGET,
+        changeOrigin: false,
+        secure: false,
+      },
+    },
   },
   build: {
     outDir: 'dist',
