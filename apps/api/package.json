@@ -24,8 +24,8 @@
     "db:migrate:dev": "node scripts/with-root-env.mjs prisma migrate dev",
     "db:seed": "node scripts/with-root-env.mjs tsx prisma/seed.ts",
     "db:reset": "node scripts/with-root-env.mjs prisma migrate reset --force",
-    "openapi:generate": "tsx scripts/generate-openapi.ts",
-    "openapi:diff": "tsx scripts/check-openapi-drift.ts"
+    "openapi:generate": "node scripts/with-root-env.mjs node dist/openapi/generate-openapi.js",
+    "openapi:diff": "node scripts/with-root-env.mjs node dist/openapi/check-openapi-drift.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

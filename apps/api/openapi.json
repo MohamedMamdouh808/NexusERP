@@ -1,0 +1,238 @@
+{
+  "components": {
+    "schemas": {
+      "CheckResultDto": {
+        "properties": {
+          "status": {
+            "description": "An unavailable check never carries a reason, a message, or an error object. The cause is recorded in the server logs under the request identifier instead.",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "example": "ok",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "DatabaseCheckResultDto": {
+        "properties": {
+          "latencyMs": {
+            "description": "Round-trip time of the database reachability query.",
+            "type": "number"
+          },
+          "status": {
+            "description": "An unavailable check never carries a reason, a message, or an error object. The cause is recorded in the server logs under the request identifier instead.",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "example": "ok",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "latencyMs"
+        ],
+        "type": "object"
+      },
+      "DependencyChecksDto": {
+        "properties": {
+          "application": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CheckResultDto"
+              }
+            ],
+            "description": "The application process itself."
+          },
+          "database": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DatabaseCheckResultDto"
+              }
+            ],
+            "description": "The PostgreSQL connection."
+          }
+        },
+        "required": [
+          "application",
+          "database"
+        ],
+        "type": "object"
+      },
+      "ErrorDetailDto": {
+        "properties": {
+          "code": {
+            "description": "Reason code for this detail.",
+            "nullable": true,
+            "type": "string"
+          },
+          "field": {
+            "description": "Dotted path of the offending input field, e.g. `lines.2.quantity`. Null for failures not tied to a field.",
+            "example": "lines.2.quantity",
+            "nullable": true,
+            "type": "string"
+          },
+          "message": {
+            "description": "Message for this detail.",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ErrorEnvelopeDto": {
+        "properties": {
+          "code": {
+            "description": "Stable machine-readable failure code. A code never changes meaning once published, so clients may branch on it rather than on the message text.",
+            "enum": [
+              "VALIDATION_ERROR",
+              "MALFORMED_REQUEST",
+              "IDEMPOTENCY_KEY_REQUIRED",
+              "OVER_RECEIPT",
+              "OVER_ALLOCATION",
+              "UNAUTHENTICATED",
+              "FORBIDDEN",
+              "MODULE_DISABLED",
+              "NOT_FOUND",
+              "METHOD_NOT_ALLOWED",
+              "CONFLICT",
+              "DUPLICATE_RECORD",
+              "INVALID_STATE_TRANSITION",
+              "INSUFFICIENT_STOCK",
+              "PRODUCT_IN_USE",
+              "CONTACT_IN_USE",
+              "LAST_ADMINISTRATOR",
+              "INVOICE_HAS_PAYMENTS",
+              "STALE_VERSION",
+              "PAYLOAD_TOO_LARGE",
+              "IDEMPOTENCY_KEY_REUSED",
+              "VALIDATION_FAILED",
+              "TOO_MANY_REQUESTS",
+              "INTERNAL_ERROR",
+              "NOT_IMPLEMENTED",
+              "SERVICE_UNAVAILABLE"
+            ],
+            "example": "VALIDATION_ERROR",
+            "type": "string"
+          },
+          "details": {
+            "description": "Field-level or check-level detail. Always present, an empty array when there is nothing to add.",
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetailDto"
+            },
+            "type": "array"
+          },
+          "message": {
+            "description": "Human-readable and safe to display verbatim. Never contains a stack trace, file path, query, hostname, or credential.",
+            "example": "Some fields need attention.",
+            "type": "string"
+          },
+          "requestId": {
+            "description": "Identifier for this request, identical to the x-request-id response header, so a user-visible failure can be traced to the server record that explains it.",
+            "example": "3f6c1d2e-9a4b-4c1f-8e77-2b5d9a0c1e33",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "details",
+          "requestId"
+        ],
+        "type": "object"
+      },
+      "HealthReportDto": {
+        "properties": {
+          "checks": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DependencyChecksDto"
+              }
+            ],
+            "description": "Each dependency reported separately, so a failure can be attributed.",
+            "example": {
+              "application": {
+                "status": "ok"
+              },
+              "database": {
+                "latencyMs": 2,
+                "status": "ok"
+              }
+            }
+          },
+          "status": {
+            "description": "Present only on a healthy response (HTTP 200).",
+            "enum": [
+              "ok"
+            ],
+            "type": "string"
+          },
+          "uptimeSeconds": {
+            "description": "Whole seconds since the application started serving.",
+            "type": "number"
+          }
+        },
+        "required": [
+          "status",
+          "uptimeSeconds",
+          "checks"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "contact": {},
+    "description": "Generated from the service source. Committed as openapi.json and diff-checked in CI, so an unintended contract change cannot merge unreviewed.",
+    "title": "NexusERP API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "description": "Reports whether the application is serving and whether its database connection is reachable. The checks are reported separately so a failure can be attributed. Never returns a version, hostname, connection string, or driver version, because this endpoint is unauthenticated and a probe response is public information.",
+        "operationId": "HealthController_getHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReportDto"
+                }
+              }
+            },
+            "description": "The application is serving and the database is reachable."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelopeDto"
+                }
+              }
+            },
+            "description": "At least one check failed. Returned in the standard error envelope so every failing response has the same shape."
+          }
+        },
+        "summary": "Report application and database health",
+        "tags": [
+          "Platform"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "tags": []
+}

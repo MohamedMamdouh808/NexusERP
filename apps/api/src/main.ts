@@ -1,8 +1,9 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { buildOpenApiDocument } from './openapi/openapi-document';
 import { assertPortIsAvailable, loadConfiguration, ConfigurationError } from './config/configuration';
 import { NestPinoLogger, createLogger } from './common/logging/logger';
 
@@ -75,19 +76,7 @@ async function bootstrap(): Promise<void> {
   if (!configuration.isProduction) {
     // The human-readable page and the committed contract are generated from the SAME
     // source, so they cannot disagree (FR-042).
-    const document = SwaggerModule.createDocument(
-      app,
-      new DocumentBuilder()
-        .setTitle('NexusERP API')
-        .setDescription(
-          'Generated from the service source. Committed as openapi.json and diff-checked in ' +
-            'CI, so an unintended contract change cannot merge unreviewed.',
-        )
-        .setVersion('0.1.0')
-        .addServer('/api/v1')
-        .build(),
-    );
-    SwaggerModule.setup('api/docs', app, document);
+    SwaggerModule.setup('api/docs', app, buildOpenApiDocument(app));
   }
 
   // Close the HTTP server before the process exits, so an in-flight request is not cut
