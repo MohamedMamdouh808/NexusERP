@@ -21,7 +21,7 @@ Consequence: the Docker image, Compose environment, pipeline, seed execution, mi
 execution, and every integration test are authored-or-not-yet, never verified. Everything
 verifiable on Node alone was implemented and verified.
 
-## Verified work — 25 of 110 tasks
+## Verified work — 35 of 110 tasks
 
 All of the following were executed and observed passing, not merely written.
 
@@ -42,6 +42,8 @@ All of the following were executed and observed passing, not merely written.
 | T110 | Checker verified with **both** controls: injected `Float` → exit 1 with the offending line; valid `Decimal(14,3)` → exit 0 |
 | T025 | Config module implemented and covered by T022 |
 | T026 | PrismaService and TransactionService author; whole package type-checks with exit 0 |
+| T047, T048, T050, T051, T052, T054 | Unit-tested: redaction, log record, request-ID adopt/generate/sanitize, envelope classification, health fail-closed |
+| T053, T055, T056, T028 | Authored and type-check clean; their HTTP-level proofs (T040-T045, T106) are integration tests and remain blocked |
 
 ### Defects the test-first discipline caught
 
@@ -57,7 +59,7 @@ behaviour of Constitution Principle V and worth recording:
    "Expected string, received number" and learned nothing about why the number was
    refused. Fixed with `invalid_type_error`.
 
-## Not implemented — 85 tasks
+## Not implemented — 75 tasks
 
 ### Blocked on Docker or PostgreSQL (need an environment, not code)
 

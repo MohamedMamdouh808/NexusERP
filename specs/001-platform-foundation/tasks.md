@@ -104,7 +104,7 @@ story work can begin until this phase is complete.
 - [X] T026 Create the Prisma service lifecycle and the `AsyncLocalStorage` transaction unit of work in `apps/api/src/platform/prisma/prisma.service.ts` and `apps/api/src/platform/transaction/transaction.service.ts`
 - [ ] T027 Create the idempotent seed entry point upserting on natural keys inside one transaction in `apps/api/prisma/seed.ts`
 - [X] T110 Create the schema numeric-type checker that fails when `apps/api/prisma/schema.prisma` declares a `Float` column, and wire it into the lint command in `apps/api/scripts/check-schema-numeric-types.ts` and `package.json` (depends on T107; Constitution Principle IV — without it, a later feature can introduce floating-point storage undetected)
-- [ ] T028 Create the application root module and bootstrap with the `/api/v1` prefix, global validation pipe, cookie parser, and shutdown hooks in `apps/api/src/app.module.ts` and `apps/api/src/main.ts`
+- [X] T028 Create the application root module and bootstrap with the `/api/v1` prefix, global validation pipe, cookie parser, and shutdown hooks in `apps/api/src/app.module.ts` and `apps/api/src/main.ts`
 - [ ] T029 Run `npm run db:migrate`, `npm run db:seed`, and `npm test` to confirm the foundational tests now pass
 
 **Checkpoint**: Foundation ready — the service boots against a real database, the shared contracts
@@ -164,20 +164,20 @@ API behavior.
 - [ ] T044 [P] [US2] Write FAILING integration test asserting health reports healthy with a reachable database and 503 in the envelope when the database is stopped mid-run in `apps/api/test/integration/health.spec.ts`
 - [ ] T045 [P] [US2] Write FAILING integration test asserting health fails closed when a check cannot be measured and leaks no version, hostname, or connection string in `apps/api/test/integration/health-fail-closed.spec.ts`
 - [ ] T046 [P] [US2] Write FAILING integration test asserting request handling and the failure path produce zero outbound calls to any third party in `apps/api/test/integration/no-third-party-egress.spec.ts`
-- [ ] T047 [P] [US2] Write FAILING unit test asserting passwords, tokens, cookies, and secrets never appear in log output in `apps/api/src/common/logging/__tests__/redaction.spec.ts`
-- [ ] T048 [P] [US2] Write FAILING unit test asserting each request log record carries the identifier, route, status, and elapsed time in `apps/api/src/common/logging/__tests__/request-log-record.spec.ts`
+- [X] T047 [P] [US2] Write FAILING unit test asserting passwords, tokens, cookies, and secrets never appear in log output in `apps/api/src/common/logging/__tests__/redaction.spec.ts`
+- [X] T048 [P] [US2] Write FAILING unit test asserting each request log record carries the identifier, route, status, and elapsed time in `apps/api/src/common/logging/__tests__/request-log-record.spec.ts`
 - [ ] T049 [P] [US2] Write FAILING unit test asserting a rate-limit response is renderable from the standard shape alone, including `Retry-After`, in `apps/web/src/lib/__tests__/api-client.spec.ts`
 - [ ] T106 [P] [US2] Write FAILING integration test asserting an endpoint that declares no permission is denied with 403 by default, and that `GET /api/v1/health` is reachable only because it carries an explicit public marker — removing that marker must make the health route return 403 in `apps/api/test/integration/default-deny.spec.ts` (depends on T055 and T056, so it is written as soon as the decorator and guard exist; Constitution Principle II requires an undeclared endpoint to fail the suite)
 
 ### Implementation for User Story 2
 
-- [ ] T050 [US2] Create the request context store and the request identifier middleware that adopts, generates, sanitizes, and echoes the identifier in `apps/api/src/common/logging/request-context.ts` and `apps/api/src/common/logging/request-id.middleware.ts`
-- [ ] T051 [US2] Configure the structured JSON logger with the redaction list and identifier correlation in `apps/api/src/common/logging/logger.ts` (emit `userId` and `organizationId` as null until authentication ships, so the field set does not change when FR-038 becomes active)
-- [ ] T052 [US2] Create the global exception filter mapping every failure class to a catalogued code with a fixed non-internal message in `apps/api/src/common/errors/all-exceptions.filter.ts`
-- [ ] T053 [US2] Create the envelope and check result response DTOs with contract annotations in `apps/api/src/common/dto/error-envelope.dto.ts` and `apps/api/src/common/dto/health-report.dto.ts`
-- [ ] T054 [US2] Create the health service running the reachability query with timing and failing closed on an unmeasured result in `apps/api/src/platform/health/health.service.ts`
-- [ ] T055 [US2] Create the health controller declared explicitly public with contract annotations in `apps/api/src/platform/health/health.controller.ts`
-- [ ] T056 [US2] Create the permission declaration decorator and the guard chain that denies every request lacking a declared permission in `apps/api/src/common/decorators/require-permission.decorator.ts` and `apps/api/src/common/guards/permission.guard.ts`
+- [X] T050 [US2] Create the request context store and the request identifier middleware that adopts, generates, sanitizes, and echoes the identifier in `apps/api/src/common/logging/request-context.ts` and `apps/api/src/common/logging/request-id.middleware.ts`
+- [X] T051 [US2] Configure the structured JSON logger with the redaction list and identifier correlation in `apps/api/src/common/logging/logger.ts` (emit `userId` and `organizationId` as null until authentication ships, so the field set does not change when FR-038 becomes active)
+- [X] T052 [US2] Create the global exception filter mapping every failure class to a catalogued code with a fixed non-internal message in `apps/api/src/common/errors/all-exceptions.filter.ts`
+- [X] T053 [US2] Create the envelope and check result response DTOs with contract annotations in `apps/api/src/common/dto/error-envelope.dto.ts` and `apps/api/src/common/dto/health-report.dto.ts`
+- [X] T054 [US2] Create the health service running the reachability query with timing and failing closed on an unmeasured result in `apps/api/src/platform/health/health.service.ts`
+- [X] T055 [US2] Create the health controller declared explicitly public with contract annotations in `apps/api/src/platform/health/health.controller.ts`
+- [X] T056 [US2] Create the permission declaration decorator and the guard chain that denies every request lacking a declared permission in `apps/api/src/common/decorators/require-permission.decorator.ts` and `apps/api/src/common/guards/permission.guard.ts`
 - [ ] T057 [US2] Mount the middleware, filters, and guards in the correct order in `apps/api/src/app.module.ts` and `apps/api/src/main.ts` so a guard failure still carries an identifier
 - [ ] T058 [US2] Create the web API client mapping every response into the envelope and honoring `Retry-After` in `apps/web/src/lib/api-client.ts`
 - [ ] T059 [US2] Verify unit and integration suites are green and critical-path coverage is at least 80% by running `npm test` and `npm run test:integration`

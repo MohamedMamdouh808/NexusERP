@@ -29,7 +29,7 @@ const config: Config = {
       testEnvironment: 'node',
       testMatch: ['<rootDir>/src/**/*.spec.ts', '<rootDir>/scripts/**/*.spec.ts'],
       transform: {
-        '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json', isolatedModules: true }],
+        '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
       },
       moduleNameMapper: {
         '^@nexuserp/shared$': '<rootDir>/../../packages/shared/src/index.ts',
@@ -52,7 +52,7 @@ const config: Config = {
       testEnvironment: 'node',
       testMatch: ['<rootDir>/test/integration/**/*.spec.ts'],
       transform: {
-        '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json', isolatedModules: true }],
+        '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
       },
       moduleNameMapper: {
         '^@nexuserp/shared$': '<rootDir>/../../packages/shared/src/index.ts',
