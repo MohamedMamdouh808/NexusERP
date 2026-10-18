@@ -21,7 +21,7 @@
  * Exit codes: 0 consistent, 1 inconsistent, 2 the check could not run.
  */
 
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 export interface HistoryProblem {
@@ -114,7 +114,7 @@ export function resolveMigrationsDir(startDir: string = process.cwd()): string {
   throw new Error(`Could not locate prisma/migrations by walking up from ${startDir}`);
 }
 
-function main(): void {
+async function main(): Promise<void> {
   let migrationsDir: string;
   try {
     migrationsDir = resolveMigrationsDir();
@@ -128,27 +128,84 @@ function main(): void {
 
   // The database comparison needs a live connection, which this check may not have (for
   // example in a lint step before a database exists). It then validates the repository
-  // side only and says so, rather than reporting a false pass.
-  if (!process.env.DATABASE_URL) {
+  // side only and says so plainly, rather than reporting a false pass.
+  const databaseUrl = process.env.DATABASE_URL;
+  if (databaseUrl === undefined || databaseUrl.length === 0) {
     console.log(
       `migration history: repository side OK (${folders.length} migration(s)); ` +
-        'DATABASE_URL not set, so the applied history was not compared.',
+        'DATABASE_URL not set, so the applied history was NOT compared. ' +
+        'This is not evidence that the history is consistent.',
     );
     process.exit(0);
   }
 
-  void readFileSync; // retained: schema resolution uses the Prisma CLI, not direct reads
+  // Read what the database actually recorded. Prisma writes this table itself; reading
+  // it directly is the only way to know the applied history without asking Prisma to
+  // deploy something.
+  let applied: AppliedMigration[];
+  try {
+    applied = await readAppliedHistory(databaseUrl);
+  } catch (error) {
+    // Could not read: that is "the check could not run", not "the history is fine".
+    console.error(
+      `migration history: could not read the applied history: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    process.exit(2);
+    return;
+  }
 
-  console.log(`migration history: ${folders.length} migration folder(s) found in ${migrationsDir}`);
+  const problems = compareHistory(applied, folders);
+
+  if (problems.length > 0) {
+    console.error(
+      `migration history: ${problems.length} problem(s) between the applied history and the ` +
+        `repository (${migrationsDir}):`,
+    );
+    for (const problem of problems) {
+      console.error(`  [${problem.kind}] ${problem.message}`);
+    }
+    process.exit(1);
+    return;
+  }
+
   console.log(
-    'Run `npm run check:migration-history` with DATABASE_URL set for the full comparison.',
+    `migration history: consistent. ${applied.length} applied migration(s) match ` +
+      `${folders.length} migration folder(s).`,
   );
   process.exit(0);
+}
+
+/**
+ * Reads `_prisma_migrations` through the generated Prisma client.
+ *
+ * The client is imported dynamically rather than at module load so that the pure
+ * comparison logic above stays importable - and testable - without a generated client or
+ * a database. A missing client is reported as "the check could not run" (exit 2), never
+ * as a pass.
+ */
+async function readAppliedHistory(databaseUrl: string): Promise<AppliedMigration[]> {
+  const { PrismaClient } = (await import('@prisma/client')) as unknown as {
+    PrismaClient: new (options: { datasources: { db: { url: string } } }) => {
+      $queryRawUnsafe: (sql: string) => Promise<AppliedMigration[]>;
+      $disconnect: () => Promise<void>;
+    };
+  };
+
+  const client = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+  try {
+    return await client.$queryRawUnsafe(
+      'SELECT migration_name, finished_at, rolled_back_at FROM _prisma_migrations',
+    );
+  } finally {
+    await client.$disconnect();
+  }
 }
 
 const invokedDirectly =
   typeof process.argv[1] === 'string' && process.argv[1].includes('check-migration-history');
 
 if (invokedDirectly) {
-  main();
+  void main();
 }
