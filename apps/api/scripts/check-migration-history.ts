@@ -16,9 +16,10 @@
  *
  * This check closes it. It compares what the database recorded against what the repository
  * contains and fails when they disagree, naming the specific migration. Wired into
- * `npm run lint` and the pipeline's migration job.
+ * `npm run check:migrations` (NOT `npm run lint`, because lint must stay runnable with no
+ * database) and the pipeline's migration job, which runs it after the db service is up.
  *
- * Exit codes: 0 consistent, 1 inconsistent, 2 the check could not run.
+ * Exit codes: 0 consistent, 1 inconsistent or unable to run.
  */
 
 import { readdirSync, existsSync } from 'node:fs';
@@ -114,29 +115,44 @@ export function resolveMigrationsDir(startDir: string = process.cwd()): string {
   throw new Error(`Could not locate prisma/migrations by walking up from ${startDir}`);
 }
 
-async function main(): Promise<void> {
+/**
+ * Runs the check and returns the process exit code.
+ *
+ * `readApplied` is injectable so the mismatch branch can be driven directly. The only way
+ * to reach it otherwise is to rename a real migration folder in a subprocess, which proves
+ * the command works but leaves the decision invisible to coverage - and a branch nobody can
+ * see is a branch nobody reviews.
+ */
+export async function runMigrationHistoryCheck(
+  readApplied: (databaseUrl: string) => Promise<AppliedMigration[]> = readAppliedHistory,
+): Promise<number> {
   let migrationsDir: string;
   try {
     migrationsDir = resolveMigrationsDir();
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(2);
-    return;
+    console.error(
+      `migration history: cannot run - ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return 1;
   }
 
   const folders = listMigrationFolders(migrationsDir);
 
-  // The database comparison needs a live connection, which this check may not have (for
-  // example in a lint step before a database exists). It then validates the repository
-  // side only and says so plainly, rather than reporting a false pass.
+  // A missing DATABASE_URL is a FAILURE, not a quiet pass. The check exists to prove the
+  // applied history matches the repository; without a database it proves nothing, and
+  // reporting that as success is how a guard comes to be trusted without ever having been
+  // satisfied. This is also why the check no longer runs as part of `npm run lint`.
   const databaseUrl = process.env.DATABASE_URL;
   if (databaseUrl === undefined || databaseUrl.length === 0) {
-    console.log(
-      `migration history: repository side OK (${folders.length} migration(s)); ` +
-        'DATABASE_URL not set, so the applied history was NOT compared. ' +
-        'This is not evidence that the history is consistent.',
+    console.error(
+      'migration history: cannot run - DATABASE_URL is not set.\n' +
+        'This check compares the migrations the DATABASE has applied against the ones in the\n' +
+        'repository, so it needs a database. Copy .env.example to .env, or start one with\n' +
+        '`docker compose up -d --wait db`, then re-run:\n' +
+        '  npm run check:migrations\n' +
+        'Nothing was compared, so nothing has been proven.',
     );
-    process.exit(0);
+    return 1;
   }
 
   // Read what the database actually recorded. Prisma writes this table itself; reading
@@ -144,16 +160,17 @@ async function main(): Promise<void> {
   // deploy something.
   let applied: AppliedMigration[];
   try {
-    applied = await readAppliedHistory(databaseUrl);
+    applied = await readApplied(databaseUrl);
   } catch (error) {
-    // Could not read: that is "the check could not run", not "the history is fine".
+    // An unreachable database is a failure, not "could not run". The pipeline must not
+    // treat a down database as a pass.
     console.error(
-      `migration history: could not read the applied history: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+      'migration history: cannot run - the database could not be read: ' +
+        `${error instanceof Error ? error.message : String(error)}\n` +
+        'The applied history was NOT compared, so nothing has been proven. Check that the\n' +
+        'database is running and that DATABASE_URL points at it.',
     );
-    process.exit(2);
-    return;
+    return 1;
   }
 
   const problems = compareHistory(applied, folders);
@@ -166,15 +183,14 @@ async function main(): Promise<void> {
     for (const problem of problems) {
       console.error(`  [${problem.kind}] ${problem.message}`);
     }
-    process.exit(1);
-    return;
+    return 1;
   }
 
   console.log(
     `migration history: consistent. ${applied.length} applied migration(s) match ` +
       `${folders.length} migration folder(s).`,
   );
-  process.exit(0);
+  return 0;
 }
 
 /**
@@ -182,7 +198,7 @@ async function main(): Promise<void> {
  *
  * The client is imported dynamically rather than at module load so that the pure
  * comparison logic above stays importable - and testable - without a generated client or
- * a database. A missing client is reported as "the check could not run" (exit 2), never
+ * a database. A missing client is reported as "the check could not run" (exit 1), never
  * as a pass.
  */
 async function readAppliedHistory(databaseUrl: string): Promise<AppliedMigration[]> {
@@ -207,5 +223,5 @@ const invokedDirectly =
   typeof process.argv[1] === 'string' && process.argv[1].includes('check-migration-history');
 
 if (invokedDirectly) {
-  void main();
+  void runMigrationHistoryCheck().then((code) => process.exit(code));
 }
