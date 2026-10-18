@@ -1,0 +1,44 @@
+# Dependencies are installed inside the image, not copied from the host
+node_modules
+**/node_modules
+
+# Build output and caches
+dist
+**/dist
+build
+**/build
+coverage
+**/coverage
+*.tsbuildinfo
+
+# Version control
+.git
+.gitignore
+.github
+
+# Environment - only the example is needed to build
+.env
+.env.*
+!.env.example
+
+# Tests and reports
+**/test
+**/tests
+**/__tests__
+**/*.spec.ts
+**/*.spec.tsx
+playwright-report
+test-results
+
+# Documentation and specifications are not needed in the image
+specs
+docs
+design-system
+*.md
+
+# Editors and OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.log
