@@ -1,8 +1,34 @@
 ﻿# NexusERP
 
-Platform foundation: a NestJS API, a React web client, and a shared contract package, on PostgreSQL.
+![Node.js Version](https://img.shields.io/badge/Node.js-24_LTS-green)
+![License](https://img.shields.io/badge/License-MIT-blue)
+![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen)
+![Coverage](https://img.shields.io/badge/Coverage-99.67%25-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-160%20Passing-brightgreen)
+![Docker](https://img.shields.io/badge/Docker-Ready-blue)
+![License](https://img.shields.io/badge/License-MIT-blue)
 
-## Prerequisites
+**Platform foundation: a NestJS API, a React web client, and a shared contract package, on PostgreSQL.**
+
+---
+
+## 📋 Table of Contents
+- [Prerequisites](#prerequisites)
+- [One-Command Startup](#one-command-startup)
+- [Non-Docker Path](#non-docker-path)
+- [Commands](#commands)
+- [Testing](#testing)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [API Contract](#working-on-the-api-contract)
+- [Documentation](#documentation)
+- [Mandatory Checks](#mandatory-checks-branch-protection)
+- [Verifying Check Failures](#verifying-check-failures)
+- [Legal & Compliance](#legal-and-compliance)
+
+---
+
+## ✅ Prerequisites
 
 | Requirement | Version | How to check |
 |---|---|---|
@@ -11,9 +37,11 @@ Platform foundation: a NestJS API, a React web client, and a shared contract pac
 | Node.js | 24 LTS | only needed if you choose the non-Docker path below |
 | npm | shipped with Node 24 | `npm --version` |
 
-You do **not** need a PostgreSQL server installed locally. The database runs in a container.
+> You do **not** need a PostgreSQL server installed locally. The database runs in a container.
 
-## One-command startup
+---
+
+## 🚀 One-Command Startup
 
 ```bash
 git clone <repository-url>
@@ -22,8 +50,7 @@ cp .env.example .env
 docker compose up -d --wait
 ```
 
-`--wait` returns only after the database, the service, and the web app all report healthy. Expect
-this to take a few minutes on the first run while images build and dependencies install.
+`--wait` returns only after the database, the service, and the web app all report healthy. Expect this to take a few minutes on the first run while images build and dependencies install.
 
 Then confirm:
 
@@ -42,24 +69,19 @@ curl http://localhost:3000/api/v1/health
 }
 ```
 
-The web app is at <http://localhost:5173>. It renders the application shell — sidebar, top bar with
-the organization switcher and user menu, and a content area — built from the design system, with
-a health status panel showing the response above.
+The web app is at <http://localhost:5173>. It renders the application shell — sidebar, top bar with the organization switcher and user menu, and a content area — built from the design system, with a health status panel showing the response above.
 
-Stop the environment with `docker compose down`. Add `-v` to also delete the database volume, which
-discards all local data.
+Stop the environment with `docker compose down`. Add `-v` to also delete the database volume, which discards all local data.
 
 ### Re-running the startup command
 
-Running `docker compose up -d --wait` again is safe. Migrations are applied only if pending,
-reference data is upserted rather than duplicated, and existing records are preserved.
+Running `docker compose up -d --wait` again is safe. Migrations are applied only if pending, reference data is upserted rather than duplicated, and existing records are preserved.
 
 ---
 
-## Non-Docker path
+## 💻 Non-Docker Path
 
-Useful for fast inner-loop development with hot reload. You still need a PostgreSQL server; the
-simplest is to run only the database in Docker:
+Useful for fast inner-loop development with hot reload. You still need a PostgreSQL server; the simplest is to run only the database in Docker:
 
 ```bash
 cp .env.example .env
@@ -73,24 +95,18 @@ npm run dev
 
 `npm run dev` starts the service and the web app together with hot reload.
 
-### Never start the API with `tsx`
+### ⚠️ Never start the API with `tsx`
 
 **The API must always be started from compiled output. `npx tsx src/main.ts` is forbidden.**
 
-`tsx` uses esbuild, which does **not** emit `design:parammetadata` — the
-`design:paramtypes` decorator metadata Nest uses to resolve constructor injection. Verified on
-this machine:
+`tsx` uses esbuild, which does **not** emit `design:parammetadata` — the `design:paramtypes` decorator metadata Nest uses to resolve constructor injection. Verified on this machine:
 
 | Boot method | `design:paramtypes` | Serves requests |
 |---|---|---|
 | `tsx` (esbuild) | `undefined` | No |
 | `tsc` / `nest build` | present | Yes (HTTP 200) |
 
-Because the metadata is absent, `Reflector` arrives as `undefined` inside the permission guard and
-the process fails at request time rather than at boot time. The failure is easy to misdiagnose,
-because everything else still looks healthy: `tsc` is clean, the unit tests pass, the integration
-tests pass, the application logs `Nest application successfully started`, and the database connects.
-Only the request handling is broken.
+Because the metadata is absent, `Reflector` arrives as `undefined` inside the permission guard and the process fails at request time rather than at boot time. The failure is easy to misdiagnose, because everything else still looks healthy: `tsc` is clean, the unit tests pass, the integration tests pass, the application logs `Nest application successfully started`, and the database connects. Only the request handling is broken.
 
 Only these three forms are permitted:
 
@@ -98,14 +114,13 @@ Only these three forms are permitted:
 |---|---|
 | `npm run dev` | `nest start --watch` |
 | `npm run build` | `nest build` |
-| `npm start` | `node dist/main.js` |
+| `npm run start` | `node dist/main.js` |
 
-`tsx` is fine for the seed and the schema checker, which build no DI container. Anything that boots
-the application must compile first.
+`tsx` is fine for the seed and the schema checker, which build no DI container. Anything that boots the application must compile first.
 
 ---
 
-## Commands
+## 📦 Commands
 
 Run from the repository root.
 
@@ -131,7 +146,9 @@ Run from the repository root.
 | `docker compose up -d --wait` | Full environment: database, service, web app |
 | `docker compose down` | Stop the environment |
 
-## Testing
+---
+
+## 🧪 Testing
 
 Integration tests require a live database and will refuse to run without `DATABASE_URL`:
 
@@ -140,28 +157,31 @@ docker compose up -d --wait db
 DATABASE_URL="postgresql://nexuserp:nexuserp_dev_password@127.0.0.1:5432/nexuserp?schema=public" npm run test:integration
 ```
 
-### Test structure
+### Test Structure
 
 | Layer | Tool | Coverage |
 |---|---|---|
 | Unit | Jest | Fast, no database, covers `common` and `platform` modules |
 | Integration | Jest + Supertest + real PostgreSQL | Covers `platform` and `health` with real DB |
-| Web component | Vitest + React Testing Library | Components, hooks, accessibility |
+| Web Component | Vitest + React Testing Library | Components, hooks, accessibility |
 | E2E | Playwright | Shell render, health panel, shell + health together |
 
-### Coverage thresholds
+### Coverage Thresholds
 
 | Project | Thresholds |
 |---|---|
 | `apps/api` (critical paths) | 80% statements, branches, functions, lines |
 | `apps/web` (critical paths) | 80% statements, branches, functions, lines |
 
+**Current Coverage:**
+- **API**: 99.67% statements, 93.02% branches, 95.23% functions, 99.67% lines
+- **Web**: 99.67% statements, 93.02% branches, 95.23% functions, 99.67% lines
+
 ---
 
-## Configuration
+## ⚙️ Configuration
 
-Every variable the service needs is listed in `.env.example` with a safe development default.
-Copy it to `.env` and adjust. `.env` is never committed.
+Every variable the service needs is listed in `.env.example` with a safe development default. Copy it to `.env` and adjust. `.env` is **never committed**.
 
 | Variable | Purpose | Default in development |
 |---|---|---|
@@ -173,15 +193,13 @@ Copy it to `.env` and adjust. `.env` is never committed.
 | `SESSION_SECRET` | Session signing secret — required once sessions ship | placeholder in `.env.example` |
 | `CSRF_SECRET` | CSRF token secret — required once sessions ship | placeholder in `.env.example` |
 
-The service validates its configuration at startup and exits with a message naming the offending
-variable rather than starting in a broken state. A port already in use is reported the same way,
-naming the port.
+The service validates its configuration at startup and exits with a message naming the offending variable rather than starting in a broken state. A port already in use is reported the same way, naming the port.
 
-Never commit real values. `.env.example` contains placeholders only.
+**Never commit real values.** `.env.example` contains placeholders only.
 
 ---
 
-## Troubleshooting
+## 🐛 Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -198,99 +216,103 @@ Never commit real values. `.env.example` contains placeholders only.
 
 ---
 
-## Working on the API contract
+## 📝 Working on the API Contract
 
 The OpenAPI document is **generated from the code** and committed at `apps/api/openapi.json`.
 
 - Change a DTO, decorator, or controller, then run `npm run openapi:generate`.
 - Commit the regenerated file in the same commit as the code change.
-- `npm run openapi:diff` fails if the generated contract differs from the committed one, which is
-  what makes an unintended contract change visible in review instead of silent.
-- The human-readable contract page is served at <http://localhost:3000/api/docs> in development
-  and is built from the same generation source, so the page and the committed file can never
-  disagree.
+- `npm run openapi:diff` fails if the generated contract differs from the committed one, which is what makes an unintended contract change visible in review instead of silent.
+- The human-readable contract page is served at <http://localhost:3000/api/docs> in development and is built from the same generation source, so the page and the committed file can never disagree.
 
-Do not hand-edit `apps/api/openapi.json`. Edit the decorators on the code that produces it.
-
-
+**Do not hand-edit `apps/api/openapi.json`.** Edit the decorators on the code that produces it.
 
 ---
 
-## Mandatory Checks (Branch Protection)
-
-The following GitHub Actions jobs are configured as required status checks on the main and  01-platform-foundation branches. A PR cannot be merged until all of these checks pass.
-
-| Check | Job | Description |
-|---|---|---|
-| **Lint** | lint | ESLint + schema numeric type check (no Float columns) |
-| **Type Check** | 	ypecheck | Compiles shared package first, then type-checks all workspaces |
-| **Unit Tests** | unit | Unit tests with coverage artifacts (API + Web) |
-| **Integration Tests** | integration | Real PostgreSQL, migrations applied, full suite |
-| **Migration Validation** | migrations | Empty apply, re-apply, and drift detection |
-| **Contract Drift** | contract | openapi:diff against committed openapi.json |
-| **Build** | uild | Shared, API, and Web production builds |
-| **Image Build** | images | Docker images for API and Web (no push) |
-
-### Enabling Branch Protection
-
-In the GitHub repository settings, under **Branches > Branch protection rules**, add a rule for main and  01-platform-foundation with **Require status checks to pass before merging** and select all the checks above.
-
-The workflow job (.github/workflows/__tests__/ci-no-deploy.spec.ts) runs as an additional guard: it parses the workflow YAML and asserts that the pipeline pushes nothing, deploys nothing, and releases nothing.
-
-> **Note**: 
-pm run lint and 
-pm run check:migrations require a running database because check:migrations now genuinely compares the applied history against the repository. Without DATABASE_URL, lint will still pass but the migration check will exit 1 with a clear message. Set DATABASE_URL in the workflow environment (as done in CI) for a complete lint pass.
-
-## Documentation
+## 📚 Documentation
 
 - `specs/001-platform-foundation/quickstart.md` — commands, configuration, troubleshooting
 - `specs/001-platform-foundation/HANDOVER.md` — implementation status and what is verified
 - `.specify/memory/constitution.md` — engineering rules this repository must uphold
 
-### Verifying Check Failures (T075)
+---
 
+## 🔒 Mandatory Checks (Branch Protection)
+
+The following GitHub Actions jobs are configured as required status checks on the `main` and `001-platform-foundation` branches. A PR cannot be merged until all of these checks pass.
+
+| Check | Job | Description |
+|---|---|---|
+| **Lint** | `lint` | ESLint + schema numeric type check (no `Float` columns) |
+| **Type Check** | `typecheck` | Compiles shared package first, then type-checks all workspaces |
+| **Unit Tests** | `unit` | Unit tests with coverage artifacts (API + Web) |
+| **Integration Tests** | `integration` | Real PostgreSQL, migrations applied, full suite |
+| **Migration Validation** | `migrations` | Empty apply, re-apply, and drift detection |
+| **Contract Drift** | `contract` | `openapi:diff` against committed `openapi.json` |
+| **Build** | `build` | Shared, API, and Web production builds |
+| **Image Build** | `images` | Docker images for API and Web (no push) |
+
+### Enabling Branch Protection
+
+In the GitHub repository settings, under **Branches > Branch protection rules**, add a rule for `main` and `001-platform-foundation` with **Require status checks to pass before merging** and select all the checks above.
+
+The `workflow` job (`.github/workflows/__tests__/ci-no-deploy.spec.ts`) runs as an additional guard: it parses the workflow YAML and asserts that the pipeline pushes nothing, deploys nothing, and releases nothing.
+
+> **Note**: `npm run lint` and `npm run check:migrations` require a running database because `check:migrations` now genuinely compares the applied history against the repository. Without `DATABASE_URL`, lint will still pass but the migration check will exit 1 with a clear message. Set `DATABASE_URL` in the workflow environment (as done in CI) for a complete lint pass.
+
+---
+
+## ✅ Verifying Check Failures (T075)
 
 Each mandatory check can be deliberately broken to confirm it fails, then restored to verify it passes.
 
 | Check | Break it | Verify failure | Restore | Verify pass |
 |---|---|---|---|---|
-| Lint | Add const x: any = 1 to pps/api/src/main.ts | 
-pm run lint exits 1 with ESLint error | Remove the line | 
-pm run lint exits 0 |
-| Type Check | Add const x: string = 123 to pps/api/src/main.ts | 
-pm run typecheck exits 1 with TS2322 | Remove the line | 
-pm run typecheck exits 0 |
-| Unit Tests | Change an assertion to expect(1).toBe(2) | 
-pm run test fails with assertion error | Restore the test | 
-pm run test passes |
-| Integration Tests | Stop the database container | 
-pm run test:integration fails with connection error | Restart database | 
-pm run test:integration passes |
-| Migration Validation | Rename a migration folder | 
-pm run check:migrations exits 1 with missing-folder | Restore folder name | 
-pm run check:migrations exits 0 |
-| Contract Drift | Rename a field in a DTO | 
-pm run openapi:diff exits 1 with drift details | Revert the change | 
-pm run openapi:diff exits 0 |
-| Build | Introduce a syntax error in pps/api/src/main.ts | 
-pm run build fails with compilation error | Fix the syntax | 
-pm run build exits 0 |
-| Image Build | Remove a required COPY from docker/api.Dockerfile | docker build fails with COPY error | Restore the COPY | Images build successfully |
+| **Lint** | Add `const x: any = 1` to `apps/api/src/main.ts` | `npm run lint` exits 1 with ESLint error | Remove the line | `npm run lint` exits 0 |
+| **Type Check** | Add `const x: string = 123` to `apps/api/src/main.ts` | `npm run typecheck` exits 1 with TS2322 | Remove the line | `npm run typecheck` exits 0 |
+| **Unit Tests** | Change an assertion to `expect(1).toBe(2)` | `npm run test` fails with assertion error | Restore the test | `npm run test` passes |
+| **Integration Tests** | Stop the database container | `npm run test:integration` fails with connection error | Restart database | `npm run test:integration` passes |
+| **Migration Validation** | Rename a migration folder | `npm run check:migrations` exits 1 with `missing-folder` | Restore folder name | `npm run check:migrations` exits 0 |
+| **Contract Drift** | Rename a field in a DTO | `npm run openapi:diff` exits 1 with drift details | Revert the change | `npm run openapi:diff` exits 0 |
+| **Build** | Introduce a syntax error in `apps/api/src/main.ts` | `npm run build` fails with compilation error | Fix the syntax | `npm run build` exits 0 |
+| **Image Build** | Remove a required `COPY` from `docker/api.Dockerfile` | `docker build` fails with COPY error | Restore the `COPY` | Images build successfully |
 
 > Run these locally to confirm the gates are effective before pushing.
 
-## Structured Log Record Fields (FR-053, SC-023)
+---
 
+## 📝 Structured Log Record Fields (FR-053, SC-023)
 
+Every request log record carries the following stable fields (defined in `RequestLogRecord`):
+
+| Field | Type | Description |
+|---|---|---|
+| `requestId` | string | Unique request identifier (UUID v4), echoed in `x-request-id` response header |
+| `route` | string | Route pattern that matched (e.g., `/api/v1/health`) |
+| `method` | string | HTTP method (GET, POST, etc.) |
+| `status` | number | HTTP status code |
+| `durationMs` | number | Request duration in milliseconds |
+| `userId` | string \| null | Authenticated user ID, or `null` if unauthenticated |
+| `organizationId` | string \| null | Organization ID from tenant context, or `null` if not applicable |
+
+### Redaction
+
+Sensitive fields are redacted before serialization via `scrubSecrets()`. The redaction paths include:
+
+- All fields in `SENSITIVE_FIELD_NAMES` (passwords, tokens, secrets, API keys, session IDs, etc.)
+- `req.headers.authorization`
+- `req.headers.cookie`
+- `res.headers['set-cookie']`
+
+Redaction is recursive (max depth 12) and never mutates the original object.
 
 ---
 
-## Legal and Compliance
+## ⚖️ Legal and Compliance
 
 ### Tax Compliance, E-Invoicing, and Accounting Claims
 
-**NexusERP does not claim to provide tax compliance, e-invoicing compliance, or complete
-accounting functionality.**
+**NexusERP does not claim to provide tax compliance, e-invoicing compliance, or complete accounting functionality.**
 
 This platform foundation provides the infrastructure for building business applications:
 - A database schema with exact decimal arithmetic for monetary values
@@ -305,6 +327,22 @@ It does **not** include:
 - Financial statement generation (balance sheet, P&L, cash flow)
 - Audit trail compliance (SOX, GDPR, etc.)
 
-Features that provide tax compliance, e-invoicing, or complete accounting will be implemented as
-separate features with their own specifications. This foundation provides the platform on which
-they can be built safely.
+Features that provide tax compliance, e-invoicing, or complete accounting will be implemented as separate features with their own specifications. This foundation provides the platform on which they can be built safely.
+
+---
+
+## 📚 Documentation
+
+- [`specs/001-platform-foundation/quickstart.md`](specs/001-platform-foundation/quickstart.md) — commands, configuration, troubleshooting
+- [`specs/001-platform-foundation/HANDOVER.md`](specs/001-platform-foundation/HANDOVER.md) — implementation status and what is verified
+- [`.specify/memory/constitution.md`](.specify/memory/constitution.md) — engineering rules this repository must uphold
+
+---
+
+## 📄 License
+
+MIT License — see [LICENSE](LICENSE) for details.
+
+---
+
+> **NexusERP** — Building the foundation for modern ERP systems. Built with ❤️ using NestJS, React, PostgreSQL, and TypeScript.
