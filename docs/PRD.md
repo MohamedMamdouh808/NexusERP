@@ -15,7 +15,7 @@
 | Last Updated | 2026-10-17 |
 | Owner | Mohamed (Product Owner / PM) |
 | Team Members | Frontend Dev, Backend Dev, Designer, QA, Engineering Lead [TBD], Pilot Business Representative [TBD] |
-| Tech Stack | React 18+, TypeScript, Vite, Tailwind CSS, Node.js LTS, NestJS, Prisma, PostgreSQL, Docker, GitHub Actions |
+| Tech Stack | React 18+, TypeScript, Vite, Tailwind CSS, Node.js LTS, NestJS, Prisma, PostgreSQL, GitHub Actions |
 | Repository | [TBD] |
 | Git Branch Prefix | NNN-feature-name |
 | PRD File Path | docs/PRD.md |
@@ -79,7 +79,7 @@ The MVP is validated when the criteria in Section 12 are met: the pilot cycle co
 - Operational invoicing and full or partial payment recording with allocation to invoices.
 - Audit log of important business and administrative actions.
 - Minimum operational reporting (stock, movements, outstanding invoices, document statuses, stock reconciliation).
-- Responsive web interface for desktop and tablet, REST API with OpenAPI documentation, automated tests, migrations, seed data, Docker development environment, and documented deployment.
+- Responsive web interface for desktop and tablet, REST API with OpenAPI documentation, automated tests, migrations, seed data, a local development environment (Node + a locally installed PostgreSQL 17), and documented deployment.
 
 ### Out of Scope
 - Full accounting, general ledger, chart of accounts, financial statements.
@@ -1047,10 +1047,10 @@ All endpoints use the `/api/v1` prefix and require authentication except registe
 | Reservation | ACTIVE → CONSUMED (shipment) or RELEASED (cancellation) |
 
 ### 9.9 Infrastructure and Deployment
-- Docker images for the backend and a static build of the frontend served by the hosting platform or the backend.
+- Frontend built and served by Vercel, backend built and run by Render's native Node runtime, and database on Supabase (managed PostgreSQL 17).
 - Hosting: Railway or Render for the MVP, with managed PostgreSQL providing backups, access control, and encryption at rest. Final provider selection compares cost, database reliability, backup and restore options, deployment simplicity, and data location.
 - Environments: development, test, and production, each with separate configuration and secrets.
-- GitHub Actions pipeline: dependency install with lockfile check, lint, format check, type check, unit tests, integration tests against PostgreSQL, build verification, Docker build, migration validation, and protected deployment.
+- GitHub Actions pipeline: dependency install with lockfile check, lint, format check, type check, unit tests, integration tests against PostgreSQL, build verification, migration validation, and protected deployment.
 - Deployment documentation covers migration, rollback, backup, and restore procedures.
 - Deployments are blocked when any mandatory check fails.
 
@@ -1069,7 +1069,7 @@ All endpoints use the `/api/v1` prefix and require authentication except registe
 - **Tasks:**
   - [ ] Finalize PRD approval and core workflow definitions (P0 scope frozen).
   - [ ] Record architecture decisions and the initial entity-relationship diagram.
-  - [ ] Create the repository, branch conventions, Docker development environment, and GitHub Actions pipeline (P0-F014).
+  - [ ] Create the repository, branch conventions, local development environment, and GitHub Actions pipeline (P0-F014).
   - [ ] Scaffold the NestJS backend and the React frontend; set up design tokens and base components.
   - [ ] Create PostgreSQL schema foundations, Prisma migrations, and seed data.
   - [ ] Implement authentication, sessions, CSRF, and rate limiting (P0-F001).

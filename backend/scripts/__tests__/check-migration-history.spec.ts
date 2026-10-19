@@ -235,7 +235,7 @@ describe('runMigrationHistoryCheck decides rather than exiting (FR-014)', () => 
       const output = lines.join('\n');
       expect(output).toContain('DATABASE_URL');
       // A refusal must tell the reader how to satisfy it, or it is just a refusal.
-      expect(output).toMatch(/docker compose up|\.env/);
+      expect(output).toMatch(/\.env/);
       // And it must not imply anything was verified.
       expect(output).not.toMatch(/consistent/i);
     } finally {

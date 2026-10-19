@@ -18,11 +18,10 @@
  *
  * Why it can silently skip:
  *
- * Both Dockerfiles copy the workspace manifests and the lockfile first and run `npm ci`
- * before the sources, so the dependency layer stays cached. This hook therefore runs in
- * the image with no schema on disk. It must not fail there. The Dockerfile runs
- * `prisma generate` explicitly once the sources are copied, so the client is still
- * present in the build stage.
+ * The schema path below is resolved against the directory the install ran in, so an
+ * install that happened before `database/prisma/schema.prisma` was on disk cannot
+ * generate anything. Failing there would report a broken install for a repository that
+ * simply is not fully checked out, so the hook says what it skipped and exits 0.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -34,7 +33,7 @@ const SCHEMA = join('database', 'prisma', 'schema.prisma');
 if (!existsSync(SCHEMA)) {
   console.log(
     'postinstall: database/prisma/schema.prisma is not present yet, so prisma generate is ' +
-      'skipped. This is expected when installing manifests before sources, as the Dockerfiles do.',
+      'skipped. This is expected when the install ran before the sources were present.',
   );
   process.exit(0);
 }

@@ -124,17 +124,6 @@
 
 ---
 
-## Phase 6: Docker & Docker Compose Updates
-
-- [ ] T035 `git mv docker/api.Dockerfile docker/backend.Dockerfile`
-- [ ] T036 `git mv docker/web.Dockerfile docker/frontend.Dockerfile`
-- [ ] T036 Update `docker/backend.Dockerfile`: update paths, add `COPY ../../database/prisma ./prisma`
-- [ ] T037 Update `docker/frontend.Dockerfile` paths from `apps/web` to `frontend`
-- [ ] T038 Update `docker-compose.yml` build contexts and Dockerfile paths
-- [ ] T038 Update `docker/api-entrypoint.sh` if paths changed
-
----
-
 ## Phase 5: GitHub Actions Workflows
 
 - [ ] T039 Update `.github/workflows/ci.yml`: paths, cache keys, working directories
@@ -144,11 +133,9 @@
 
 ## Phase 6: Configuration Files
 
-- [ ] T039 Update `.dockerignore` paths
 - [ ] T038 Update `.prettierignore` paths
 - [ ] T038 Update `.gitignore` paths
 - [ ] T039 Update `.prettierignore` paths
-- [ ] T039 Update `.dockerignore` paths
 
 ---
 
@@ -164,24 +151,11 @@
 
 ---
 
-## Phase 6: Docker & Docker Compose Updates
-
-- [ ] T038 `git mv docker/api.Dockerfile docker/backend.Dockerfile`
-- [ ] T038 `git mv docker/web.Dockerfile docker/frontend.Dockerfile`
-- [ ] T039 Update `docker/backend.Dockerfile` paths and add `COPY ../../database/prisma ./prisma`
-- [ ] T039 Update `docker/frontend.Dockerfile` paths
-- [ ] T039 Update `docker-compose.yml` build contexts and Dockerfile paths
-- [ ] T039 Update `docker/api-entrypoint.sh` if paths changed
-
----
-
 ## Phase 7: Configuration Files
 
-- [ ] T039 Update `.dockerignore` paths
 - [ ] T039 Update `.prettierignore` paths
 - [ ] T038 Update `.gitignore` paths
 - [ ] T038 Update `.prettierignore` paths
-- [ ] T039 Update `.dockerignore` paths
 
 ---
 
@@ -210,13 +184,6 @@
 
 ---
 
-## Phase 8: Dockerfile Tests Update
-
-- [ ] T042 Update `scripts/__tests__/dockerfile-layer-order.spec.ts` paths
-- [ ] T042 Update `test/integration/entrypoint-fail-fast.spec.ts` paths
-
----
-
 ## Phase 9: GitHub Actions Workflow Test
 
 - [ ] T042 Update `.github/workflows/__tests__/ci-no-deploy.spec.ts` paths
@@ -227,7 +194,6 @@
 
 - [ ] T043 Run verification: clean clone test, npm ci, typecheck, lint, check:migrations, tests
 - [ ] T043 Verify openapi:diff empty
-- [ ] T043 Verify docker compose up -d --wait healthy
 - [ ] T043 Run full test suite
 - [ ] T043 Guard audit: verify each guard fails when deliberately broken
 - [ ] T043 Update HANDOVER.md with restructure notes
@@ -249,24 +215,20 @@
 - TypeScript Config: 4 tasks
 - Database Prisma Config: 2 tasks
 - Root Scripts: 4 tasks
-- Docker & Docker Compose: 5 tasks
 - GitHub Actions: 2 tasks
 - Configuration Files: 5 tasks
 - Boundary Enforcement: 6 tasks
-- Docker & Docker Compose: 6 tasks
 - GitHub Actions: 2 tasks
 - Configuration Files: 5 tasks
 - Boundary Enforcement Tests: 3 tasks
-- Dockerfile Tests: 2 tasks
 - GitHub Actions Workflow Test: 1 task
 - Documentation Updates: 6 tasks
 - 001 Feature Documents: 1 task
 - Structure Guard: 2 tasks
-- Dockerfile Tests: 2 tasks
 - GitHub Actions Workflow Test: 1 task
 - Verification & Documentation: 6 tasks
 
-**Total Tasks: ~75 tasks**
+**Total Tasks: ~56 tasks**
 
 ---
 
@@ -287,15 +249,12 @@ Root Config (T024-T026)
 TypeScript Configs (T027-T029)
 Database Prisma Config (T030-T031)
 Root Scripts (T032-T035)
-Docker & Docker Compose (T035-T039)
 GitHub Actions (T039-T040)
 Config Files (T039-T039)
 Boundary Enforcement (T040-T035)
-Docker & Docker Compose (T035-T039)
 GitHub Actions (T039-T039)
 Config Files (T039)
 Boundary Enforcement Tests (T035)
-Dockerfile Tests (T042)
 GitHub Actions Workflow Test (T042)
 Documentation Updates (T040-T043)
 Verification & Documentation (T043)
@@ -309,10 +268,10 @@ Verification & Documentation (T043)
 - **T015-T020** (database workspace) can run in parallel with T020-T023 (backend) and T022-T023 (frontend)
 - **T024-T026** (root config) can run after all moves complete
 - **T027-T029** (TS configs) can run in parallel with T030-T031
-- **T032-T035** (scripts) can run in parallel with T035-T039 (Docker)
+- **T032-T035** (scripts) can run in parallel with the GitHub Actions updates
 - **T039** (GitHub Actions) and **T039** (Config files) can run in parallel
-- **T040** (Boundary enforcement) and **T035** (Docker) can run in parallel
-- **T041** (Structure guard) and **T042** (Dockerfile tests) can run in parallel
+- **T040** (Boundary enforcement) and **T039** (Config files) can run in parallel
+- **T041** (Structure guard) and **T042** (GitHub Actions workflow test) can run in parallel
 - **T043** (Verification) must run last after all implementation
 
 ---
@@ -324,12 +283,11 @@ Verification & Documentation (T043)
 - Database workspace creation (T002-T019)
 - Root workspace config updates (T024-T026)
 - Basic boundary enforcement (T035)
-- Docker/Compose updates (T035-T039)
 - All tests passing (T043)
 
 ### Incremental Delivery
 1. **Week 1**: File restructure + Database workspace + Root config
-2. **Week 2**: Backend/Frontend updates + Docker + CI
+2. **Week 2**: Backend/Frontend updates + CI
 3. **Week 2-3**: Boundary enforcement + Tests + Docs
 3. **Week 3**: Verification + Guard audits
 
@@ -342,7 +300,6 @@ Verification & Documentation (T043)
 - [ ] Lint passes: `npm run lint`
 - [ ] `npm run check:migrations` passes
 - [ ] `npm run openapi:diff` shows empty diff
-- [ ] `docker compose up -d --wait` reaches healthy
 - [ ] `npm run test:e2e` passes
 - [ ] All guards fail when deliberately broken
 - [ ] `git log --follow` works on moved files
@@ -359,8 +316,6 @@ Verification & Documentation (T043)
 | `apps/api/prisma/` | `database/prisma/` |
 | `apps/web` | `frontend/` |
 | `packages/shared/` | `shared/` |
-| `docker/api.Dockerfile` | `docker/backend.Dockerfile` |
-| `docker/web.Dockerfile` | `docker/frontend.Dockerfile` |
 | `apps/api/prisma/` | `database/prisma/` |
 | `packages/shared/` | `shared/` |
 
@@ -371,13 +326,13 @@ Verification & Documentation (T043)
 - [ ] SC-001: Each workspace passes same test count (160 unit, 51 integration, 58 web, 5 e2e)
 - [ ] SC-002: `openapi:diff` empty diff
 - [ ] SC-003: Clean clone: `npm ci`, `typecheck`, `lint`, `check:migrations`, all tests pass
-- [ ] SC-004: `docker compose up -d --wait` healthy from fresh volume
+- [ ] SC-004: Migrations apply from empty and the seed is idempotent from a fresh database
 - [ ] SC-005: All CI jobs green
-- [ ] SC-006: All 10 guards fail when deliberately broken
+- [ ] SC-006: All 8 guards fail when deliberately broken
 - [ ] SC-007: `git log --follow` works on moved files
-- [ ] SC-008: Docker compose healthy from fresh volume
+- [ ] SC-008: Migrations apply from empty and the seed is idempotent from a fresh database
 - [ ] SC-009: All CI jobs green
-- [ ] SC-010: All 10 guards fail when deliberately broken
+- [ ] SC-010: All 8 guards fail when deliberately broken
 
 ---
 
@@ -386,4 +341,4 @@ Verification & Documentation (T043)
 **Branch**: `002-repo-restructure`  
 **Spec**: `specs/002-repo-restructure/spec.md`  
 **Plan**: `specs/002-repo-restructure/plan.md`  
-**Total Tasks**: ~75 tasks across 10 phases
+**Total Tasks**: ~56 tasks across 10 phases

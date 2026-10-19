@@ -15,9 +15,8 @@
  *
  * This wrapper loads the root `.env` into `process.env` and then runs the requested
  * command with the same environment, so the documented command and the documented
- * location finally agree. Values already present in the environment win, which keeps
- * CI and the Docker builds — where variables are injected rather than read from a file
- * — working unchanged.
+ * location finally agree. Values already present in the environment win, which keeps CI
+ * — where variables are injected rather than read from a file — working unchanged.
  *
  * It is a thin wrapper on purpose: it does not parse Prisma's output or interpret
  * exit codes, it simply hands the process through and propagates the exit code.
@@ -71,8 +70,8 @@ const environment = { ...process.env };
 if (existsSync(envPath)) {
   const fromFile = parseEnvFile(readFileSync(envPath, 'utf8'));
   for (const [key, value] of Object.entries(fromFile)) {
-    // Never override a variable that is already set: CI and the images inject their
-    // own values and must not be overruled by a developer's local file.
+    // Never override a variable that is already set: CI injects its own values and
+    // must not be overruled by a developer's local file.
     if (environment[key] === undefined) {
       environment[key] = value;
     }

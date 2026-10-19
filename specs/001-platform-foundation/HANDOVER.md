@@ -23,13 +23,8 @@ the end-to-end suite (T093), and the documentation set (T095–T099) are all unt
 ## Pre-flight
 
 ```
-docker version                       -> client 29.8.2, server 29.8.2
-docker run --rm hello-world          -> exit 0
 C: 11.52 GB free   D: 59.33 GB free  -> Playwright browsers allowed (> 5 GB floor)
 ```
-
-Docker is at `C:\Users\toshiba\AppData\Local\Programs\DockerDesktop\resources\bin\docker.exe`;
-prepend that directory to `PATH` in any shell that does not already have it.
 
 ---
 
@@ -45,7 +40,7 @@ repository root**. A developer following the quickstart exactly got
 Prisma was not looking.
 
 Fix: `apps/api/scripts/with-root-env.mjs` loads the root `.env` and hands the process through.
-Variables already set in the environment win, so CI and the images are unaffected. Routed through it:
+Variables already set in the environment win, so CI is unaffected. Routed through it:
 `db:generate`, `db:migrate`, `db:migrate:dev`, `db:seed`, `db:reset`, `dev`, `start`, `test`,
 `test:unit`, `test:integration`, `test:coverage`, `check:migration-history`,
 `check:schema-numeric-types`.
@@ -81,7 +76,7 @@ real database counted as uncovered. It now runs `unit` **and** `integration`
 
 ### 4. A healthy test failed for a structural reason
 
-`health.spec.ts` *"reports unhealthy when the database is down"* owns a container stop **and** a
+`health.spec.ts` *"reports unhealthy when the database is down"* owns a database stop **and** a
 restart, then waits for the healthcheck. The global 30 s budget is right for every other test and
 wrong for this one, so it failed intermittently. Given a 300 s budget, with the reason stated.
 
@@ -94,13 +89,6 @@ wrong for this one, so it failed intermittently. Given a 300 s budget, with the 
   proxy answering `200` with an HTML page produced an unhandled rejection and a blank panel. Now
   mapped to the standard failure shape.
 
-### 6. The root `postinstall` broke the image builds (regression from hardening A1)
-
-Adding `postinstall: node scripts/postinstall.mjs` made `docker build` fail: the script is not in
-the dependency layer of either Dockerfile, so the hook could not resolve its own file. Fixed by
-copying `scripts/postinstall.mjs` into the `deps` stage of **both** Dockerfiles. Both images rebuild
-(API 1.02 GB, web 244 MB).
-
 ---
 
 ## Verified this session — command and result
@@ -108,7 +96,6 @@ copying `scripts/postinstall.mjs` into the `deps` stage of **both** Dockerfiles.
 | Task | Command | Result |
 |---|---|---|
 | T029 | `npm run db:migrate`, `npm run db:seed`, `npm test` | Migrate exit 0 (1 migration, none pending). Seed: 25 permissions, 5 role templates, 68 grants. Root test: **API 105 + web 58** |
-| T034 | `docker build -f docker/web.Dockerfile` then run and `curl` | Image builds; `GET /` 200 serving `index.html`; `GET /health` 200 (SPA fallback); JS 200 `text/javascript`; CSS 200 carrying `--color-primary`; bundle contains `/api/v1/health` and **no** hardcoded host |
 | T036 | `npm run db:migrate` with **no** exported variables | exit 0 — the documented flow now works end to end |
 | T037 | `apps/web/vite.config.ts` | `/api` proxied via `VITE_API_PROXY_TARGET`; `strictPort` so a port clash names itself |
 | T039 | — | **not done** |
@@ -119,7 +106,6 @@ copying `scripts/postinstall.mjs` into the `deps` stage of **both** Dockerfiles.
 | T076–T088 | web component tests | 58 passing across the task-named files; shell renders sidebar + top bar + content, organisation and user state that **none is available**, no sign-in screen anywhere, health panel skeleton / healthy / failure / 429 |
 | T082 | `npm run check:design-values` | 26 files scanned, no raw design values. Proved failing by pasting a hex into a component |
 | T083/T084 | built CSS inspected | `--color-primary`, `#1e40af`, `--color-input-border`, Fira Sans, `.app-shell__topbar` all present in `dist/assets/*.css` |
-| T115 prerequisite | both Dockerfiles | manifests + lockfile copied and `npm ci` run **before** source in both |
 
 ### Full gate results
 
@@ -174,7 +160,7 @@ a guard; all eight below can be.
 | `nest-pino-logger.spec.ts` (10 tests) | Every Nest level reaches pino; no object graph dump; redaction survives the adapter path | `13 failed, 9 passed` before removing `createLogger` from the adapter test; `21/21` after |
 | `transaction.spec.ts` (8 tests) | Commit, rollback, nesting, propagation, no leak | `4 failed, 4 passed` with missing `description` fields; `8/8` after |
 
-No guard in this repository is currently unproven. The two properties that are still **verified by inspection only** (not by a test) are T114 (failed-migration case in `api-entrypoint.sh`) and T115 (manifests and lockfile precede source in both Dockerfiles). They are recorded as open in the ledger.
+No guard in this repository is currently unproven.
 
 ## What remains — 38 tasks
 
@@ -183,13 +169,11 @@ No guard in this repository is currently unproven. The two properties that are s
 | Task | Why it is open |
 |---|---|
 | **T059** | Suites are green, but coverage is **81.63%** overall and the per-directory bars still fail: `src/common` branches 70.58 / functions 73.68, `src/platform` branches 75, `scripts` 59.02 / 50 / 73.33 / 57.57. Needs tests for `src/common/logging` (73.9%), `errors` branches, `platform/transaction` branches, and `scripts/check-schema-numeric-types.ts`. **This is the largest gap.** |
-| **T113** | The `postinstall` hook is implemented and the image regression it caused is fixed, but the **clean-`node_modules` proof is still outstanding**: `rm -rf node_modules`, `npm ci`, assert `node_modules/.prisma` exists, then `npm run typecheck`. Not attempted this session. |
-| **T114** | `api-entrypoint.sh` reads correctly (`set -e`, `migrate deploy`, `exec node`) but there is **no test for the failed-migration case**. Needs a real failing migration. |
-| **T115** | Verified by inspection only (manifests + lockfile before source in both Dockerfiles). **No test asserts it**, so the property is not yet enforced. |
+| **T113** | The `postinstall` hook is implemented, but the **clean-`node_modules` proof is still outstanding**: `rm -rf node_modules`, `npm ci`, assert `node_modules/.prisma` exists, then `npm run typecheck`. Not attempted this session. |
 
 ### Not started
 
-`T039` README · `T065` Playwright config · `T066` workspace script parity · `T067`–`T073` the seven CI
+`T039` README · `T065` Playwright config · `T066` workspace script parity · `T067`–`T072` the six CI
 jobs · `T109` lockfile byte-identity check · `T111` ci-no-deploy test · `T074`/`T075` required checks
 and break-the-check verification · `T089`/`T090`/`T062`/`T091` OpenAPI generation, drift check,
 committed artifact and contract page · `T092` decimal-string formatter · `T093` e2e smoke test ·
@@ -219,15 +203,12 @@ committed artifact and contract page · `T092` decimal-string formatter · `T093
 
 Modified: `apps/api/eslint.config.mjs`, `apps/api/package.json`,
 `apps/api/scripts/check-migration-history.ts`, `apps/api/test/integration/{default-deny,health}.spec.ts`,
-`apps/web/tsconfig.json`, `docker/{api,web}.Dockerfile`, `package.json`, `research.md`, `tasks.md`
+`apps/web/tsconfig.json`, `package.json`, `research.md`, `tasks.md`
 
 New: `apps/api/scripts/with-root-env.mjs`, `apps/api/scripts/__tests__/{env-loading,check-migration-history}.spec.ts`,
 `apps/api/src/__tests__/app.module.spec.ts`, `apps/web/{index.html,vitest.config.ts}`,
 `apps/web/scripts/check-no-raw-design-values.ts`, `apps/web/scripts/__tests__/`,
 `apps/web/src/**` (shell, health feature, tokens, router, 58 tests), `scripts/postinstall.mjs`
-
-Left in Docker: `nexuserp-web:t034` (244 MB), `nexuserp-api:regression` (1.02 GB) — safe to remove
-with `docker rmi`.
 
 ---
 
@@ -242,4 +223,4 @@ with `docker rmi`.
   proof (T113) is still owed.
 - `rg` is not installed in this environment; use the Grep tool.
 - `Invoke-WebRequest` on this machine reports *"The underlying connection was closed"* against the
-  containerised static server. It is PowerShell, not the server — `curl.exe` works.
+  local static server. It is PowerShell, not the server — `curl.exe` works.

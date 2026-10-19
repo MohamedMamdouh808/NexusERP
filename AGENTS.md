@@ -2,12 +2,13 @@
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
 
-**Current Plan**: [001-platform-foundation](specs/001-platform-foundation/plan.md)
-**Spec**: [001-platform-foundation/spec.md](specs/001-platform-foundation/spec.md)
-**Research decisions**: [research.md](specs/001-platform-foundation/research.md)
-**Data model**: [data-model.md](specs/001-platform-foundation/data-model.md)
-**API contract**: [contracts/openapi.yaml](specs/001-platform-foundation/contracts/openapi.yaml) and [contracts/error-catalog.md](specs/001-platform-foundation/contracts/error-catalog.md)
-**Setup and commands**: [quickstart.md](specs/001-platform-foundation/quickstart.md)
+**Current Plan**: [003-staging-deployment](specs/003-staging-deployment/plan.md)
+**Spec**: [003-staging-deployment/spec.md](specs/003-staging-deployment/spec.md)
+**Research decisions**: [research.md](specs/003-staging-deployment/research.md)
+**Data model**: [data-model.md](specs/003-staging-deployment/data-model.md)
+**Deploy contract**: [contracts/deploy-definitions.md](specs/003-staging-deployment/contracts/deploy-definitions.md) and [contracts/environment-variables.md](specs/003-staging-deployment/contracts/environment-variables.md)
+**Setup and commands**: [quickstart.md](specs/003-staging-deployment/quickstart.md)
+**Deployment runbook**: [docs/staging-deployment.md](docs/staging-deployment.md)
 **Project rules**: [.specify/memory/constitution.md](.specify/memory/constitution.md)
 **Product requirements**: [docs/PRD.md](docs/PRD.md)
 **Design system**: [design-system/nexuserp/MASTER.md](design-system/nexuserp/MASTER.md)

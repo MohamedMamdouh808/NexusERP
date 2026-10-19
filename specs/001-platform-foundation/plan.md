@@ -6,7 +6,7 @@
 ## Summary
 
 Deliver the NexusERP platform foundation: one repository holding a NestJS service and a React web
-app in npm workspaces, a Docker Compose environment running real PostgreSQL, Prisma migrations
+app in npm workspaces, a locally installed PostgreSQL 17 server for development, Prisma migrations
 with idempotent reference data, a GitHub Actions pipeline that gates every merge, and the
 cross-cutting HTTP concerns every later feature depends on — a single error envelope, request
 identifiers, structured JSON logging, a health endpoint, and a generated OpenAPI contract.
@@ -47,7 +47,7 @@ Service — Jest with two projects in one configuration: `unit` (no database) an
 Web — Vitest with React Testing Library for components and hooks; Playwright for the smoke test.
 Coverage thresholds enforced inside the runners: 80% for critical paths, reported as a CI artifact.
 
-**Target Platform**: Node.js LTS on Linux containers. The service runs on Railway or Render with
+**Target Platform**: Node.js LTS. The service runs on Railway or Render with
 managed PostgreSQL; selection is deferred to the deployment and operations work
 ([research.md R-019](research.md)). The web app is a static build. Browser support is Chrome 100+,
 Safari 15+, Firefox 100+, Edge (Chromium), at desktop (1024px+) and tablet (768–1023px) widths.
@@ -101,8 +101,7 @@ requirements exist.
 **Scale/Scope**:
 Pilot dataset target is 10,000 products, 100,000 stock movements, and 50,000 invoices. This
 feature creates three global reference tables and no tenant-owned table. Expected output is one
-service package, one web package, one shared package, two Dockerfiles, one Compose file, and one
-pipeline workflow.
+service package, one web package, one shared package, and one pipeline workflow.
 
 ## Constitution Check
 
@@ -204,9 +203,9 @@ Four further clarifications in the same session confirmed decisions the plan had
 none of them altered the design:
 
 - **Deployment** — the pipeline stops at verification. [research.md R-013](research.md) already
-  listed eight mandatory verification jobs and no deploy stage, and R-019 already committed to
-  portable images with hosting deferred. The specification now states the prohibition explicitly in
-  FR-050a/FR-050b so it cannot be read as an omission.
+  listed seven mandatory verification jobs and no deploy stage, and R-019 already deferred hosting.
+  The specification now states the prohibition explicitly in FR-050a so it cannot be read as an
+  omission.
 - **Rate limiting** — the error shape ships, the mechanism does not. [research.md R-005](research.md)
   already defined the catalogued codes, and R-020 already excluded a limiter. The specification now
   adds FR-022a/FR-022b and SC-021 so the client is correct before any limiter exists.
@@ -248,20 +247,11 @@ NexusERP/
 ├── .env.example                     # Every required variable with a safe development default
 ├── .gitignore
 ├── README.md                        # Entry point: quickstart link, error codes, health address
-├── docker-compose.yml               # db + api + web, healthchecked, used with --wait
-├── .dockerignore
-│
-├── docker/
-│   ├── api.Dockerfile               # Multi-stage: deps -> build -> runtime
-│   └── web.Dockerfile               # Multi-stage: deps -> build -> static assets
 │
 ├── .github/workflows/
 │   ├── ci.yml                       # Mandatory job graph; see research.md R-013
 │   └── __tests__/
 │       └── ci-no-deploy.spec.ts     # Asserts the workflow deploys nothing (FR-050a, T111)
-│
-├── scripts/
-│   └── verify-image-portability.sh  # Runs the built image with only documented config (SC-020, T108)
 │
 ├── apps/
 │   ├── api/                         # NestJS service (the only consumer of the database)
@@ -363,7 +353,6 @@ holds exactly one file:
 |---|---|---|
 | `apps/api/scripts/` | `check-schema-numeric-types.ts` and its test | Makes Constitution Principle IV structural: a `Float` column in the schema fails the lint command, so a later feature cannot introduce floating-point storage silently (T107, T110) |
 | `apps/web/scripts/` | `__tests__/no-raw-design-values.spec.ts` | Makes Constitution Principle VIII structural: a raw color or font value anywhere under `apps/web/src` fails the test, so the token pipeline cannot be bypassed by pasting a hex value into a component (T082) |
-| `scripts/` | `verify-image-portability.sh` | Proves the pipeline image runs with only documented configuration, which is what makes hosting genuinely undecided (SC-020, T108) |
 | `.github/workflows/__tests__/` | `ci-no-deploy.spec.ts` | Makes FR-050a enforceable: the assertion reads the workflow definition, so the pipeline cannot acquire a deploy step without failing its own test (T111) |
 
 **Structure Decision**: npm workspaces with `apps/api`, `apps/web`, and `packages/shared` as
@@ -406,8 +395,8 @@ set aside.
 Complete. See [research.md](research.md): 20 decisions, each with rationale and rejected
 alternatives, covering repository layout, runtime pins, the transaction unit of work, decimal
 handling, the error envelope, request identity, structured logging, the health contract, OpenAPI
-generation and drift detection, the migration lifecycle, idempotent seeding, the Compose
-environment, the CI job graph and blocking policy, the design-token bridge, the session scope
+generation and drift detection, the migration lifecycle, idempotent seeding, the local
+development environment, the CI job graph and blocking policy, the design-token bridge, the session scope
 boundary, the reference-data scope boundary, coverage thresholds, reproducible installs, hosting
 portability, and the test-layer split. No `NEEDS CLARIFICATION` item remains unresolved.
 

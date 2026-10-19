@@ -4,7 +4,7 @@
 **Created**: 2026-10-18
 **Status**: Draft
 **MoSCoW Priority**: P0 (P3 is never implemented in v1 — Principle IX)
-**Input**: User description: "Set up the NexusERP foundation: a NestJS backend and React frontend in one repository, Docker development environment with PostgreSQL, Prisma migrations and seed data, GitHub Actions CI (lint, type check, unit and integration tests against PostgreSQL, build, Docker build, migration validation), a standard API error format ({code, message, details, requestId}), health endpoint GET /api/v1/health, OpenAPI generation, and structured JSON logging with request IDs. See docs/PRD.md Sections 7.0, 8, 9.2, 9.9."
+**Input**: User description: "Set up the NexusERP foundation: a NestJS backend and React frontend in one repository, a local development environment with PostgreSQL, Prisma migrations and seed data, GitHub Actions CI (lint, type check, unit and integration tests against PostgreSQL, build, migration validation), a standard API error format ({code, message, details, requestId}), health endpoint GET /api/v1/health, OpenAPI generation, and structured JSON logging with request IDs. See docs/PRD.md Sections 7.0, 8, 9.2, 9.9."
 
 ---
 
@@ -13,7 +13,7 @@
 ### Session 2026-10-18
 
 - Q: What the web app shows before authentication exists → A: App shell plus a health status panel only; sidebar and top bar render clearly labelled placeholders for organization and user until authentication ships.
-- Q: Scope of the production deployment stage in the pipeline → A: Pipeline stops at verification; images are built and proven buildable, and the deploy stage and hosting configuration belong to the operations feature.
+- Q: Scope of the production deployment stage in the pipeline → A: Pipeline stops at verification; the build succeeds and is verified, and the deploy stage and hosting configuration belong to the operations feature.
 - Q: Rate limiting in this feature → A: Ship only the 429 error shape and `Retry-After` handling in the web client; the limiting mechanism itself arrives with authentication, where the PRD's real targets live.
 - Q: Product analytics and error monitoring in this feature → A: Neither. This feature produces the log records and error context that both services consume; the integrations themselves arrive later, once the vendor and a real user workflow exist.
 - Q: Availability and recovery expectations for the foundation → A: No availability SLO here. The feature guarantees only the health endpoint's correctness and its own fast-fail startup; uptime, backup, and recovery targets attach when a hosted environment exists.
@@ -92,8 +92,7 @@ API behavior.
 Every change proposed to the repository is verified automatically before it can be merged. A
 developer learns within minutes that a change breaks a rule, a type, a unit test, an integration
 test, a build, or the database schema. A change that would alter the database in an unreviewable
-way is refused rather than applied silently, and a change that cannot produce a working image is
-never merged.
+way is refused rather than applied silently.
 
 **Why this priority**: With one developer and a 16-week schedule, a broken merge is discovered
 late or not at all. Automated verification is the only control that keeps quality constant while
@@ -115,8 +114,7 @@ Deliverable value: a merge gate nobody can bypass.
    when a migration cannot be applied from empty or cannot be applied in sequence.
 4. **Given** a change that alters the published API contract unintentionally, **When** the
    contract is regenerated, **Then** the difference is surfaced for review.
-5. **Given** a clean change, **When** the pipeline runs, **Then** every mandatory check passes,
-   including producing a deployable image.
+5. **Given** a clean change, **When** the pipeline runs, **Then** every mandatory check passes.
 
 ---
 
@@ -189,7 +187,7 @@ Deliverable value: a single coherent, documented project.
 - The health panel loads while the service is unreachable — the shell still renders, and the panel
   shows the failure with a retry action rather than an empty or blank area.
 - A change is merged to the default branch — nothing is deployed and no hosted environment is
-  restarted; the pipeline's terminal action is producing a verified image.
+  restarted; the pipeline's terminal action is verification.
 
 ---
 
@@ -204,8 +202,7 @@ Deliverable value: a single coherent, documented project.
 - **FR-002**: The two parts MUST be independently runnable and buildable from that single
   repository, without a second repository or a manual copy step.
 - **FR-003**: The repository MUST provide a documented directory layout so a contributor can locate
-  the interface, the service, the database schema, the automated checks, and the image build
-  definitions without guesswork.
+  the interface, the service, the database schema, and the automated checks without guesswork.
 - **FR-004**: Credentials, keys, and environment-specific values MUST NOT be committed to the
   repository; the project MUST provide a documented example of every value the service needs.
 
@@ -363,12 +360,9 @@ Deliverable value: a single coherent, documented project.
   database and that the schema matches the repository's expectations.
 - **FR-049**: The pipeline MUST verify dependencies can be installed reproducibly from the
   committed lock definitions.
-- **FR-050**: The pipeline MUST verify that a deployable image can be produced for the service, and
-  that the interface can be built into static assets.
+- **FR-050**: The pipeline MUST verify that the interface can be built into static assets.
 - **FR-050a**: The pipeline MUST NOT deploy. Merging any change MUST NOT push, publish, or restart
   anything in a hosted environment. Verification is the terminal action of this pipeline.
-- **FR-050b**: The images the pipeline produces MUST be portable and host-agnostic, so the hosting
-  platform can be chosen later without rebuilding or restructuring them.
 - **FR-051**: A change MUST NOT be merged while the pipeline is failing or has not completed.
 - **FR-052**: The project MUST document what each mandatory check covers and how to reproduce a
   failure locally.
@@ -487,8 +481,7 @@ Deliverable value: a single coherent, documented project.
   the pipeline fails if the integration suite is skipped or runs without a real database.
 - **SC-012**: Migrations apply cleanly from an empty database on every pipeline run, and a pipeline
   run against a database that has already applied them succeeds without altering data.
-- **SC-013**: The service produces a deployable image and the interface produces static assets on
-  every pipeline run.
+- **SC-013**: The interface produces static assets on every pipeline run.
 - **SC-014**: Critical business-logic paths, including the error format, request identifier handling,
   health states, and migration validity, reach at least 80% coverage, reported by the pipeline.
 - **SC-015**: The setup, layout, commands, error codes, and health address are documented well enough
@@ -501,11 +494,8 @@ Deliverable value: a single coherent, documented project.
 - **SC-018**: Zero raw color or font values appear in web app code, verified by an automated check
   that fails the pipeline when one does.
 - **SC-019**: Zero pipeline stages push, publish, or restart anything in a hosted environment,
-  verified by inspecting the pipeline definition. A merge produces a verified image and nothing
+  verified by inspecting the pipeline definition. A merge produces a verified build and nothing
   else.
-- **SC-020**: The image built by the pipeline runs on a hosting platform that was not known when
-  the image was written, verified by running it from a clean environment with only documented
-  configuration.
 - **SC-021**: The 429 response shape and `Retry-After` handling are exercised by an automated test
   against a simulated rate-limit response, while zero routes delivered by this feature are rate
   limited and no documentation claims otherwise.
@@ -527,7 +517,8 @@ Deliverable value: a single coherent, documented project.
 - The technology stack is fixed by the product requirements document rather than chosen by this
   feature: the service is NestJS on Node.js LTS with TypeScript, the interface is React with
   TypeScript and Vite, the database is PostgreSQL accessed through Prisma with version-controlled
-  migrations, the development environment is containerized with Docker, and the pipeline is GitHub
+  migrations, the frontend and backend run directly on the machine via npm scripts against a
+  locally installed PostgreSQL 17 server reached at `127.0.0.1:5432`, and the pipeline is GitHub
   Actions. These are constraints, not design decisions of this feature.
 - Reference data means baseline data the product requires to function: the global permission
   catalog and the default role templates, each defined once in the shared package and loaded
@@ -548,8 +539,8 @@ Deliverable value: a single coherent, documented project.
   health address, and inherit the error format and request identifier behavior defined here.
 - Reference data is for development and test environments only and is never loaded into production.
 - Backups, restoration testing, alerting, hosting selection, and the deploy stage of the pipeline
-  belong to the deployment and operations feature. This feature delivers a verified, portable image
-  and the documentation needed to run it, and stops there: it never deploys and never configures a
+  belong to the deployment and operations feature. This feature delivers the verified build and the
+  documentation needed to run it, and stops there: it never deploys and never configures a
   hosting platform.
 - Rate limiting is not implemented here. This feature delivers the failure shape and the client's
   handling of it so a client generated from the contract is correct before any limiter exists; the

@@ -33,6 +33,26 @@ describe('loadConfiguration', () => {
     expect(error.variableName).toBe('DATABASE_URL');
   });
 
+  it('refuses to start with DATABASE_URL absent rather than serving half-configured (FR-031, SC-008)', () => {
+    const { DATABASE_URL: _omitted, ...withoutDatabase } = validEnv;
+    const error = catchConfigurationError(() => loadConfiguration(withoutDatabase));
+
+    expect(error).toBeInstanceOf(ConfigurationError);
+    expect(error.variableName).toBe('DATABASE_URL');
+    // The message tells the reader what to do, not merely that something is wrong: a
+    // service that started here would answer requests against a database it never
+    // reached, and the failure would surface as every query failing rather than as a
+    // refusal to start.
+    expect(error.message).toContain('.env.example');
+  });
+
+  it('refuses a present-but-empty DATABASE_URL, because that is still unconfigured (FR-031)', () => {
+    const error = catchConfigurationError(() => loadConfiguration({ ...validEnv, DATABASE_URL: '' }));
+
+    expect(error.variableName).toBe('DATABASE_URL');
+    expect(error.message).toContain('must not be empty');
+  });
+
   it('names the variable when its value is invalid, not just its type', () => {
     const error = catchConfigurationError(() =>
       loadConfiguration({ ...validEnv, DATABASE_URL: 'mysql://user@localhost/db' }),

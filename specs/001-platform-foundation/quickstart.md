@@ -10,12 +10,12 @@ Everything a new contributor needs to reach a running environment and a green ch
 
 | Requirement | Version | How to check |
 |---|---|---|
-| Docker with Compose v2 | 22+ with the `compose` plugin | `docker compose version` |
+| PostgreSQL | 17 | `psql --version` |
 | Git | any recent | `git --version` |
-| Node.js | 24 LTS | only needed if you choose the non-Docker path below |
+| Node.js | 24 LTS | `node --version` |
 | npm | shipped with Node 24 | `npm --version` |
 
-You do **not** need a PostgreSQL server installed locally. The database runs in a container.
+The service connects to a PostgreSQL 17 server installed locally and reached at `127.0.0.1:5432`.
 
 ---
 
@@ -25,11 +25,14 @@ You do **not** need a PostgreSQL server installed locally. The database runs in 
 git clone <repository-url>
 cd NexusERP
 cp .env.example .env
-docker compose up -d --wait
+npm ci
+npm run db:migrate
+npm run db:seed
+npm run dev
 ```
 
-`--wait` returns only after the database, the service, and the web app all report healthy. Expect
-this to take a few minutes on the first run while images build and dependencies install.
+`npm run dev` starts the service and the web app together with hot reload against the locally
+installed PostgreSQL server. Expect `npm ci` to take a few minutes on the first run.
 
 Then confirm:
 
@@ -52,32 +55,15 @@ The web app is at <http://localhost:5173>. It renders the application shell — 
 the organization switcher and user menu, and a content area — built from the design system, with
 a health status panel showing the response above.
 
-Stop the environment with `docker compose down`. Add `-v` to also delete the database volume, which
-discards all local data.
+Stop the environment with Ctrl+C. To discard all local data, drop and re-create the local database
+with `npm run db:reset`.
 
 ### Re-running the startup command
 
-Running `docker compose up -d --wait` again is safe. Migrations are applied only if pending,
+Running `npm run dev` again is safe. Migrations are applied only if pending,
 reference data is upserted rather than duplicated, and existing records are preserved.
 
 ---
-
-## Non-Docker path
-
-Useful for fast inner-loop development with hot reload. You still need a PostgreSQL server; the
-simplest is to run only the database in Docker:
-
-```bash
-cp .env.example .env
-docker compose up -d --wait db
-
-npm ci
-npm run db:migrate
-npm run db:seed
-npm run dev
-```
-
-`npm run dev` starts the service and the web app together with hot reload.
 
 ### Never start the API with `tsx`
 
@@ -136,8 +122,6 @@ Run from the repository root.
 | `npm run db:reset` | Drop, re-migrate, and re-seed the local database — never in CI or production |
 | `npm run openapi:generate` | Regenerate `apps/api/openapi.json` from the code |
 | `npm run openapi:diff` | Fail if the generated contract differs from the committed one |
-| `docker compose up -d --wait` | Full environment: database, service, web app |
-| `docker compose down` | Stop the environment |
 
 ### Integration tests and the database
 
@@ -147,7 +131,6 @@ the integration suite truncates between tests. To run the whole environment's ch
 does:
 
 ```bash
-docker compose up -d --wait db
 npm run db:migrate
 npm test
 npm run test:integration
@@ -185,7 +168,7 @@ Copy it to `.env` and adjust. `.env` is never committed.
 |---|---|---|
 | `NODE_ENV` | Runtime mode | `development` |
 | `PORT` | Port the service listens on | `3000` |
-| `DATABASE_URL` | PostgreSQL connection string | points at the `db` container |
+| `DATABASE_URL` | PostgreSQL connection string | points at the locally installed PostgreSQL server (`127.0.0.1:5432`) |
 | `LOG_LEVEL` | Minimum log level emitted | `info` |
 | `CORS_ORIGINS` | Explicit allowed origins, comma-separated | the local web origin |
 | `SESSION_SECRET` | Session signing secret — required once sessions ship | placeholder in `.env.example` |
@@ -222,8 +205,8 @@ Do not hand-edit `apps/api/openapi.json`. Edit the decorators on the code that p
 | `port is already in use` | Another process holds the port | Stop it, or change `PORT` in `.env` |
 | `environment variable DATABASE_URL is missing` | `.env` not created | `cp .env.example .env` |
 | Service exits immediately at startup | Invalid configuration or unreachable database | Read the startup message; it names the variable or dependency |
-| Health returns 503 with `database` unavailable | Database container not ready, or a migration failed | `docker compose logs db`; then `docker compose up -d --wait` again |
-| Integration tests fail with a connection error | Tests pointed at a database that is not running | `docker compose up -d --wait db` |
+| Health returns 503 with `database` unavailable | The local database is not ready, or a migration failed | Check the PostgreSQL 17 service; then re-run `npm run db:migrate` |
+| Integration tests fail with a connection error | Tests pointed at a database that is not running | Start the local PostgreSQL 17 server |
 | Integration tests report unexpected data | Tests ran against a database holding other data | Use a dedicated test database; the suite truncates between tests |
 | Migration fails partway | A migration cannot apply to the current schema | The message names the migration; fix it or reset locally with `npm run db:reset` |
 | `openapi:diff` fails after editing the API | Regenerated contract not committed | `npm run openapi:generate` and commit the result |

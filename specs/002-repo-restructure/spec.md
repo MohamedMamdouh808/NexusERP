@@ -18,7 +18,7 @@ A developer joining the project can immediately understand the codebase structur
 
 **Acceptance Scenarios**:
 1. **Given** a fresh clone, **When** running `npm ci && npm run typecheck && npm run lint && npm run check:migrations`, **Then** all commands exit 0
-2. **Given** the new structure, **When** running `docker compose up -d --wait`, **Then** all services reach healthy state with migrations applied and seed idempotent
+2. **Given** the new structure, **When** running `npm run db:migrate` then `npm run db:seed`, **Then** migrations apply from empty and the seed is idempotent
 
 ### User Story 2 - Database Ownership Isolation (Priority: P1)
 
@@ -148,13 +148,13 @@ A structure guard fails if `apps/` or `packages/` reappears, or if any tracked f
 - **SC-001**: Each workspace passes the same number of tests as before the move (160 unit tests, 51 integration tests, 58 web component tests, 5 e2e tests)
 - **SC-002**: `openapi:diff` shows an empty diff (byte-identical OpenAPI document)
 - **SC-003**: From a clean clone: `npm ci`, `npm run typecheck`, `npm run lint`, `npm run check:migrations`, and every test suite pass
-- **SC-004**: `docker compose up -d --wait` reaches healthy from a fresh volume, both images build, migrations apply from empty, and the seed is idempotent
+- **SC-004**: Migrations apply from empty and the seed is idempotent from a fresh database
 - **SC-005**: Every mandatory CI job is green on the branch
-- **SC-006**: Every guard in HANDOVER.md guard audit (numeric-type checker, migration guard, default-deny, redaction, no-raw-design-values, OpenAPI build test, boot smoke test, health no-leak, Dockerfile ordering, entrypoint failure) still fails when deliberately broken after the move
+- **SC-006**: Every guard in HANDOVER.md guard audit (numeric-type checker, migration guard, default-deny, redaction, no-raw-design-values, OpenAPI build test, boot smoke test, health no-leak) still fails when deliberately broken after the move
 - **SC-007**: `git log --follow` shows preserved history for all moved files
 - **SC-006**: `openapi:diff` shows an empty diff (byte-identical OpenAPI document)
 - **SC-007**: From a clean clone: `npm ci`, `typecheck`, `lint`, `check:migrations`, and every test suite pass
-- **SC-008**: `docker compose up -d --wait` reaches healthy from a fresh volume, both images build, migrations apply from empty, and the seed is idempotent
+- **SC-008**: Migrations apply from empty and the seed is idempotent from a fresh database
 - **SC-009**: Every mandatory CI job is green on the branch
 - **SC-010**: Every guard in HANDOVER.md still fails when deliberately broken after the move
 
@@ -163,13 +163,12 @@ A structure guard fails if `apps/` or `packages/` reappears, or if any tracked f
 ## Assumptions
 
 - The current repository structure has `apps/web`, `apps/api` (with `prisma/` inside), and `packages/shared`
-- The `docker/`, `design-system/`, `docs/`, `scripts/`, `specs/`, `.github/`, and `.specify/` directories remain at the repository root
-- No new features, no dependency upgrades, no renaming of workspace packages, compose services, API routes, or database objects
-- The `docker/`, `design-system/`, `docs/`, `scripts/`, `specs/`, `.github/`, and `.specify/` directories remain at the repository root
+- The `design-system/`, `docs/`, `scripts/`, `specs/`, `.github/`, and `.specify/` directories remain at the repository root
+- No new features, no dependency upgrades, no renaming of workspace packages, API routes, or database objects
+- The `design-system/`, `docs/`, `scripts/`, `specs/`, `.github/`, and `.specify/` directories remain at the repository root
 - The existing test suites and CI pipeline are the source of truth for behavior verification
-- The existing `docker-compose.yml`, `package.json` workspaces configuration, and turbo/turborepo configuration (if any) will be updated to reflect new paths
-- The `docker/` directory with `api.Dockerfile`, `web.Dockerfile`, `api-entrypoint.sh`, and `static-server.mjs` remains at the repository root
-- The `scripts/` directory with `verify-image-portability.sh`, `postinstall.mjs`, `check-schema-numeric-types.ts`, etc. remains at the repository root
+- The existing `package.json` workspaces configuration and turbo/turborepo configuration (if any) will be updated to reflect new paths
+- The `scripts/` directory with `postinstall.mjs`, `check-schema-numeric-types.ts`, etc. remains at the repository root
 
 ---
 

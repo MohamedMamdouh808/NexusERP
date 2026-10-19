@@ -36,6 +36,16 @@ const environmentSchema = z.object({
     }),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
+  // Defaults to trusting nothing. Behind a proxy the socket address is the proxy's, so
+  // trusting the hop count is what lets the service see the real caller - but trusting a
+  // header a caller can supply is how the caller invents its address. The default
+  // therefore records the socket, and an environment that needs trust states it explicitly.
+  TRUST_PROXY: z
+    .string()
+    .default('false')
+    .refine((value) => value === 'false' || /^[1-9]\d*$/.test(value), {
+      message: "must be 'false' or a positive integer hop count",
+    }),
   SESSION_SECRET: z.string().min(16).optional(),
   CSRF_SECRET: z.string().min(16).optional(),
 });
@@ -49,6 +59,12 @@ export interface Configuration {
   readonly logLevel: Environment['LOG_LEVEL'];
   /** Explicit allowlist. A wildcard is rejected: an open CORS policy negates cookies. */
   readonly corsOrigins: readonly string[];
+  /**
+   * How many forwarding-proxy hops to trust when deriving the client's address and
+   * protocol. `false` trusts nothing and records the socket address; a positive integer
+   * trusts that many hops (FR-007).
+   */
+  readonly trustProxy: false | number;
   readonly sessionSecret: string | undefined;
   readonly csrfSecret: string | undefined;
   readonly isProduction: boolean;
@@ -103,6 +119,7 @@ export function loadConfiguration(source: NodeJS.ProcessEnv = process.env): Conf
     databaseUrl: env.DATABASE_URL,
     logLevel: env.LOG_LEVEL,
     corsOrigins,
+    trustProxy: env.TRUST_PROXY === 'false' ? false : Number(env.TRUST_PROXY),
     sessionSecret: env.SESSION_SECRET,
     csrfSecret: env.CSRF_SECRET,
     isProduction: env.NODE_ENV === 'production',

@@ -23,8 +23,8 @@ async function bootstrap(): Promise<void> {
   try {
     configuration = loadConfiguration();
   } catch (error) {
-    // Printed to stderr as well as thrown: this is the message a developer sees when the
-    // container exits, and it must name the variable.
+    // Printed to stderr as well as thrown: this is the message a developer sees when
+    // startup fails, and it must name the variable.
     console.error(error instanceof Error ? error.message : String(error));
     throw error;
   }
@@ -50,10 +50,11 @@ async function bootstrap(): Promise<void> {
     logger: nestLogger,
   });
 
-  // Trust nothing about the client's address. An explicit proxy setting is required
-  // before rate limiting or audit can rely on the remote address, and trusting an
-  // unconfigured proxy is how a client spoofs its IP.
-  app.set('trust proxy', false);
+  // Trust nothing unless the environment says how many proxy hops are in front of the
+  // service. Behind a proxy the socket address is the proxy's, so an explicit hop count is
+  // what lets rate limiting and audit see the real caller - and trusting an unconfigured
+  // proxy is how a client spoofs its IP.
+  app.set('trust proxy', configuration.trustProxy);
 
   // All routes live under the versioned prefix (PRD Section 9.5).
   app.setGlobalPrefix('api/v1');

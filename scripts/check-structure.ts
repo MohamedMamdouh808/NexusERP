@@ -10,16 +10,15 @@
  *   packages/shared-> shared/
  *
  * Nothing enforces that once the move is done. A stray `mkdir apps` or a copied
- * snippet containing `apps/api/src/main.ts` in a workflow, a Dockerfile, or a
- * README reintroduces the layout this feature removed, and the failure surfaces
- * much later as a path that resolves in one place and not another.
+ * snippet containing `apps/api/src/main.ts` in a workflow, a script, or a README
+ * reintroduces the layout this feature removed, and the failure surfaces much later
+ * as a path that resolves in one place and not another.
  *
  * This guard fails when:
  *
  *   1. `apps/` or `packages/` exists at the repository root again.
  *   2. a tracked file outside the two spec feature directories still names an old
- *      path (`apps/api`, `apps/web`, `packages/shared`, `api.Dockerfile`,
- *      `web.Dockerfile`).
+ *      path (`apps/api`, `apps/web`, `packages/shared`).
  *
  * Both spec directories are excluded on purpose. `specs/001-platform-foundation`
  * is the historical record of the old layout, and `specs/002-repo-restructure` is
@@ -49,7 +48,6 @@ interface OldPathRule {
 const OLD_PATH_RULES: readonly OldPathRule[] = [
   { pattern: /apps\/(?:api|web)\b/, description: 'the old apps/ layout' },
   { pattern: /packages\/shared\b/, description: 'the old packages/shared layout' },
-  { pattern: /\b(?:api|web)\.Dockerfile\b/, description: 'the old Dockerfile names' },
 ];
 
 /** This file names the old paths in order to forbid them. */

@@ -34,12 +34,12 @@ bundle and the server and makes the API contract impossible to import cleanly fr
 
 ## R-002 — Runtime and engine pins
 
-**Decision**: Node.js 24 LTS, pinned in `engines` in every `package.json`, in `.nvmrc`, and in
-every Docker image. PostgreSQL 17 (Alpine) in development and CI, matching the managed
+**Decision**: Node.js 24 LTS, pinned in `engines` in every `package.json` and in `.nvmrc`.
+PostgreSQL 17 installed locally in development and used in CI, matching the managed
 PostgreSQL major version on the chosen hosting platform.
 
 **Rationale**: "Node.js LTS" in the PRD is not specific enough to build against. Pinning one
-major version in three places — manifest, local hint, and image — removes the most common cause
+major version in two places — manifest and local hint — removes the most common cause
 of "works on my machine" failures in CI. PostgreSQL major versions must match development, CI,
 and production or a migration that passes CI can still fail in production.
 
@@ -207,7 +207,7 @@ the page and the committed file come from one source.
 ## R-010 — Migration lifecycle and drift detection
 
 **Decision**: `prisma migrate dev` is used locally only to author migrations;
-`prisma migrate deploy` is the single command that applies migrations in CI, in containers, and
+`prisma migrate deploy` is the single command that applies migrations in CI and
 in production. `prisma migrate reset` is permitted only against a developer database. CI runs
 three migration checks against a fresh PostgreSQL service: apply the full history to an empty
 database; apply the history a second time and assert success with no data change; and run
@@ -251,24 +251,18 @@ the schema.
 
 ## R-012 — One-command development environment
 
-**Decision**: `docker-compose.yml` defines three services: `db` (PostgreSQL 17 with a named
-volume and a `pg_isready` healthcheck), `api` (Node image running migrations then the service,
-gated on `db` being healthy), and `web` (Node image running the dev server with the API proxied
-to `api`). The documented command is `docker compose up -d --wait`, which returns only after all
-three report healthy. Production-capable multi-stage `Dockerfile`s are provided separately for
-the service and for the static web build; they are the same images the hosting platform builds.
+**Decision**: The development environment is brought up directly on the machine. PostgreSQL 17 is
+installed locally and reached at `127.0.0.1:5432`; the `api` and `web` apps run from their npm
+scripts and are started together with `npm run dev`. The service waits for the database to accept
+connections before serving requests, and the web dev server proxies `/api` to the service.
 
-**Rationale**: FR-005 requires one command from a clean checkout with no preinstalled database,
-and FR-007 requires the service to wait for the database rather than crash-loop. Compose health
-checks plus `--wait` express exactly that: readiness is declared, not timed. Using the dev server
-for `web` (rather than serving static assets) keeps hot reload available, which a one-developer
-team needs, while the multi-stage Dockerfile provides the production asset path.
+**Rationale**: FR-005 requires a single documented command for the whole development environment,
+and FR-007 requires the service to wait for the database rather than crash-loop. Running the two
+apps directly keeps hot reload available, which a one-developer team needs, and keeps the inner
+loop short.
 
-**Alternatives considered**: Running PostgreSQL on the host and the apps in containers — rejected,
-it reintroduces the "works on my machine" problem this feature exists to remove. Serving the web
-app from a static container in development — rejected, it removes hot reload for no benefit.
-A `docker-compose.override.yml` split — unnecessary at three services; kept in one file and noted
-as a split point if it grows.
+**Alternatives considered**: Serving a prebuilt static bundle during development — rejected, it
+removes hot reload for no benefit.
 
 ---
 
@@ -282,14 +276,13 @@ merge except where noted:
 | `lint` | ESLint (flat config) and Prettier check, both workspaces | yes |
 | `typecheck` | `tsc --noEmit`, service and web | yes |
 | `test-unit` | Jest unit projects and Vitest, no database required | yes |
-| `test-integration` | PostgreSQL service container, `migrate deploy`, Jest integration projects | yes |
+| `test-integration` | a fresh PostgreSQL instance, `migrate deploy`, Jest integration projects | yes |
 | `migrate-validate` | apply from empty, re-apply for idempotency, drift diff (R-010) | yes |
 | `contract-check` | regenerate OpenAPI and diff against the committed artifact (R-009) | yes |
 | `build` | service build and web static build | yes |
-| `docker-build` | both production images | yes |
 | `e2e-smoke` | Playwright smoke against the running stack | no, advisory in this feature |
 
-Integration jobs provision PostgreSQL through a service container rather than a compose stack, so
+Integration jobs provision a PostgreSQL instance rather than a local stack, so
 they start in seconds and can run in parallel with unit tests. Coverage thresholds are enforced
 inside `test-unit` and `test-integration` (R-017).
 
@@ -302,7 +295,7 @@ forgotten.
 
 **Alternatives considered**: One monolithic job — rejected, every run pays the database cost and a
 failure gives no signal about which gate broke. A reusable workflow consumed by other repositories
-— rejected as premature. Making `docker-build` non-blocking — rejected, FR-050 is explicit.
+— rejected as premature.
 
 ---
 
@@ -402,8 +395,8 @@ rejected as an external dependency for a project with no third-party integration
 
 ## R-018 — Reproducible installs
 
-**Decision**: A single committed `package-lock.json` at the workspace root. CI and the Docker
-images install with `npm ci`, never `npm install`. Dependency versions are pinned to exact
+**Decision**: A single committed `package-lock.json` at the workspace root. CI installs with
+`npm ci`, never `npm install`. Dependency versions are pinned to exact
 versions in the manifests, not ranges, for anything the pipeline treats as mandatory.
 
 **Rationale**: FR-049 requires reproducibility, and `npm install` can silently resolve a different
@@ -416,19 +409,18 @@ a deliberate task, and an automated bump is an unreviewed change to a build-defi
 
 ---
 
-## R-019 — Hosting: decision deferred, artifacts kept portable
+## R-019 — Hosting: decision deferred
 
-**Decision**: This feature produces portable multi-stage Dockerfiles and a `.dockerignore` for
-the service and the web build, and nothing hosting-specific. Railway is the working preference
-over Render because it builds the Dockerfile directly and manages PostgreSQL in the same project,
+**Decision**: This feature produces no hosting-specific configuration; the choice of hosting
+platform is deferred to the deployment and operations work. Railway is the working preference
+over Render because it manages PostgreSQL in the same project,
 which matches the "one primary developer, no platform-specific operations" constraint; final
 selection requires the cost, backup, restore, and data-location comparison the PRD defers to the
 deployment and operations work.
 
 **Rationale**: The specification's assumptions place hosting selection outside this feature.
 Writing a platform config file now would presume a decision the PRD explicitly defers, and a
-presumed decision is expensive to reverse. Dockerfiles are the portable artifact both platforms
-consume, so nothing is lost by deferring.
+presumed decision is expensive to reverse.
 
 **Alternatives considered**: Committing `railway.json` or `render.yaml` now — rejected, see above.
 Deploying to a virtual machine with hand-managed PostgreSQL — rejected, it contradicts the
@@ -471,5 +463,5 @@ avoid configuring Jest's decorators support twice.
 | Sessions and CSRF in scope | Deferred to the authentication feature, seams reserved (R-015) |
 | Reference data scope | Global permission catalog and role templates; tenant data waits for P0-F002 (R-016) |
 | Demo workspace in seed | Split; reference catalog here, tenant workspace with P0-F002 — **flagged deviation** |
-| Hosting platform | Deferred to operations; portable Dockerfiles delivered (R-019) |
+| Hosting platform | Deferred to the operations feature (R-019) |
 | E2E blocking status | Advisory in this feature, becomes blocking with the first user-facing feature (R-013) |

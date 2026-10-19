@@ -60,22 +60,6 @@
 - Both database and backend need to load root `.env`
 - Keeps the rule: real env vars win over file, nothing printed
 
-### 4. Prisma Schema Location in Docker
-**Decision**: Copy `database/prisma` into the backend image so the entrypoint's `prisma migrate deploy` works.
-
-**Rationale**: The entrypoint runs `prisma migrate deploy` which needs the schema at runtime. The schema must be copied into the image at `/app/prisma/` or similar.
-
-### 5. Dockerfile Renaming
-**Decision**: Rename `docker/api.Dockerfile` → `docker/backend.Dockerfile` and `docker/web.Dockerfile` → `docker/frontend.Dockerfile`
-
-**Rationale**: Consistent naming with new folder structure (`backend/`, `frontend/`).
-
-### 4. Dockerfile Manifest Copy Order
-**Decision**: Keep manifests and lockfile copied before source; copy `database/prisma` into the backend image so the entrypoint's `prisma migrate deploy` still works.
-
-### 4. Docker Compose
-**Decision**: Update `docker-compose.yml` build contexts and Dockerfile paths. Service names (`api`, `web`, `db`) remain unchanged.
-
 ### 5. GitHub Actions Workflows
 **Decision**: Update all workflow paths, working directories, and cache keys to reflect new structure.
 
@@ -86,12 +70,6 @@
 - No new dependency needed (ESLint already present)
 - Can enforce: frontend → only shared; backend → shared + database; database/shared → neither frontend nor backend
 - Testable: a test reads each workspace package.json and fails on forbidden dependency
-
-### 5. Dockerfile Ordering Test
-**Decision**: Keep the Dockerfile ordering test (manifests+lockfile copied before source).
-
-### 5. Migration Entrypoint Test
-**Decision**: Keep the failed-migration entrypoint test, update paths.
 
 ### 6. Git History Preservation
 **Decision**: Use `git mv` for all file moves to preserve history.
@@ -108,9 +86,6 @@
 ### Database Workspace Location
 **Chosen**: `database/` at root
 **Rejected**: `packages/database` (would keep `packages/` directory which should be removed)
-
-### Docker Image Names
-**Decision**: Keep `nexuserp-api` and `nexuserp-web` as image names (service names unchanged)
 
 ### Git History
 **Decision**: Use `git mv` for all file moves to preserve history.
@@ -134,11 +109,8 @@
 | Prisma config | `prisma.config.ts` in database workspace |
 | Prisma generate | Runs in database workspace, backend consumes via workspace dep |
 | Database package | `@nexuserp/database` with schema, migrations, seed, checks |
-| Dockerfiles | Renamed to `backend.Dockerfile`, `frontend.Dockerfile` |
-| Docker Compose | Updated paths, service names unchanged |
 | GitHub Actions | Updated paths, working directories, cache keys |
 | Import boundaries | ESLint `no-restricted-imports` + package.json validation test |
-| Dockerfile tests | Keep ordering test + entrypoint failure test, update paths |
 | Git history | Use `git mv` for all moves |
 | Docs | Update all living docs with new paths |
 
@@ -149,7 +121,7 @@
 All clarifications resolved. The repository restructure is well-defined with clear decisions on:
 1. New directory structure
 2. Prisma configuration and workspace
-3. Docker and CI/CD updates
+3. CI/CD updates
 4. Import boundary enforcement
 5. Documentation updates
 

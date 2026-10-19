@@ -5,8 +5,8 @@ name: CI
 #
 # No job here pushes an image to a registry, deploys anything, or produces a release.
 # T111 and `.github/workflows/__tests__/ci-no-deploy.spec.ts` assert that structurally
-# rather than by substring, and this file is kept free of `docker push`, a registry login
-# step, and any build-and-push action with push enabled.
+# rather than by substring, and this file is kept free of a registry login step and of any
+# build-and-push action with push enabled.
 
 on:
   push:
@@ -209,16 +209,20 @@ jobs:
       - name: Build shared, service and web
         run: npm run build
 
-  images:
-    name: Image build (no push)
+  secret-scan:
+    name: Secret scan
     runs-on: ubuntu-latest
+    # A repository-local scan (FR-030): it walks the tracked files, so no install step is
+    # needed and nothing is downloaded. Like every job here it pushes nothing, logs in to
+    # no registry, and deploys nothing - `ci-no-deploy.spec.ts` asserts that, including
+    # that this job runs only a repository-local command.
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - name: Build the service image
-        run: docker build -f docker/backend.Dockerfile -t nexuserp-api:ci .
-      - name: Build the web image
-        run: docker build -f docker/frontend.Dockerfile -t nexuserp-web:ci .
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: No secret in the repository
+        run: node scripts/check-secrets.mjs
 
   workflow:
     name: Workflow assertions

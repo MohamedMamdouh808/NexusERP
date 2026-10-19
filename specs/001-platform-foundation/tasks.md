@@ -48,7 +48,7 @@ of each story.
 ## Path Conventions
 
 - **Workspace root**: `package.json`, `package-lock.json`, `.nvmrc`, `.env.example`,
-  `docker-compose.yml`, `docker/`, `.github/workflows/`
+  `.github/workflows/`
 - **Service**: `apps/api/`, with `apps/api/prisma/` for the schema, migrations, and seed
 - **Web**: `apps/web/`, with `apps/web/src/` and `apps/web/e2e/`
 - **Shared contracts**: `packages/shared/src/`
@@ -64,7 +64,7 @@ of each story.
 No behavior yet.
 
 - [X] T001 Create npm workspaces root manifest with `workspaces: ["apps/*", "packages/*"]` and orchestration scripts in `package.json`
-- [X] T002 Add Node 24 pin in `.nvmrc` and `engines` in `package.json`; add `.gitignore` and `.dockerignore` at repository root
+- [X] T002 Add Node 24 pin in `.nvmrc` and `engines` in `package.json`; add `.gitignore` at repository root
 - [X] T003 [P] Create formatting config at `.prettierrc` and `.prettierignore`
 - [X] T004 Create `apps/api/package.json` with NestJS, Prisma, `@nestjs/swagger`, `pino`, `cookie-parser`, `class-validator`, and dev dependencies in `apps/api/package.json`
 - [X] T005 Create `apps/api/tsconfig.json` and `apps/api/tsconfig.build.json` targeting ES2023 with decorator metadata
@@ -125,18 +125,14 @@ templates are queryable. Deliverable value: a working, reproducible development 
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [X] T030 [P] [US1] Write FAILING integration test asserting the migration history applies cleanly to an empty database, that re-applying it changes no data, that the applied history shows no drift from `apps/api/prisma/schema.prisma`, and that a named volume preserves existing rows across a re-run in `apps/api/test/integration/migrations-from-empty.spec.ts` (merged from the former T061; FR-006, FR-008, FR-012, FR-013, FR-048)
+- [X] T030 [P] [US1] Write FAILING integration test asserting the migration history applies cleanly to an empty database, that re-applying it changes no data, that the applied history shows no drift from `apps/api/prisma/schema.prisma`, and that re-applying it preserves existing rows across a re-run in `apps/api/test/integration/migrations-from-empty.spec.ts` (merged from the former T061; FR-006, FR-008, FR-012, FR-013, FR-048)
 - [X] T031 [P] [US1] Write FAILING integration test asserting an out-of-order or missing migration history is refused and names the offending migration in `apps/api/test/integration/migrations-history.spec.ts`
 - [X] T032 [P] [US1] Write FAILING integration test asserting the **content invariants** of the seed — exactly five role templates, every catalog permission granted by the administrator template, no duplicate grant within a template — in `apps/api/test/integration/seed-content.spec.ts` (distinct from T024, which proves the idempotency guarantee that repeated loads create nothing twice)
 
 ### Implementation for User Story 1
 
-- [X] T033 [P] [US1] Create the multi-stage service image that installs with the lockfile, builds, and runs migrations before serving in `docker/api.Dockerfile`
-- [X] T034 [P] [US1] Create the multi-stage web image that builds static assets and serves them in `docker/web.Dockerfile`
-- [X] T035 [US1] Create the Compose environment with a healthchecked database pinned to the same PostgreSQL major version used in production, a named volume so data survives a re-run, a service gated on database health, and the web app in `docker-compose.yml` (FR-006, FR-007, FR-008)
 - [X] T036 [US1] Add the database, seed, development, and build scripts to `package.json` so migrations and seeding run as documented commands
 - [X] T037 [P] [US1] Configure the development server to proxy `/api` to the service in `apps/web/vite.config.ts`
-- [X] T038 [US1] Wire the Compose services so `docker compose up -d --wait` returns only after all three report healthy in `docker-compose.yml` (depends on T035)
 - [X] T039 [US1] Document the one-command startup, every available command, and the failure modes in `README.md`
 
 **Checkpoint**: A clean checkout reaches a running environment with one command; re-running it
@@ -190,7 +186,7 @@ reports both components separately and fails closed.
 ## Phase 5: User Story 3 - Ship Only Changes That Pass Every Check (Priority: P3)
 
 **Goal**: No change merges unless it passes lint, type check, unit tests, integration tests against
-a real database, migration validation, contract drift detection, build, and image build — and the
+a real database, migration validation, contract drift detection, and build — and the
 pipeline never deploys.
 
 **Independent Test**: Break each check in turn on a throwaway branch and confirm the pipeline
@@ -213,19 +209,17 @@ Deliverable value: a merge gate nobody can bypass.
 - [X] T066 [US3] Add the repository rule and type check commands to `package.json` so both workspaces are covered
 - [X] T067 [US3] Create the lint and type check pipeline job in `.github/workflows/ci.yml`
 - [X] T068 [US3] Create the unit test job with a coverage artifact in `.github/workflows/ci.yml`
-- [X] T069 [US3] Create the integration test job provisioning a real database service container in `.github/workflows/ci.yml`
+- [X] T069 [US3] Create the integration test job provisioning a real database in `.github/workflows/ci.yml`
 - [X] T070 [US3] Create the migration validation job covering empty apply, re-apply, and drift detection in `.github/workflows/ci.yml`
 - [X] T071 [US3] Create the contract drift job regenerating and comparing the committed contract in `.github/workflows/ci.yml`
 - [X] T072 [US3] Create the build job for the service and the static web assets in `.github/workflows/ci.yml` (this is the verification task for FR-001 and FR-002: one repository, one version history, both parts independently buildable from it)
-- [X] T073 [US3] Create the image build job that builds both images without publishing them in `.github/workflows/ci.yml`
-- [X] T109 [P] [US3] Install dependencies in every pipeline job with `npm ci --frozen-lockfile`, and add a check that `package-lock.json` is committed and is byte-identical after each install in `.github/workflows/ci.yml` (FR-049; depends on T067 through T073 — the jobs it modifies must exist first)
-- [X] T111 [P] [US3] Write FAILING test asserting registry and release semantics rather than raw substrings, in `.github/workflows/__tests__/ci-no-deploy.spec.ts`: the workflow MUST contain no step that pushes an image to a registry (no `docker push`, no registry login step, no build-and-push action with push enabled), no job named or behaving as deploy or release, and no output of a deployed environment URL; building an image without pushing it, `actions/checkout`, and cache steps MUST pass. The same test MUST assert that a skipped integration job fails the pipeline (depends on T067 through T073 — the workflow definition must exist first; SC-011, SC-019)
-- [X] T108 [US3] Run the built service image in a clean environment configured only from `.env.example`, confirm it starts, and confirm `GET /api/v1/health` responds, in `.github/workflows/ci.yml` or a local script under `scripts/verify-image-portability.sh` (SC-020, depends on T073)
+- [X] T109 [P] [US3] Install dependencies in every pipeline job with `npm ci --frozen-lockfile`, and add a check that `package-lock.json` is committed and is byte-identical after each install in `.github/workflows/ci.yml` (FR-049; depends on T067 through T072 — the jobs it modifies must exist first)
+- [X] T111 [P] [US3] Write FAILING test asserting deploy and release semantics rather than raw substrings, in `.github/workflows/__tests__/ci-no-deploy.spec.ts`: the workflow MUST contain no job named or behaving as deploy or release, and no output of a deployed environment URL; `actions/checkout` and cache steps MUST pass. The same test MUST assert that a skipped integration job fails the pipeline (depends on T067 through T072 — the workflow definition must exist first; SC-011, SC-019)
 - [X] T074 [US3] Declare the mandatory checks as required status checks and document the setup in `README.md`
 - [X] T075 [US3] Verify each mandatory check fails when deliberately broken and passes when fixed, recording the result in `README.md`
 
 **Checkpoint**: No change can merge with a mandatory check failing, incomplete, or skipped; the
-pipeline's terminal action is a verified image and nothing else.
+pipeline's terminal action is verification and nothing else.
 
 ---
 
@@ -280,8 +274,6 @@ tokens; the contract is generated and drift is impossible to merge silently.
 - [X] T097 [P] Verification that the implemented error codes, the status mapping, and the 403-versus-404 rule match the published catalog in `specs/001-platform-foundation/contracts/error-catalog.md`
 - [X] T112 [P] Audit every documentation file this feature produces for any availability, backup, or recovery claim, and remove or reword any found, so the product claims no uptime or recovery target (FR-034b, SC-025; depends on T039 and T095 — the documents it audits must exist first)
 - [X] T113 Add a `postinstall` hook that runs `prisma generate`, and prove it from a clean `node_modules` so `npm ci` followed by `npm run typecheck` passes on a clean clone — `npm ci` replaces `node_modules` including the generated client in `node_modules/.prisma`, leaving every Prisma model typed `any` and the type checker reporting phantom errors in correct code; verify in `package.json` and `scripts/postinstall.mjs`, with a test that removes the generated client and asserts a subsequent install restores it (depends on T019, the schema the generator reads, and on T036 for the workspace script wiring; Constitution Principle V and SC-014 — a clean clone must reproduce a green type check, not a type check that depends on stale generated files)
-- [X] T114 Verify `docker/api-entrypoint.sh` runs `prisma migrate deploy` under `set -e`, fails fast with a non-zero exit when a migration fails, and ends with `exec node`, and add a test for the failed-migration case where it is feasible — a service that boots against an un-migrated database serves requests against tables that do not exist (SC-020, T108 portability; depends on T033, the image that runs this entrypoint)
-- [X] T115 Verify both Dockerfiles copy the package manifests and the lockfile and run `npm ci` before copying source, and fix either if it does not — building after the source copy throws away the cached dependency layer and lets an image diverge from the committed lockfile (FR-049; depends on T033 and T034, the two images, and on T109 for the lockfile-reproducibility expectation)
 - [X] T116 Add the research note "Database locale is C (ASCII-only `lower()` and byte-order sorting); revisit collation when Arabic support is decided" to `research.md` (Principle IX, Scope Discipline — record the assumption now so the P1 foundation does not silently prejudge a later Arabic requirement)
 - [X] T098 [P] Statement in the documentation that the product makes no tax-compliance, e-invoicing, or complete-accounting claim in `README.md`
 - [X] T099 Documentation of what each mandatory pipeline check covers and how to reproduce a failure locally in `README.md`
@@ -310,11 +302,10 @@ tokens; the contract is generated and drift is impossible to merge silently.
 - **User Story 1 (P1)**: Can start after Foundational (Phase 2) - No dependencies on other stories
 - **User Story 2 (P2)**: Can start after Foundational (Phase 2) - No dependencies on other stories
 - **User Story 3 (P3)**: Can start after Foundational (Phase 2) - **Not fully independent of
-  User Story 4.** The lint, type check, unit, and build jobs stand alone, but two of its gates
+  User Story 4.** The lint, type check, unit, and build jobs stand alone, but one of its gates
   cannot be verified until US4 exists: the contract drift job needs the generated artifact from
-  T089, and the image portability task needs the image contents US4 finalizes. Its own failing
-  tests therefore live in US1 and US4, not here. This phase is meaningfully complete once US1,
-  US2, and US4 artifacts exist.
+  T089. Its own failing tests therefore live in US1 and US4, not here. This phase is meaningfully
+  complete once US1, US2, and US4 artifacts exist.
 - **User Story 4 (P4)**: Can start after Foundational (Phase 2) - Its health panel depends on the
   health endpoint from User Story 2, and its contract tasks (T089, T090, T062) depend on the
   annotated endpoint. The shell components, token bridge, and raw design value check do not depend

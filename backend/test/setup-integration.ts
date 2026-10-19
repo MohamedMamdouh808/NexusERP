@@ -12,7 +12,8 @@ const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
   throw new Error(
     'DATABASE_URL is not set. Integration tests require a real PostgreSQL instance ' +
-      '(Constitution Principle V, FR-047). Start one with `docker compose up -d --wait db`, ' +
-      'then re-run. SQLite and in-memory substitutes are not acceptable.',
+      '(Constitution Principle V, FR-047): set DATABASE_URL in `.env` to a database you ' +
+      'are willing to have migrated and truncated, then re-run. SQLite and in-memory ' +
+      'substitutes are not acceptable.',
   );
 }

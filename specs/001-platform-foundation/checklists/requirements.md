@@ -42,7 +42,7 @@
 | No NEEDS CLARIFICATION markers | PASS | Zero markers. Every gap was resolved with an informed guess recorded in Assumptions. |
 | Requirements testable and unambiguous | PASS | 54 requirements, each with a single observable outcome. Verified no requirement combines two behaviors. |
 | Success criteria measurable | PASS | SC-001 to SC-016 all carry a number, percentage, or count. |
-| Success criteria technology-agnostic | PASS | Criteria reference minutes, percentages, counts, and "real database instance" / "deployable image" — no framework or language named. |
+| Success criteria technology-agnostic | PASS | Criteria reference minutes, percentages, counts, and "real database instance" — no framework or language named. |
 | All acceptance scenarios defined | PASS | 4 user stories, 18 acceptance scenarios, each in Given/When/Then form. |
 | Edge cases identified | PASS | 13 edge cases covering startup races, partial migration failure, repeated application, out-of-order migrations, log injection, secret redaction, port conflict, unreadable schema history, contract drift, missing configuration, and unattended runs. |
 | Scope clearly bounded | PASS | Explicit exclusions in Assumptions: auth, organizations, memberships, roles, and all business modules. Constitution Compliance IX restates the P1 deferral. |
@@ -57,7 +57,7 @@ on.
 ### Item flagged as PASS with a documented interpretation
 
 - **No implementation details (languages, frameworks, APIs).** The stack named in the user's own
-  request — NestJS, React, PostgreSQL, Prisma, Docker, GitHub Actions — is a fixed constraint of
+  request — NestJS, React, PostgreSQL, Prisma, GitHub Actions — is a fixed constraint of
   the product requirements document (Sections 1, 9.2, 9.9), not a design choice available to this
   feature. These names are therefore confined to the Assumptions section as constraints. They do
   not appear in any functional requirement or success criterion, and no requirement depends on them:

@@ -4,9 +4,9 @@
 # platform, so a Windows contributor and a Linux one produce identical diffs. Without
 # this, a file edited on Windows arrives as CRLF and every line shows as changed.
 #
-# This matters here because the CI pipeline, the Docker images, and the formatter all
-# assume LF. `text=auto eol=lf` makes the repository itself the enforcement point rather
-# than relying on each tool to agree.
+# This matters here because the CI pipeline and the formatter both assume LF. `text=auto
+# eol=lf` makes the repository itself the enforcement point rather than relying on each
+# tool to agree.
 
 * text=auto eol=lf
 

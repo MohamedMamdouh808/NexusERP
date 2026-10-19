@@ -366,16 +366,5 @@ describe('migration history', () => {
     );
     expect(problems.some((p) => p.kind === 'missing-folder')).toBe(false);
   });
-});;;
-
-/** Fails loudly if the expected reference volume is absent (FR-008). */
-describe('database volume', () => {
-  it('uses a named volume, so data survives `docker compose down`', () => {
-    const docker = 'C:\\Users\\toshiba\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe';
-    const out = execFileSync(docker, ['volume', 'ls', '--format', '{{.Name}}'], {
-      encoding: 'utf8',
-      timeout: 60_000,
-    });
-    expect(out).toContain('nexuserp-postgres-data');
-  });
 });
+

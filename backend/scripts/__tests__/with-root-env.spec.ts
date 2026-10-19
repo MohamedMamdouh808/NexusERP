@@ -8,9 +8,9 @@ import { afterAll, describe, expect, it } from '@jest/globals';
  * with-root-env.mjs sits in front of every command that reads configuration, so its
  * contract matters more than its size:
  *
- *  1. A REAL environment variable wins over the file. CI and the container images inject
- *     DATABASE_URL and friends directly; a developer's local `.env` must not silently
- *     override them, or a green pipeline can be testing the wrong database.
+ *  1. A REAL environment variable wins over the file. CI injects DATABASE_URL and
+ *     friends directly; a developer's local `.env` must not silently override them, or a
+ *     green pipeline can be testing the wrong database.
  *  2. It never prints a value. It reads secrets by design, so anything it logged would be
  *     a disclosure channel.
  *  3. A missing `.env` does not fail commands that do not need one. `npm run build` must

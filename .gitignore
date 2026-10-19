@@ -15,6 +15,10 @@ test-results/
 blob-report/
 .playwright/
 
+# Python bytecode (the vendored design-system skill ships .py scripts)
+__pycache__/
+*.pyc
+
 # Environment - never commit real values (FR-004)
 .env
 .env.*
@@ -26,10 +30,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 logs/
-
-# Docker
-# NOTE: .dockerignore and Dockerfiles are build DEFINITIONS and must be committed.
-# Ignoring them silently breaks the image build for anyone else who clones.
 
 # Editors and OS
 .DS_Store

@@ -154,8 +154,8 @@ export async function runMigrationHistoryCheck(
     console.error(
       'migration history: cannot run - DATABASE_URL is not set.\n' +
         'This check compares the migrations the DATABASE has applied against the ones in the\n' +
-        'repository, so it needs a database. Copy .env.example to .env, or start one with\n' +
-        '`docker compose up -d --wait db`, then re-run:\n' +
+        'repository, so it needs a database. Copy .env.example to .env and set DATABASE_URL,\n' +
+        'then re-run:\n' +
         '  npm run check:migrations\n' +
         'Nothing was compared, so nothing has been proven.',
     );

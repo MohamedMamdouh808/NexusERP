@@ -37,7 +37,8 @@
     "check:schema-numeric-types": "npm run check:schema-numeric-types --workspace @nexuserp/database",
     "check:migrations": "npm run check:migrations --workspace @nexuserp/database",
     "check:boundaries": "tsx scripts/check-boundaries.ts",
-    "check:structure": "tsx scripts/check-structure.ts"
+    "check:structure": "tsx scripts/check-structure.ts",
+    "check:secrets": "node scripts/check-secrets.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

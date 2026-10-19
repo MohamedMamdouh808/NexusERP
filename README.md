@@ -5,8 +5,6 @@
 ![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/Coverage-99.67%25-brightgreen)
 ![Tests](https://img.shields.io/badge/Tests-160%20Passing-brightgreen)
-![Docker](https://img.shields.io/badge/Docker-Ready-blue)
-![License](https://img.shields.io/badge/License-MIT-blue)
 
 **Platform foundation: a NestJS API, a React web client, and a shared contract package, on PostgreSQL.**
 
@@ -15,7 +13,6 @@
 ## 📋 Table of Contents
 - [Prerequisites](#prerequisites)
 - [One-Command Startup](#one-command-startup)
-- [Non-Docker Path](#non-docker-path)
 - [Commands](#commands)
 - [Testing](#testing)
 - [Configuration](#configuration)
@@ -32,12 +29,12 @@
 
 | Requirement | Version | How to check |
 |---|---|---|
-| Docker with Compose v2 | 22+ with the `compose` plugin | `docker compose version` |
+| PostgreSQL 17 | 17, installed directly on the machine and listening on `127.0.0.1:5432` | `psql --version` |
 | Git | any recent | `git --version` |
-| Node.js | 24 LTS | only needed if you choose the non-Docker path below |
+| Node.js | 24 LTS | `node --version` |
 | npm | shipped with Node 24 | `npm --version` |
 
-> You do **not** need a PostgreSQL server installed locally. The database runs in a container.
+> No container tooling is used anywhere in this project. Local development runs against a PostgreSQL 17 instance installed directly on the machine.
 
 ---
 
@@ -46,11 +43,14 @@
 ```bash
 git clone <repository-url>
 cd NexusERP
+npm ci
 cp .env.example .env
-docker compose up -d --wait
+npm run db:migrate
+npm run db:seed
+npm run dev
 ```
 
-`--wait` returns only after the database, the service, and the web app all report healthy. Expect this to take a few minutes on the first run while images build and dependencies install.
+Point `DATABASE_URL` in `.env` at your local PostgreSQL 17 instance (`postgresql://nexuserp:nexuserp_dev_password@127.0.0.1:5432/nexuserp`). `npm run dev` starts the API and the web app together with hot reload. Expect the first run to take a few minutes while dependencies install.
 
 Then confirm:
 
@@ -71,35 +71,19 @@ curl http://localhost:3000/api/v1/health
 
 The web app is at <http://localhost:5173>. It renders the application shell — sidebar, top bar with the organization switcher and user menu, and a content area — built from the design system, with a health status panel showing the response above.
 
-Stop the environment with `docker compose down`. Add `-v` to also delete the database volume, which discards all local data.
+Stop the development servers with Ctrl+C. To discard local data, reset the local database with `npm run db:reset`.
 
 ### Re-running the startup command
 
-Running `docker compose up -d --wait` again is safe. Migrations are applied only if pending, reference data is upserted rather than duplicated, and existing records are preserved.
+Re-running `npm run db:migrate` and `npm run db:seed` is safe. Migrations are applied only if pending, reference data is upserted rather than duplicated, and existing records are preserved.
 
 ---
-
-## 💻 Non-Docker Path
-
-Useful for fast inner-loop development with hot reload. You still need a PostgreSQL server; the simplest is to run only the database in Docker:
-
-```bash
-cp .env.example .env
-docker compose up -d --wait db
-
-npm ci
-npm run db:migrate
-npm run db:seed
-npm run dev
-```
-
-`npm run dev` starts the service and the web app together with hot reload.
 
 ### ⚠️ Never start the API with `tsx`
 
 **The API must always be started from compiled output. `npx tsx src/main.ts` is forbidden.**
 
-`tsx` uses esbuild, which does **not** emit `design:parammetadata` — the `design:paramtypes` decorator metadata Nest uses to resolve constructor injection. Verified on this machine:
+`tsx` uses esbuild, which does **not** emit `design:paramtypes` — the decorator metadata Nest uses to resolve constructor injection. Verified on this machine:
 
 | Boot method | `design:paramtypes` | Serves requests |
 |---|---|---|
@@ -143,17 +127,14 @@ Run from the repository root.
 | `npm run db:reset` | Drop, re-migrate, and re-seed the local database — never in CI or production |
 | `npm run openapi:generate` | Regenerate `backend/openapi.json` from the code |
 | `npm run openapi:diff` | Fail if the generated contract differs from the committed one |
-| `docker compose up -d --wait` | Full environment: database, service, web app |
-| `docker compose down` | Stop the environment |
 
 ---
 
 ## 🧪 Testing
 
-Integration tests require a live database and will refuse to run without `DATABASE_URL`:
+Integration tests require a running PostgreSQL 17 instance and will refuse to run without `DATABASE_URL`. Start your local PostgreSQL 17 first, then:
 
 ```bash
-docker compose up -d --wait db
 DATABASE_URL="postgresql://nexuserp:nexuserp_dev_password@127.0.0.1:5432/nexuserp?schema=public" npm run test:integration
 ```
 
@@ -187,7 +168,7 @@ Every variable the service needs is listed in `.env.example` with a safe develop
 |---|---|---|
 | `NODE_ENV` | Runtime mode | `development` |
 | `PORT` | Port the service listens on | `3000` |
-| `DATABASE_URL` | PostgreSQL connection string | points at the `db` container |
+| `DATABASE_URL` | PostgreSQL connection string | points at the local PostgreSQL 17 instance |
 | `LOG_LEVEL` | Minimum log level emitted | `info` |
 | `CORS_ORIGINS` | Explicit allowed origins, comma-separated | the local web origin |
 | `SESSION_SECRET` | Session signing secret — required once sessions ship | placeholder in `.env.example` |
@@ -206,8 +187,8 @@ The service validates its configuration at startup and exits with a message nami
 | `port is already in use` | Another process holds the port | Stop it, or change `PORT` in `.env` |
 | `environment variable DATABASE_URL is missing` | `.env` not created | `cp .env.example .env` |
 | Service exits immediately at startup | Invalid configuration or unreachable database | Read the startup message; it names the variable |
-| `Health returns 503 with database` unavailable | Database container not ready, or a migration failed | `docker compose logs db`; then `docker compose up -d --wait` again |
-| Integration tests fail with a connection error | Tests pointed at a database that is not running | `docker compose up -d --wait db` |
+| `Health returns 503 with database` unavailable | Database not ready, or a migration failed | Check that the local PostgreSQL 17 service is running, then re-run `npm run db:migrate` |
+| Integration tests fail with a connection error | Tests pointed at a database that is not running | Start your local PostgreSQL 17 instance, then check `DATABASE_URL` |
 | Integration tests report unexpected data | Tests ran against a database holding other data | Use a dedicated test database; the suite truncates between tests |
 | Migration fails partway | A migration cannot apply to the current schema | The message names the migration; fix it or reset locally with `npm run db:reset` |
 | `openapi:diff` fails after editing the API | Regenerated contract not committed | `npm run openapi:generate` and commit the result |
@@ -229,14 +210,6 @@ The OpenAPI document is **generated from the code** and committed at `backend/op
 
 ---
 
-## 📚 Documentation
-
-- `specs/001-platform-foundation/quickstart.md` — commands, configuration, troubleshooting
-- `specs/001-platform-foundation/HANDOVER.md` — implementation status and what is verified
-- `.specify/memory/constitution.md` — engineering rules this repository must uphold
-
----
-
 ## 🔒 Mandatory Checks (Branch Protection)
 
 The following GitHub Actions jobs are configured as required status checks on the `main` and `001-platform-foundation` branches. A PR cannot be merged until all of these checks pass.
@@ -250,7 +223,7 @@ The following GitHub Actions jobs are configured as required status checks on th
 | **Migration Validation** | `migrations` | Empty apply, re-apply, and drift detection |
 | **Contract Drift** | `contract` | `openapi:diff` against committed `openapi.json` |
 | **Build** | `build` | Shared, API, and Web production builds |
-| **Image Build** | `images` | Docker images for API and Web (no push) |
+| **Secret Scan** | `secret-scan` | Walks the tracked files and fails on a committed secret |
 
 ### Enabling Branch Protection
 
@@ -271,11 +244,10 @@ Each mandatory check can be deliberately broken to confirm it fails, then restor
 | **Lint** | Add `const x: any = 1` to `backend/src/main.ts` | `npm run lint` exits 1 with ESLint error | Remove the line | `npm run lint` exits 0 |
 | **Type Check** | Add `const x: string = 123` to `backend/src/main.ts` | `npm run typecheck` exits 1 with TS2322 | Remove the line | `npm run typecheck` exits 0 |
 | **Unit Tests** | Change an assertion to `expect(1).toBe(2)` | `npm run test` fails with assertion error | Restore the test | `npm run test` passes |
-| **Integration Tests** | Stop the database container | `npm run test:integration` fails with connection error | Restart database | `npm run test:integration` passes |
+| **Integration Tests** | Stop the local PostgreSQL 17 instance | `npm run test:integration` fails with connection error | Restart PostgreSQL | `npm run test:integration` passes |
 | **Migration Validation** | Rename a migration folder | `npm run check:migrations` exits 1 with `missing-folder` | Restore folder name | `npm run check:migrations` exits 0 |
 | **Contract Drift** | Rename a field in a DTO | `npm run openapi:diff` exits 1 with drift details | Revert the change | `npm run openapi:diff` exits 0 |
 | **Build** | Introduce a syntax error in `backend/src/main.ts` | `npm run build` fails with compilation error | Fix the syntax | `npm run build` exits 0 |
-| **Image Build** | Remove a required `COPY` from `docker/backend.Dockerfile` | `docker build` fails with COPY error | Restore the `COPY` | Images build successfully |
 
 > Run these locally to confirm the gates are effective before pushing.
 
@@ -333,6 +305,8 @@ Features that provide tax compliance, e-invoicing, or complete accounting will b
 
 ## 📚 Documentation
 
+- [`docs/staging-deployment.md`](docs/staging-deployment.md) — staging deployment runbook
+- [`docs/PRD.md`](docs/PRD.md) — product requirements
 - [`specs/001-platform-foundation/quickstart.md`](specs/001-platform-foundation/quickstart.md) — commands, configuration, troubleshooting
 - [`specs/001-platform-foundation/HANDOVER.md`](specs/001-platform-foundation/HANDOVER.md) — implementation status and what is verified
 - [`.specify/memory/constitution.md`](.specify/memory/constitution.md) — engineering rules this repository must uphold

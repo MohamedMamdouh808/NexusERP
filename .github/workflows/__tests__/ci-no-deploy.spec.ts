@@ -199,9 +199,8 @@ console.log('ci-no-deploy: workflow assertions');
 test('every job that runs Node tooling installs with npm ci --frozen-lockfile (T109)', () => {
   assert.ok(workflow.jobs.length > 0, 'the workflow defines no jobs');
   for (const job of workflow.jobs) {
-    // The images job builds the Dockerfiles, which install their own dependencies inside
-    // the image; the workflow-assertions job runs a standalone Node script. Neither runs
-    // repository tooling, so neither needs `npm ci`.
+    // The workflow-assertions job runs a standalone Node script and needs no repository
+    // tooling; every other job installs before it runs anything.
     const runsNodeTooling = job.steps.some((step) => /(^|\s)npm\s+(run|ci|test|exec)/.test(step.run ?? ''));
     if (!runsNodeTooling) continue;
 
@@ -252,13 +251,76 @@ test('no step emits a deployed environment URL', () => {
   assert.deepEqual(offenders, []);
 });
 
-test('building an image without pushing it is present and allowed', () => {
+test('no step deploys, restarts, or calls a host to roll a release out (T020)', () => {
+  // FR-011: the pipeline deploys nothing. The checks above catch a push or a registry
+  // login; this one catches the remaining ways a workflow ships code without pushing an
+  // image to a registry - invoking a host's CLI, calling a deploy hook, or restarting a
+  // service. `autoDeployTrigger: checksPass` on the host is what turns a green pipeline
+  // into a deploy, so the workflow must contain no step that does it itself.
+  const offenders = workflow.jobs.flatMap((job) =>
+    job.steps
+      .filter((step) => {
+        const run = step.run ?? '';
+        if (/\b(vercel|netlify|flyctl|fly|heroku|kubectl|terraform|serverless|sls)\b/.test(run)) {
+          return true;
+        }
+        if (/\brender\s+(deploy|restart|services)\b/.test(run)) return true;
+        if (/deploy[-_ ]?hook/i.test(run)) return true;
+        if (/\brestart\b/i.test(run)) return true;
+        if (/curl[^\n]*https?:\/\//i.test(run)) return true;
+        if (/wget[^\n]*https?:\/\//i.test(run)) return true;
+        return false;
+      })
+      .map((step) => `${job.id}: ${step.name ?? step.uses ?? 'run'}`),
+  );
+  assert.deepEqual(offenders, []);
+});
+
+test('the secret scan job runs only repository-local commands (T020, FR-011)', () => {
+  const scan = workflow.jobs.find(
+    (job) => /secret[-_ ]?scan/i.test(job.id) || /secret[-_ ]?scan/i.test(job.name),
+  );
+  assert.ok(scan, 'the workflow has no secret scan job');
+
+  // An allowlist, not a denylist: a new command has to be named here, so a step that
+  // reaches the network cannot arrive unnoticed. `node` running a repository script is
+  // the whole job; `git` is permitted so the scan can enumerate tracked files.
+  const localCommand = /^(node|npm|npx|git|sh|bash)\b/;
+
+  for (const step of scan.steps) {
+    if (step.uses) continue;
+    for (const line of (step.run ?? '').split('\n')) {
+      const command = line.trim();
+      if (command === '' || command.startsWith('#')) continue;
+      assert.ok(
+        localCommand.test(command),
+        `the secret scan job runs "${command}", which is not a repository-local command`,
+      );
+    }
+  }
+
+  // The scan must run the committed script rather than an inline pipeline, so what CI
+  // runs is what a developer can run.
+  const runsTheScript = scan.steps.some((step) =>
+    /scripts\/check-secrets\.mjs/.test(step.run ?? ''),
+  );
+  assert.ok(runsTheScript, 'the secret scan job does not run scripts/check-secrets.mjs');
+});
+
+test('the pipeline builds no container image (Docker was removed from the project)', () => {
+  // This used to be the inverse assertion - two images built and not pushed. The project
+  // no longer ships Dockerfiles, so the guard is now that the pipeline does not quietly
+  // grow an image build back.
   const builds = workflow.jobs.flatMap((job) =>
     job.steps
       .filter((step) => /docker\s+build/.test(step.run ?? ''))
       .map((step) => `${job.id}: ${step.name ?? 'run'}`),
   );
-  assert.ok(builds.length >= 2, `expected both images to be built, found ${builds.length}`);
+  assert.deepEqual(
+    builds,
+    [],
+    'the workflow builds a container image, but the project no longer ships Dockerfiles',
+  );
 });
 
 test('actions/checkout is used', () => {
