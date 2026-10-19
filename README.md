@@ -1,4 +1,4 @@
-﻿# NexusERP
+# NexusERP
 
 ![Node.js Version](https://img.shields.io/badge/Node.js-24_LTS-green)
 ![License](https://img.shields.io/badge/License-MIT-blue)
@@ -141,7 +141,7 @@ Run from the repository root.
 | `npm run db:migrate:dev` | Author a new migration from schema changes — use locally only |
 | `npm run db:seed` | Load reference data; safe to run repeatedly |
 | `npm run db:reset` | Drop, re-migrate, and re-seed the local database — never in CI or production |
-| `npm run openapi:generate` | Regenerate `apps/api/openapi.json` from the code |
+| `npm run openapi:generate` | Regenerate `backend/openapi.json` from the code |
 | `npm run openapi:diff` | Fail if the generated contract differs from the committed one |
 | `docker compose up -d --wait` | Full environment: database, service, web app |
 | `docker compose down` | Stop the environment |
@@ -170,8 +170,8 @@ DATABASE_URL="postgresql://nexuserp:nexuserp_dev_password@127.0.0.1:5432/nexuser
 
 | Project | Thresholds |
 |---|---|
-| `apps/api` (critical paths) | 80% statements, branches, functions, lines |
-| `apps/web` (critical paths) | 80% statements, branches, functions, lines |
+| `backend` (critical paths) | 80% statements, branches, functions, lines |
+| `frontend` (critical paths) | 80% statements, branches, functions, lines |
 
 **Current Coverage:**
 - **API**: 99.67% statements, 93.02% branches, 95.23% functions, 99.67% lines
@@ -218,14 +218,14 @@ The service validates its configuration at startup and exits with a message nami
 
 ## 📝 Working on the API Contract
 
-The OpenAPI document is **generated from the code** and committed at `apps/api/openapi.json`.
+The OpenAPI document is **generated from the code** and committed at `backend/openapi.json`.
 
 - Change a DTO, decorator, or controller, then run `npm run openapi:generate`.
 - Commit the regenerated file in the same commit as the code change.
 - `npm run openapi:diff` fails if the generated contract differs from the committed one, which is what makes an unintended contract change visible in review instead of silent.
 - The human-readable contract page is served at <http://localhost:3000/api/docs> in development and is built from the same generation source, so the page and the committed file can never disagree.
 
-**Do not hand-edit `apps/api/openapi.json`.** Edit the decorators on the code that produces it.
+**Do not hand-edit `backend/openapi.json`.** Edit the decorators on the code that produces it.
 
 ---
 
@@ -268,14 +268,14 @@ Each mandatory check can be deliberately broken to confirm it fails, then restor
 
 | Check | Break it | Verify failure | Restore | Verify pass |
 |---|---|---|---|---|
-| **Lint** | Add `const x: any = 1` to `apps/api/src/main.ts` | `npm run lint` exits 1 with ESLint error | Remove the line | `npm run lint` exits 0 |
-| **Type Check** | Add `const x: string = 123` to `apps/api/src/main.ts` | `npm run typecheck` exits 1 with TS2322 | Remove the line | `npm run typecheck` exits 0 |
+| **Lint** | Add `const x: any = 1` to `backend/src/main.ts` | `npm run lint` exits 1 with ESLint error | Remove the line | `npm run lint` exits 0 |
+| **Type Check** | Add `const x: string = 123` to `backend/src/main.ts` | `npm run typecheck` exits 1 with TS2322 | Remove the line | `npm run typecheck` exits 0 |
 | **Unit Tests** | Change an assertion to `expect(1).toBe(2)` | `npm run test` fails with assertion error | Restore the test | `npm run test` passes |
 | **Integration Tests** | Stop the database container | `npm run test:integration` fails with connection error | Restart database | `npm run test:integration` passes |
 | **Migration Validation** | Rename a migration folder | `npm run check:migrations` exits 1 with `missing-folder` | Restore folder name | `npm run check:migrations` exits 0 |
 | **Contract Drift** | Rename a field in a DTO | `npm run openapi:diff` exits 1 with drift details | Revert the change | `npm run openapi:diff` exits 0 |
-| **Build** | Introduce a syntax error in `apps/api/src/main.ts` | `npm run build` fails with compilation error | Fix the syntax | `npm run build` exits 0 |
-| **Image Build** | Remove a required `COPY` from `docker/api.Dockerfile` | `docker build` fails with COPY error | Restore the `COPY` | Images build successfully |
+| **Build** | Introduce a syntax error in `backend/src/main.ts` | `npm run build` fails with compilation error | Fix the syntax | `npm run build` exits 0 |
+| **Image Build** | Remove a required `COPY` from `docker/backend.Dockerfile` | `docker build` fails with COPY error | Restore the `COPY` | Images build successfully |
 
 > Run these locally to confirm the gates are effective before pushing.
 

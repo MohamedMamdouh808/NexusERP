@@ -1,4 +1,4 @@
-﻿---
+---
 
 description: "Task list for the NexusERP platform foundation"
 ---

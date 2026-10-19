@@ -80,12 +80,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: coverage-api
-          path: apps/api/coverage/
+          path: backend/coverage/
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         with:
           name: coverage-web
-          path: apps/web/coverage/
+          path: frontend/coverage/
           if-no-files-found: warn
 
   integration:
@@ -216,9 +216,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       - name: Build the service image
-        run: docker build -f docker/api.Dockerfile -t nexuserp-api:ci .
+        run: docker build -f docker/backend.Dockerfile -t nexuserp-api:ci .
       - name: Build the web image
-        run: docker build -f docker/web.Dockerfile -t nexuserp-web:ci .
+        run: docker build -f docker/frontend.Dockerfile -t nexuserp-web:ci .
 
   workflow:
     name: Workflow assertions

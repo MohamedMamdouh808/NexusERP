@@ -38,10 +38,10 @@ Start the API only with `nest build`, `nest start`, or `node dist/main.js`:
 - `npm run build` → `nest build`
 - `npm start` → `node dist/main.js`
 
-`tsx` is acceptable only for scripts that build no Nest DI container: `prisma/seed.ts` and
-`scripts/check-schema-numeric-types.ts`. Any script that boots the app, including OpenAPI
+`tsx` is acceptable only for scripts that build no Nest DI container: `database/prisma/seed.ts` and
+`database/scripts/check-schema-numeric-types.ts`. Any script that boots the app, including OpenAPI
 generation, must compile first and import from `dist`.
-`apps/api/test/integration/boot-smoke.spec.ts` enforces this at the suite level.
+`backend/test/integration/boot-smoke.spec.ts` enforces this at the suite level.
 
 ## Prisma client after a clean install
 

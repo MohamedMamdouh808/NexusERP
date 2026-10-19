@@ -1,0 +1,77 @@
+# syntax=docker/dockerfile:1
+#
+# NexusERP web image (T034).
+#
+# Multi-stage: install, build the static assets, then serve them from a minimal runtime
+# that contains no Node build tooling.
+#
+# IMPORTANT: the built assets are INJECTED into the image, not mounted at runtime. A
+# bind-mounted asset directory is the classic pattern for a development setup and it is
+# exactly what makes a running container disagree with its own image. This image serves
+# the bundle it was built with.
+#
+# The served assets are the production build (T050). For local development with hot
+# reload, run the dev server through `npm run dev --workspace @nexuserp/web` on the host
+# rather than rebuilding this image on every change.
+#
+# Workspace layout (002-repo-restructure): shared/, backend/, frontend/ and database/ live
+# at the repository root. This image builds shared/ and frontend/.
+
+# ---------------------------------------------------------------------------
+# deps
+# ---------------------------------------------------------------------------
+FROM node:24-alpine AS deps
+WORKDIR /repo
+
+# Every workspace manifest is copied, not just the two this image builds: the root
+# manifest declares all four as workspaces, so `npm ci` resolves all four before it runs
+# and fails outright if one is absent.
+COPY package.json package-lock.json ./
+COPY shared/package.json ./shared/
+COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
+COPY database/package.json ./database/
+
+# The root `postinstall` hook runs as part of `npm ci`, so the script it points at has
+# to be in the dependency layer. It finds no schema here and exits without generating
+# anything, which is the behaviour the hook is designed for; without the file present,
+# however, the install itself fails and the image cannot be built at all.
+COPY scripts/postinstall.mjs ./scripts/postinstall.mjs
+
+RUN npm ci --workspace @nexuserp/web --workspace @nexuserp/shared --include-workspace-root
+
+# ---------------------------------------------------------------------------
+# build
+# ---------------------------------------------------------------------------
+FROM node:24-alpine AS build
+WORKDIR /repo
+
+COPY --from=deps /repo/node_modules ./node_modules
+COPY package.json package-lock.json ./
+COPY shared ./shared
+COPY frontend ./frontend
+
+# The web app imports types and schemas from the shared package, so it is compiled first.
+RUN npm run build --workspace @nexuserp/shared \
+ && npm run build --workspace @nexuserp/web
+
+# ---------------------------------------------------------------------------
+# runtime
+# ---------------------------------------------------------------------------
+FROM node:24-alpine AS runtime
+WORKDIR /app
+
+# `tini` gives the process a real init so SIGTERM reaches Node. Nothing else is added:
+# the static server is a dependency-free script from the repository rather than an
+# installed package, so the runtime image contains nothing outside the committed lockfile.
+RUN apk add --no-cache tini
+
+COPY --from=build /repo/frontend/dist ./dist
+COPY docker/static-server.mjs ./static-server.mjs
+
+EXPOSE 5173
+
+USER node
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "/app/static-server.mjs"]

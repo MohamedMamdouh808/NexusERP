@@ -29,11 +29,11 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-const SCHEMA = join('apps', 'api', 'prisma', 'schema.prisma');
+const SCHEMA = join('database', 'prisma', 'schema.prisma');
 
 if (!existsSync(SCHEMA)) {
   console.log(
-    'postinstall: apps/api/prisma/schema.prisma is not present yet, so prisma generate is ' +
+    'postinstall: database/prisma/schema.prisma is not present yet, so prisma generate is ' +
       'skipped. This is expected when installing manifests before sources, as the Dockerfiles do.',
   );
   process.exit(0);

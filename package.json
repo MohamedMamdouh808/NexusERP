@@ -5,8 +5,10 @@
   "description": "NexusERP - multi-tenant modular-monolith ERP SaaS",
   "license": "UNLICENSED",
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "frontend",
+    "backend",
+    "database",
+    "shared"
   ],
   "engines": {
     "node": ">=22.13.0"
@@ -17,7 +19,7 @@
     "dev:api": "npm run dev --workspace @nexuserp/api",
     "dev:web": "npm run dev --workspace @nexuserp/web",
     "build": "npm run build --workspace @nexuserp/shared && npm run build --workspace @nexuserp/api && npm run build --workspace @nexuserp/web",
-    "lint": "npm run lint --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present && npm run check:boundaries && npm run check:structure",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "npm run build --workspace @nexuserp/shared && npm run typecheck --workspaces --if-present",
@@ -25,14 +27,17 @@
     "test:integration": "npm run test:integration --workspace @nexuserp/api",
     "test:coverage": "npm run test:coverage --workspace @nexuserp/api",
     "test:e2e": "npm run test:e2e --workspace @nexuserp/web",
-    "db:generate": "npm run db:generate --workspace @nexuserp/api",
-    "db:migrate": "npm run db:migrate --workspace @nexuserp/api",
-    "db:migrate:dev": "npm run db:migrate:dev --workspace @nexuserp/api",
-    "db:seed": "npm run db:seed --workspace @nexuserp/api",
-    "db:reset": "npm run db:reset --workspace @nexuserp/api",
+    "db:generate": "npm run db:generate --workspace @nexuserp/database",
+    "db:migrate": "npm run db:migrate --workspace @nexuserp/database",
+    "db:migrate:dev": "npm run db:migrate:dev --workspace @nexuserp/database",
+    "db:seed": "npm run db:seed --workspace @nexuserp/database",
+    "db:reset": "npm run db:reset --workspace @nexuserp/database",
     "openapi:generate": "npm run openapi:generate --workspace @nexuserp/api",
     "openapi:diff": "npm run openapi:diff --workspace @nexuserp/api",
-    "check:schema-numeric-types": "npm run check:schema-numeric-types --workspace @nexuserp/api"
+    "check:schema-numeric-types": "npm run check:schema-numeric-types --workspace @nexuserp/database",
+    "check:migrations": "npm run check:migrations --workspace @nexuserp/database",
+    "check:boundaries": "tsx scripts/check-boundaries.ts",
+    "check:structure": "tsx scripts/check-structure.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
