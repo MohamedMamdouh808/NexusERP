@@ -212,7 +212,7 @@ The OpenAPI document is **generated from the code** and committed at `backend/op
 
 ## 🔒 Mandatory Checks (Branch Protection)
 
-The following GitHub Actions jobs are configured as required status checks on the `main` and `001-platform-foundation` branches. A PR cannot be merged until all of these checks pass.
+The following GitHub Actions jobs are configured as required status checks on the `main` branch. A PR cannot be merged until all of these checks pass.
 
 | Check | Job | Description |
 |---|---|---|
@@ -227,7 +227,7 @@ The following GitHub Actions jobs are configured as required status checks on th
 
 ### Enabling Branch Protection
 
-In the GitHub repository settings, under **Branches > Branch protection rules**, add a rule for `main` and `001-platform-foundation` with **Require status checks to pass before merging** and select all the checks above.
+In the GitHub repository settings, under **Branches > Branch protection rules**, add a rule for `main` with **Require status checks to pass before merging** and select all the checks above.
 
 The `workflow` job (`.github/workflows/__tests__/ci-no-deploy.spec.ts`) runs as an additional guard: it parses the workflow YAML and asserts that the pipeline pushes nothing, deploys nothing, and releases nothing.
 

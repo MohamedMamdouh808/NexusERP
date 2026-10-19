@@ -10,7 +10,7 @@ name: CI
 
 on:
   push:
-    branches: ["main", "001-platform-foundation"]
+    branches: ["main"]
   pull_request:
 
 # A cancelled workflow must not be reported as a pass.
