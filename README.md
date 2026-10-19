@@ -1,48 +1,98 @@
-# NexusERP
+﻿# NexusERP
 
 Platform foundation: a NestJS API, a React web client, and a shared contract package, on PostgreSQL.
 
 ## Prerequisites
 
-- Node.js 24 (see `.nvmrc`)
-- Docker, for the PostgreSQL container
-- npm 11+
+| Requirement | Version | How to check |
+|---|---|---|
+| Docker with Compose v2 | 22+ with the `compose` plugin | `docker compose version` |
+| Git | any recent | `git --version` |
+| Node.js | 24 LTS | only needed if you choose the non-Docker path below |
+| npm | shipped with Node 24 | `npm --version` |
 
-## Quick start
+You do **not** need a PostgreSQL server installed locally. The database runs in a container.
+
+## One-command startup
+
+```bash
+git clone <repository-url>
+cd NexusERP
+cp .env.example .env
+docker compose up -d --wait
+```
+
+`--wait` returns only after the database, the service, and the web app all report healthy. Expect
+this to take a few minutes on the first run while images build and dependencies install.
+
+Then confirm:
+
+```bash
+curl http://localhost:3000/api/v1/health
+```
+
+```json
+{
+  "status": "ok",
+  "uptimeSeconds": 42,
+  "checks": {
+    "application": { "status": "ok" },
+    "database": { "status": "ok", "latencyMs": 2 }
+  }
+}
+```
+
+The web app is at <http://localhost:5173>. It renders the application shell — sidebar, top bar with
+the organization switcher and user menu, and a content area — built from the design system, with
+a health status panel showing the response above.
+
+Stop the environment with `docker compose down`. Add `-v` to also delete the database volume, which
+discards all local data.
+
+### Re-running the startup command
+
+Running `docker compose up -d --wait` again is safe. Migrations are applied only if pending,
+reference data is upserted rather than duplicated, and existing records are preserved.
+
+---
+
+## Non-Docker path
+
+Useful for fast inner-loop development with hot reload. You still need a PostgreSQL server; the
+simplest is to run only the database in Docker:
 
 ```bash
 cp .env.example .env
 docker compose up -d --wait db
+
 npm ci
-npm run db:generate     # required after every clean install
 npm run db:migrate
 npm run db:seed
 npm run dev
 ```
 
-The API is then on <http://localhost:3000> and its health endpoint on
-<http://localhost:3000/api/v1/health>.
+`npm run dev` starts the service and the web app together with hot reload.
 
-> `npm ci` deletes `node_modules`, including the generated Prisma client. Run `npm run db:generate`
-> before `npm run typecheck`, or every Prisma query will be typed `any` and the type check will
-> report phantom errors.
+### Never start the API with `tsx`
 
-## Never start the API with `tsx`
+**The API must always be started from compiled output. `npx tsx src/main.ts` is forbidden.**
 
-**Start the API only through `nest build`, `nest start`, or `node dist/main.js`.**
-`npx tsx src/main.ts` is forbidden.
-
-`tsx` uses esbuild, which does not emit `design:parammetadata`, so `design:paramtypes` is
-`undefined` and Nest cannot resolve constructor injection. The application still logs a successful
-start and still connects to the database, but requests fail, because `Reflector` is injected as
-`undefined` into the permission guard.
-
-Verified:
+`tsx` uses esbuild, which does **not** emit `design:parammetadata` — the
+`design:paramtypes` decorator metadata Nest uses to resolve constructor injection. Verified on
+this machine:
 
 | Boot method | `design:paramtypes` | Serves requests |
 |---|---|---|
-| `tsx` | `undefined` | No |
-| `nest build` / `tsc` | present | Yes (HTTP 200) |
+| `tsx` (esbuild) | `undefined` | No |
+| `tsc` / `nest build` | present | Yes (HTTP 200) |
+
+Because the metadata is absent, `Reflector` arrives as `undefined` inside the permission guard and
+the process fails at request time rather than at boot time. The failure is easy to misdiagnose,
+because everything else still looks healthy: `tsc` is clean, the unit tests pass, the integration
+tests pass, the application logs `Nest application successfully started`, and the database connects.
+Only the request handling is broken.
+
+Only these three forms are permitted:
 
 | Script | Command |
 |---|---|
@@ -53,6 +103,8 @@ Verified:
 `tsx` is fine for the seed and the schema checker, which build no DI container. Anything that boots
 the application must compile first.
 
+---
+
 ## Commands
 
 Run from the repository root.
@@ -60,12 +112,24 @@ Run from the repository root.
 | Command | What it does |
 |---|---|
 | `npm ci` | Reproducible install of every workspace from the committed lockfile |
-| `npm run dev` | Start with hot reload |
-| `npm run build` | Build the API and the web app |
-| `npm run lint` | Lint and schema numeric checks |
-| `npm run typecheck` | Type check every workspace |
-| `npm test` | Unit tests |
+| `npm run dev` | Service and web app together, with hot reload |
+| `npm run build` | Production build of the service and a static build of the web app |
+| `npm run lint` | Lint and format check across both workspaces |
+| `npm run format` | Apply formatting |
+| `npm run typecheck` | Type check both workspaces |
+| `npm test` | Unit tests only — fast, no database required |
 | `npm run test:integration` | Integration tests against a real PostgreSQL instance |
+| `npm run test:coverage` | Unit tests with coverage thresholds enforced |
+| `npm run test:e2e` | Playwright smoke test against the running stack |
+| `npm run db:generate` | Generate the Prisma client |
+| `npm run db:migrate` | Apply pending migrations (development authoring uses a separate command) |
+| `npm run db:migrate:dev` | Author a new migration from schema changes — use locally only |
+| `npm run db:seed` | Load reference data; safe to run repeatedly |
+| `npm run db:reset` | Drop, re-migrate, and re-seed the local database — never in CI or production |
+| `npm run openapi:generate` | Regenerate `apps/api/openapi.json` from the code |
+| `npm run openapi:diff` | Fail if the generated contract differs from the committed one |
+| `docker compose up -d --wait` | Full environment: database, service, web app |
+| `docker compose down` | Stop the environment |
 
 ## Testing
 
@@ -76,8 +140,171 @@ docker compose up -d --wait db
 DATABASE_URL="postgresql://nexuserp:nexuserp_dev_password@127.0.0.1:5432/nexuserp?schema=public" npm run test:integration
 ```
 
+### Test structure
+
+| Layer | Tool | Coverage |
+|---|---|---|
+| Unit | Jest | Fast, no database, covers `common` and `platform` modules |
+| Integration | Jest + Supertest + real PostgreSQL | Covers `platform` and `health` with real DB |
+| Web component | Vitest + React Testing Library | Components, hooks, accessibility |
+| E2E | Playwright | Shell render, health panel, shell + health together |
+
+### Coverage thresholds
+
+| Project | Thresholds |
+|---|---|
+| `apps/api` (critical paths) | 80% statements, branches, functions, lines |
+| `apps/web` (critical paths) | 80% statements, branches, functions, lines |
+
+---
+
+## Configuration
+
+Every variable the service needs is listed in `.env.example` with a safe development default.
+Copy it to `.env` and adjust. `.env` is never committed.
+
+| Variable | Purpose | Default in development |
+|---|---|---|
+| `NODE_ENV` | Runtime mode | `development` |
+| `PORT` | Port the service listens on | `3000` |
+| `DATABASE_URL` | PostgreSQL connection string | points at the `db` container |
+| `LOG_LEVEL` | Minimum log level emitted | `info` |
+| `CORS_ORIGINS` | Explicit allowed origins, comma-separated | the local web origin |
+| `SESSION_SECRET` | Session signing secret — required once sessions ship | placeholder in `.env.example` |
+| `CSRF_SECRET` | CSRF token secret — required once sessions ship | placeholder in `.env.example` |
+
+The service validates its configuration at startup and exits with a message naming the offending
+variable rather than starting in a broken state. A port already in use is reported the same way,
+naming the port.
+
+Never commit real values. `.env.example` contains placeholders only.
+
+---
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `port is already in use` | Another process holds the port | Stop it, or change `PORT` in `.env` |
+| `environment variable DATABASE_URL is missing` | `.env` not created | `cp .env.example .env` |
+| Service exits immediately at startup | Invalid configuration or unreachable database | Read the startup message; it names the variable |
+| `Health returns 503 with database` unavailable | Database container not ready, or a migration failed | `docker compose logs db`; then `docker compose up -d --wait` again |
+| Integration tests fail with a connection error | Tests pointed at a database that is not running | `docker compose up -d --wait db` |
+| Integration tests report unexpected data | Tests ran against a database holding other data | Use a dedicated test database; the suite truncates between tests |
+| Migration fails partway | A migration cannot apply to the current schema | The message names the migration; fix it or reset locally with `npm run db:reset` |
+| `openapi:diff` fails after editing the API | Regenerated contract not committed | `npm run openapi:generate` and commit the result |
+| Seed appears to do nothing | Already seeded | Expected — seeding is idempotent and reports what it updated |
+| `npm run typecheck` reports `Cannot find module '@nexuserp/shared'` | Clean install without prior build | `npm run build --workspace @nexuserp/shared` |
+
+---
+
+## Working on the API contract
+
+The OpenAPI document is **generated from the code** and committed at `apps/api/openapi.json`.
+
+- Change a DTO, decorator, or controller, then run `npm run openapi:generate`.
+- Commit the regenerated file in the same commit as the code change.
+- `npm run openapi:diff` fails if the generated contract differs from the committed one, which is
+  what makes an unintended contract change visible in review instead of silent.
+- The human-readable contract page is served at <http://localhost:3000/api/docs> in development
+  and is built from the same generation source, so the page and the committed file can never
+  disagree.
+
+Do not hand-edit `apps/api/openapi.json`. Edit the decorators on the code that produces it.
+
+
+
+---
+
+## Mandatory Checks (Branch Protection)
+
+The following GitHub Actions jobs are configured as required status checks on the main and  01-platform-foundation branches. A PR cannot be merged until all of these checks pass.
+
+| Check | Job | Description |
+|---|---|---|
+| **Lint** | lint | ESLint + schema numeric type check (no Float columns) |
+| **Type Check** | 	ypecheck | Compiles shared package first, then type-checks all workspaces |
+| **Unit Tests** | unit | Unit tests with coverage artifacts (API + Web) |
+| **Integration Tests** | integration | Real PostgreSQL, migrations applied, full suite |
+| **Migration Validation** | migrations | Empty apply, re-apply, and drift detection |
+| **Contract Drift** | contract | openapi:diff against committed openapi.json |
+| **Build** | uild | Shared, API, and Web production builds |
+| **Image Build** | images | Docker images for API and Web (no push) |
+
+### Enabling Branch Protection
+
+In the GitHub repository settings, under **Branches > Branch protection rules**, add a rule for main and  01-platform-foundation with **Require status checks to pass before merging** and select all the checks above.
+
+The workflow job (.github/workflows/__tests__/ci-no-deploy.spec.ts) runs as an additional guard: it parses the workflow YAML and asserts that the pipeline pushes nothing, deploys nothing, and releases nothing.
+
+> **Note**: 
+pm run lint and 
+pm run check:migrations require a running database because check:migrations now genuinely compares the applied history against the repository. Without DATABASE_URL, lint will still pass but the migration check will exit 1 with a clear message. Set DATABASE_URL in the workflow environment (as done in CI) for a complete lint pass.
+
 ## Documentation
 
 - `specs/001-platform-foundation/quickstart.md` — commands, configuration, troubleshooting
 - `specs/001-platform-foundation/HANDOVER.md` — implementation status and what is verified
 - `.specify/memory/constitution.md` — engineering rules this repository must uphold
+
+### Verifying Check Failures (T075)
+
+
+Each mandatory check can be deliberately broken to confirm it fails, then restored to verify it passes.
+
+| Check | Break it | Verify failure | Restore | Verify pass |
+|---|---|---|---|---|
+| Lint | Add const x: any = 1 to pps/api/src/main.ts | 
+pm run lint exits 1 with ESLint error | Remove the line | 
+pm run lint exits 0 |
+| Type Check | Add const x: string = 123 to pps/api/src/main.ts | 
+pm run typecheck exits 1 with TS2322 | Remove the line | 
+pm run typecheck exits 0 |
+| Unit Tests | Change an assertion to expect(1).toBe(2) | 
+pm run test fails with assertion error | Restore the test | 
+pm run test passes |
+| Integration Tests | Stop the database container | 
+pm run test:integration fails with connection error | Restart database | 
+pm run test:integration passes |
+| Migration Validation | Rename a migration folder | 
+pm run check:migrations exits 1 with missing-folder | Restore folder name | 
+pm run check:migrations exits 0 |
+| Contract Drift | Rename a field in a DTO | 
+pm run openapi:diff exits 1 with drift details | Revert the change | 
+pm run openapi:diff exits 0 |
+| Build | Introduce a syntax error in pps/api/src/main.ts | 
+pm run build fails with compilation error | Fix the syntax | 
+pm run build exits 0 |
+| Image Build | Remove a required COPY from docker/api.Dockerfile | docker build fails with COPY error | Restore the COPY | Images build successfully |
+
+> Run these locally to confirm the gates are effective before pushing.
+
+## Structured Log Record Fields (FR-053, SC-023)
+
+
+
+---
+
+## Legal and Compliance
+
+### Tax Compliance, E-Invoicing, and Accounting Claims
+
+**NexusERP does not claim to provide tax compliance, e-invoicing compliance, or complete
+accounting functionality.**
+
+This platform foundation provides the infrastructure for building business applications:
+- A database schema with exact decimal arithmetic for monetary values
+- An API contract with precise error handling and structured logging
+- A health monitoring endpoint for infrastructure observability
+- An authentication/authorization framework (to be implemented in later features)
+
+It does **not** include:
+- Tax calculation engines or tax rule engines
+- E-invoicing format generation (UBL, Peppol, Facturae, etc.)
+- Double-entry bookkeeping or general ledger accounting
+- Financial statement generation (balance sheet, P&L, cash flow)
+- Audit trail compliance (SOX, GDPR, etc.)
+
+Features that provide tax compliance, e-invoicing, or complete accounting will be implemented as
+separate features with their own specifications. This foundation provides the platform on which
+they can be built safely.

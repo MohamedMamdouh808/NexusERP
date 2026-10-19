@@ -1,4 +1,4 @@
----
+﻿---
 
 description: "Task list for the NexusERP platform foundation"
 ---
@@ -137,7 +137,7 @@ templates are queryable. Deliverable value: a working, reproducible development 
 - [X] T036 [US1] Add the database, seed, development, and build scripts to `package.json` so migrations and seeding run as documented commands
 - [X] T037 [P] [US1] Configure the development server to proxy `/api` to the service in `apps/web/vite.config.ts`
 - [X] T038 [US1] Wire the Compose services so `docker compose up -d --wait` returns only after all three report healthy in `docker-compose.yml` (depends on T035)
-- [ ] T039 [US1] Document the one-command startup, every available command, and the failure modes in `README.md`
+- [X] T039 [US1] Document the one-command startup, every available command, and the failure modes in `README.md`
 
 **Checkpoint**: A clean checkout reaches a running environment with one command; re-running it
 preserves data and creates no duplicates.
@@ -209,20 +209,20 @@ Deliverable value: a merge gate nobody can bypass.
 
 - [X] T063 [P] [US3] Wire the coverage thresholds that fail below 80% on critical paths in `apps/api/jest.config.ts`
 - [X] T064 [P] [US3] Configure the web test runner with component tests and coverage thresholds in `apps/web/vitest.config.ts`
-- [ ] T065 [P] [US3] Configure the end-to-end runner as an advisory check in `apps/web/playwright.config.ts`
-- [ ] T066 [US3] Add the repository rule and type check commands to `package.json` so both workspaces are covered
-- [ ] T067 [US3] Create the lint and type check pipeline job in `.github/workflows/ci.yml`
-- [ ] T068 [US3] Create the unit test job with a coverage artifact in `.github/workflows/ci.yml`
-- [ ] T069 [US3] Create the integration test job provisioning a real database service container in `.github/workflows/ci.yml`
-- [ ] T070 [US3] Create the migration validation job covering empty apply, re-apply, and drift detection in `.github/workflows/ci.yml`
-- [ ] T071 [US3] Create the contract drift job regenerating and comparing the committed contract in `.github/workflows/ci.yml`
-- [ ] T072 [US3] Create the build job for the service and the static web assets in `.github/workflows/ci.yml` (this is the verification task for FR-001 and FR-002: one repository, one version history, both parts independently buildable from it)
-- [ ] T073 [US3] Create the image build job that builds both images without publishing them in `.github/workflows/ci.yml`
-- [ ] T109 [P] [US3] Install dependencies in every pipeline job with `npm ci --frozen-lockfile`, and add a check that `package-lock.json` is committed and is byte-identical after each install in `.github/workflows/ci.yml` (FR-049; depends on T067 through T073 — the jobs it modifies must exist first)
-- [ ] T111 [P] [US3] Write FAILING test asserting registry and release semantics rather than raw substrings, in `.github/workflows/__tests__/ci-no-deploy.spec.ts`: the workflow MUST contain no step that pushes an image to a registry (no `docker push`, no registry login step, no build-and-push action with push enabled), no job named or behaving as deploy or release, and no output of a deployed environment URL; building an image without pushing it, `actions/checkout`, and cache steps MUST pass. The same test MUST assert that a skipped integration job fails the pipeline (depends on T067 through T073 — the workflow definition must exist first; SC-011, SC-019)
+- [X] T065 [P] [US3] Configure the end-to-end runner as an advisory check in `apps/web/playwright.config.ts`
+- [X] T066 [US3] Add the repository rule and type check commands to `package.json` so both workspaces are covered
+- [X] T067 [US3] Create the lint and type check pipeline job in `.github/workflows/ci.yml`
+- [X] T068 [US3] Create the unit test job with a coverage artifact in `.github/workflows/ci.yml`
+- [X] T069 [US3] Create the integration test job provisioning a real database service container in `.github/workflows/ci.yml`
+- [X] T070 [US3] Create the migration validation job covering empty apply, re-apply, and drift detection in `.github/workflows/ci.yml`
+- [X] T071 [US3] Create the contract drift job regenerating and comparing the committed contract in `.github/workflows/ci.yml`
+- [X] T072 [US3] Create the build job for the service and the static web assets in `.github/workflows/ci.yml` (this is the verification task for FR-001 and FR-002: one repository, one version history, both parts independently buildable from it)
+- [X] T073 [US3] Create the image build job that builds both images without publishing them in `.github/workflows/ci.yml`
+- [X] T109 [P] [US3] Install dependencies in every pipeline job with `npm ci --frozen-lockfile`, and add a check that `package-lock.json` is committed and is byte-identical after each install in `.github/workflows/ci.yml` (FR-049; depends on T067 through T073 — the jobs it modifies must exist first)
+- [X] T111 [P] [US3] Write FAILING test asserting registry and release semantics rather than raw substrings, in `.github/workflows/__tests__/ci-no-deploy.spec.ts`: the workflow MUST contain no step that pushes an image to a registry (no `docker push`, no registry login step, no build-and-push action with push enabled), no job named or behaving as deploy or release, and no output of a deployed environment URL; building an image without pushing it, `actions/checkout`, and cache steps MUST pass. The same test MUST assert that a skipped integration job fails the pipeline (depends on T067 through T073 — the workflow definition must exist first; SC-011, SC-019)
 - [X] T108 [US3] Run the built service image in a clean environment configured only from `.env.example`, confirm it starts, and confirm `GET /api/v1/health` responds, in `.github/workflows/ci.yml` or a local script under `scripts/verify-image-portability.sh` (SC-020, depends on T073)
-- [ ] T074 [US3] Declare the mandatory checks as required status checks and document the setup in `README.md`
-- [ ] T075 [US3] Verify each mandatory check fails when deliberately broken and passes when fixed, recording the result in `README.md`
+- [X] T074 [US3] Declare the mandatory checks as required status checks and document the setup in `README.md`
+- [X] T075 [US3] Verify each mandatory check fails when deliberately broken and passes when fixed, recording the result in `README.md`
 
 **Checkpoint**: No change can merge with a mandatory check failing, incomplete, or skipped; the
 pipeline's terminal action is a verified image and nothing else.
@@ -258,13 +258,13 @@ coherent, documented project.
 - [X] T086 [US4] Create the sidebar, top bar with organization switcher and user menu placeholders, and content area in `apps/web/src/components/shell/`
 - [X] T087 [US4] Create the health status panel wired to the health endpoint with loading, healthy, and failure states in `apps/web/src/features/health/`
 - [X] T088 [P] [US4] Create the router, query client, and error boundary in `apps/web/src/app/` and `apps/web/src/main.tsx`
-- [ ] T089 [US4] Add the contract generation command and commit the generated document in `apps/api/package.json` and `apps/api/openapi.json`
-- [ ] T090 [US4] Add the contract comparison command that fails on drift in `apps/api/package.json`
-- [ ] T062 [P] [US4] Write FAILING integration test asserting the generated contract matches the committed artifact and that a changed endpoint produces a diff in `apps/api/test/integration/contract-drift.spec.ts` (depends on T089 — it cannot be written before the committed artifact exists)
-- [ ] T091 [US4] Serve the human-readable contract page in development from the same generation source in `apps/api/src/main.ts`
-- [ ] T092 [US4] Add the decimal string formatter that never converts through a floating-point number in `apps/web/src/lib/format.ts`
-- [ ] T093 [US4] Write the end-to-end smoke test covering shell render and health read in `apps/web/e2e/smoke.spec.ts`
-- [ ] T094 [US4] Verify the generated contract matches the committed artifact, the raw design value check passes, and the shell renders in `apps/api/package.json` and `apps/web`
+- [X] T089 [US4] Add the contract generation command and commit the generated document in `apps/api/package.json` and `apps/api/openapi.json`
+- [X] T090 [US4] Add the contract comparison command that fails on drift in `apps/api/package.json`
+- [X] T062 [P] [US4] Write FAILING integration test asserting the generated contract matches the committed artifact and that a changed endpoint produces a diff in `apps/api/test/integration/contract-drift.spec.ts` (depends on T089 — it cannot be written before the committed artifact exists)
+- [X] T091 [US4] Serve the human-readable contract page in development from the same generation source in `apps/api/src/main.ts`
+- [X] T092 [US4] Add the decimal string formatter that never converts through a floating-point number in `apps/web/src/lib/format.ts`
+- [X] T093 [US4] Write the end-to-end smoke test covering shell render and health read in `apps/web/e2e/smoke.spec.ts`
+- [X] T094 [US4] Verify the generated contract matches the committed artifact, the raw design value check passes, and the shell renders in `apps/api/package.json` and `apps/web`
 
 **Checkpoint**: One checkout runs both parts; the shell and health panel render from design system
 tokens; the contract is generated and drift is impossible to merge silently.
@@ -275,16 +275,16 @@ tokens; the contract is generated and drift is impossible to merge silently.
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T095 [P] Documentation updates covering setup, layout, commands, error codes, and the health address in `README.md`, including the stable set of fields a structured log record always carries (FR-053, SC-023)
-- [ ] T096 Documentation of the schema conventions later features inherit — tenant scoping with composite keys, exact decimals, append-only immutability, transaction boundary — in `README.md` and `specs/001-platform-foundation/data-model.md`
-- [ ] T097 [P] Verification that the implemented error codes, the status mapping, and the 403-versus-404 rule match the published catalog in `specs/001-platform-foundation/contracts/error-catalog.md`
-- [ ] T112 [P] Audit every documentation file this feature produces for any availability, backup, or recovery claim, and remove or reword any found, so the product claims no uptime or recovery target (FR-034b, SC-025; depends on T039 and T095 — the documents it audits must exist first)
+- [X] T095 [P] Documentation updates covering setup, layout, commands, error codes, and the health address in `README.md`, including the stable set of fields a structured log record always carries (FR-053, SC-023)
+- [X] T096 Documentation of the schema conventions later features inherit — tenant scoping with composite keys, exact decimals, append-only immutability, transaction boundary — in `README.md` and `specs/001-platform-foundation/data-model.md`
+- [X] T097 [P] Verification that the implemented error codes, the status mapping, and the 403-versus-404 rule match the published catalog in `specs/001-platform-foundation/contracts/error-catalog.md`
+- [X] T112 [P] Audit every documentation file this feature produces for any availability, backup, or recovery claim, and remove or reword any found, so the product claims no uptime or recovery target (FR-034b, SC-025; depends on T039 and T095 — the documents it audits must exist first)
 - [X] T113 Add a `postinstall` hook that runs `prisma generate`, and prove it from a clean `node_modules` so `npm ci` followed by `npm run typecheck` passes on a clean clone — `npm ci` replaces `node_modules` including the generated client in `node_modules/.prisma`, leaving every Prisma model typed `any` and the type checker reporting phantom errors in correct code; verify in `package.json` and `scripts/postinstall.mjs`, with a test that removes the generated client and asserts a subsequent install restores it (depends on T019, the schema the generator reads, and on T036 for the workspace script wiring; Constitution Principle V and SC-014 — a clean clone must reproduce a green type check, not a type check that depends on stale generated files)
 - [X] T114 Verify `docker/api-entrypoint.sh` runs `prisma migrate deploy` under `set -e`, fails fast with a non-zero exit when a migration fails, and ends with `exec node`, and add a test for the failed-migration case where it is feasible — a service that boots against an un-migrated database serves requests against tables that do not exist (SC-020, T108 portability; depends on T033, the image that runs this entrypoint)
 - [X] T115 Verify both Dockerfiles copy the package manifests and the lockfile and run `npm ci` before copying source, and fix either if it does not — building after the source copy throws away the cached dependency layer and lets an image diverge from the committed lockfile (FR-049; depends on T033 and T034, the two images, and on T109 for the lockfile-reproducibility expectation)
 - [X] T116 Add the research note "Database locale is C (ASCII-only `lower()` and byte-order sorting); revisit collation when Arabic support is decided" to `research.md` (Principle IX, Scope Discipline — record the assumption now so the P1 foundation does not silently prejudge a later Arabic requirement)
-- [ ] T098 [P] Statement in the documentation that the product makes no tax-compliance, e-invoicing, or complete-accounting claim in `README.md`
-- [ ] T099 Documentation of what each mandatory pipeline check covers and how to reproduce a failure locally in `README.md`
+- [X] T098 [P] Statement in the documentation that the product makes no tax-compliance, e-invoicing, or complete-accounting claim in `README.md`
+- [X] T099 Documentation of what each mandatory pipeline check covers and how to reproduce a failure locally in `README.md`
 - [ ] T100 [P] Code cleanup and refactoring across `apps/api/src/` and `apps/web/src/`
 - [ ] T101 [P] Performance optimization across `apps/api/src/common/`, `apps/api/src/platform/`, and `apps/web/src/`
 - [ ] T102 [P] Accessibility audit of the shell and health panel against WCAG 2.1 AA — labeled fields, contrast, visible focus, keyboard operation, announced errors — in `apps/web/src/`

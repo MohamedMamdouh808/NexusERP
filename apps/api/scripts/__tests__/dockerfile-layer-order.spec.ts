@@ -50,9 +50,6 @@ function parseStages(path: string): Stage[] {
   return stages;
 }
 
-/** Any COPY that pulls in application source rather than a manifest. */
-const SOURCE_COPY = /^COPY\s+(?:--from=\S+\s+)?(apps\/|src\/)/i;
-
 /**
  * A COPY is a MANIFEST copy when it names `package.json`, `package-lock.json`, or the
  * postinstall hook. Everything else is source.
