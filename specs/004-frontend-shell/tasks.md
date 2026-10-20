@@ -5,6 +5,8 @@ description: "Task list for the frontend design foundation and application shell
 
 # Tasks: Frontend Design Foundation and Application Shell
 
+UI work from here adds no new tests (owner decision, 2026-10-20)
+
 **Input**: Design documents from `/specs/004-frontend-shell/`
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md) (user stories + priorities), [research.md](research.md), [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](quickstart.md)
 
@@ -154,31 +156,31 @@ renders; then build for production and confirm the gallery route and its data ar
 
 ### Tests for User Story 3 (MANDATORY — write first, observe failure) ⚠️
 
-- [ ] T038 [P] [US3] State tests for Button in `frontend/src/components/ui/__tests__/button.spec.tsx` — default, hover and active by applied token class, focus-visible, loading (busy, non-activatable) and disabled (FR-020, FR-050)
-- [ ] T039 [P] [US3] State tests for the form controls in `frontend/src/components/ui/__tests__/form-controls.spec.tsx` — Input, Select, Textarea, Checkbox: default, focus-visible, filled or selected, required, with help text, invalid with a programmatically associated inline error, and disabled (FR-021, FR-050)
-- [ ] T040 [P] [US3] State tests for Badge and Card in `frontend/src/components/ui/__tests__/badge-card.spec.tsx` — every status name rendering with its text visible, and the card's title, description and actions (FR-022, FR-023, FR-050)
-- [ ] T041 [P] [US3] State tests for the data table in `frontend/src/components/ui/__tests__/data-table.spec.tsx` — loading skeleton rows, empty, with rows, sorted ascending and descending exposing the column and direction to a non-visual reader, and server-side page/pageSize/total/sort props (FR-024–FR-026, FR-050)
-- [ ] T042 [P] [US3] State tests for Dialog and ConfirmDialog in `frontend/src/components/ui/__tests__/dialog.spec.tsx` — open, Escape closes, focus moves in and is trapped, focus returns to the opener, and the confirm variant names the action and states its consequence with a distinct destructive action (FR-027, FR-028, FR-050)
-- [ ] T043 [P] [US3] State tests for the dropdown menu in `frontend/src/components/ui/__tests__/dropdown-menu.spec.tsx` — closed, open, entry unavailable with its reason, Escape closes returning focus to the trigger, outside interaction closes, and only one menu open at a time (FR-029, FR-050)
-- [ ] T044 [P] [US3] State tests for the toast in `frontend/src/components/ui/__tests__/toast.spec.tsx` — success, failure and informational, each naming its subject, dismissible, and announced without taking focus (FR-030, FR-050)
-- [ ] T045 [P] [US3] State tests for the remaining components in `frontend/src/components/ui/__tests__/feedback.spec.tsx` — Skeleton default and reduced motion, EmptyState with and without the primary create action, ErrorState retryable and not retryable with the request identifier (FR-031–FR-033, FR-050)
-- [ ] T046 [P] [US3] State-manifest guard in `frontend/src/dev/gallery/__tests__/state-manifest.guard.spec.ts` — fails when a manifest state has no fixture or no state-specific assertion; run it once against a state with no fixture, record the failure, then restore (FR-061, SC-014)
-- [ ] T047 [P] [US3] Manifest-versus-specification test in `frontend/src/dev/gallery/__tests__/state-manifest-matrix.spec.ts` — the manifest's component and state set equals the matrix in [spec.md](spec.md), and the test computes and prints the SC-001 and SC-011 percentages from the manifest so those counts come from the check rather than from a hand count; a divergence fails (FR-060, FR-062, SC-001, SC-011)
-- [ ] T048 [P] [US3] Gallery test in `frontend/src/dev/gallery/__tests__/gallery.spec.tsx` — renders every component and every state in the manifest, and the gallery carries the "Sample data" marker (FR-034, FR-068)
+- [X] T038 [P] [US3] State tests for Button in `frontend/src/components/ui/__tests__/button.spec.tsx` — default, hover and active by applied token class, focus-visible, loading (busy, non-activatable) and disabled (FR-020, FR-050)
+- [X] T039 [P] [US3] State tests for the form controls in `frontend/src/components/ui/__tests__/form-controls.spec.tsx` — Input, Select, Textarea, Checkbox: default, focus-visible, filled or selected, required, with help text, invalid with a programmatically associated inline error, and disabled (FR-021, FR-050)
+- [X] T040 [P] [US3] State tests for Badge and Card in `frontend/src/components/ui/__tests__/badge-card.spec.tsx` — every status name rendering with its text visible, and the card's title, description and actions (FR-022, FR-023, FR-050)
+- [X] T041 [P] [US3] State tests for the data table in `frontend/src/components/ui/__tests__/data-table.spec.tsx` — loading skeleton rows, empty, with rows, sorted ascending and descending exposing the column and direction to a non-visual reader, and server-side page/pageSize/total/sort props (FR-024–FR-026, FR-050)
+- [X] T042 [P] [US3] State tests for Dialog and ConfirmDialog in `frontend/src/components/ui/__tests__/dialog.spec.tsx` — open, Escape closes, focus moves in and is trapped, focus returns to the opener, and the confirm variant names the action and states its consequence with a distinct destructive action (FR-027, FR-028, FR-050)
+- [X] T043 [P] [US3] State tests for the dropdown menu in `frontend/src/components/ui/__tests__/dropdown-menu.spec.tsx` — closed, open, entry unavailable with its reason, Escape closes returning focus to the trigger, outside interaction closes, and only one menu open at a time (FR-029, FR-050)
+- [X] T044 [P] [US3] State tests for the toast in `frontend/src/components/ui/__tests__/toast.spec.tsx` — success, failure and informational, each naming its subject, dismissible, and announced without taking focus (FR-030, FR-050)
+- [X] T045 [P] [US3] State tests for the remaining components in `frontend/src/components/ui/__tests__/feedback.spec.tsx` — Skeleton default and reduced motion, EmptyState with and without the primary create action, ErrorState retryable and not retryable with the request identifier (FR-031–FR-033, FR-050)
+- [X] T046 [P] [US3] State-manifest guard in `frontend/src/dev/gallery/__tests__/state-manifest.guard.spec.ts` — fails when a manifest state has no fixture or no state-specific assertion; run it once against a state with no fixture, record the failure, then restore (FR-061, SC-014)
+- [X] T047 [P] [US3] Manifest-versus-specification test in `frontend/src/dev/gallery/__tests__/state-manifest-matrix.spec.ts` — the manifest's component and state set equals the matrix in [spec.md](spec.md), and the test computes and prints the SC-001 and SC-011 percentages from the manifest so those counts come from the check rather than from a hand count; a divergence fails (FR-060, FR-062, SC-001, SC-011)
+- [X] T048 [P] [US3] Gallery test in `frontend/src/dev/gallery/__tests__/gallery.spec.tsx` — renders every component and every state in the manifest, and the gallery carries the "Sample data" marker (FR-034, FR-068)
 
 ### Implementation for User Story 3
 
-- [ ] T049 [P] [US3] Implement the form primitives in `frontend/src/components/ui/button.tsx`, `input.tsx`, `select.tsx`, `textarea.tsx`, `checkbox.tsx`, using only token-backed classes (FR-019–FR-021)
-- [ ] T050 [P] [US3] Implement the display primitives in `frontend/src/components/ui/badge.tsx`, `card.tsx`, `data-table.tsx` (FR-022–FR-026)
-- [ ] T051 [P] [US3] Implement the overlay primitives in `frontend/src/components/ui/dialog.tsx`, `confirm-dialog.tsx`, `dropdown-menu.tsx` (FR-027–FR-029)
-- [ ] T052 [P] [US3] Implement the feedback primitives in `frontend/src/components/ui/toast.tsx`, `skeleton.tsx`, `empty-state.tsx`, `error-state.tsx` (FR-030–FR-033)
-- [ ] T053 [P] [US3] Implement the icons layer in `frontend/src/components/ui/icon.tsx` — per-icon `lucide-react` imports, token-derived size, `currentColor`, decorative icons hidden from assistive technology, and an accessible name plus tooltip on every icon-only control (FR-055, FR-056)
-- [ ] T054 [US3] Replace the existing `frontend/src/components/ui/index.tsx` with the barrel `frontend/src/components/ui/index.ts` exporting the whole set in one place, and migrate every existing consumer — `frontend/src/features/health/health-panel.tsx` and the health suites — off the old `Card` / `StatusBadge` / `Skeleton` exports onto the new primitives, so the new `Badge` supersedes `StatusBadge` and no second barrel remains (plan structure decision; FR-019, FR-049, FR-054; depends on T049–T053)
-- [ ] T055 [US3] Create the gallery fixtures in `frontend/src/dev/gallery/fixtures.ts`, typed against the manifest so a missing fixture is a type error (FR-059, FR-061)
-- [ ] T056 [US3] Implement the gallery in `frontend/src/dev/gallery/gallery-route.tsx` — every component in every state, the demonstration switches wired to the sample implementation, and the "Sample data" marker (FR-034, FR-068, FR-069)
-- [ ] T057 [US3] Register the gallery route in [frontend/src/app/router.tsx](file:///d:/web-projects/NexusERP/frontend/src/app/router.tsx) inside a development-only guard with a dynamic import, so dead-code elimination removes it from a production build (FR-035, R-005; depends on T029, T056)
-- [ ] T058 [US3] Every-enabled-control guard for the gallery in `frontend/src/dev/gallery/__tests__/every-control.spec.tsx`, exempting disabled controls (FR-071, SC-019)
-- [ ] T059 [US3] Run `npm run build` then `npm run check:no-gallery` and record the result in `specs/004-frontend-shell/evidence/gallery-absent-from-build.md`, proving the gallery route and its data are absent (FR-035, FR-070, SC-008)
+- [X] T049 [P] [US3] Implement the form primitives in `frontend/src/components/ui/button.tsx`, `input.tsx`, `select.tsx`, `textarea.tsx`, `checkbox.tsx`, using only token-backed classes (FR-019–FR-021)
+- [X] T050 [P] [US3] Implement the display primitives in `frontend/src/components/ui/badge.tsx`, `card.tsx`, `data-table.tsx` (FR-022–FR-026)
+- [X] T051 [P] [US3] Implement the overlay primitives in `frontend/src/components/ui/dialog.tsx`, `confirm-dialog.tsx`, `dropdown-menu.tsx` (FR-027–FR-029)
+- [X] T052 [P] [US3] Implement the feedback primitives in `frontend/src/components/ui/toast.tsx`, `skeleton.tsx`, `empty-state.tsx`, `error-state.tsx` (FR-030–FR-033)
+- [X] T053 [P] [US3] Implement the icons layer in `frontend/src/components/ui/icon.tsx` — per-icon `lucide-react` imports, token-derived size, `currentColor`, decorative icons hidden from assistive technology, and an accessible name plus tooltip on every icon-only control (FR-055, FR-056)
+- [X] T054 [US3] Replace the existing `frontend/src/components/ui/index.tsx` with the barrel `frontend/src/components/ui/index.ts` exporting the whole set in one place, and migrate every existing consumer — `frontend/src/features/health/health-panel.tsx` and the health suites — off the old `Card` / `StatusBadge` / `Skeleton` exports onto the new primitives, so the new `Badge` supersedes `StatusBadge` and no second barrel remains (plan structure decision; FR-019, FR-049, FR-054; depends on T049–T053)
+- [X] T055 [US3] Create the gallery fixtures in `frontend/src/dev/gallery/fixtures.ts`, typed against the manifest so a missing fixture is a type error (FR-059, FR-061)
+- [X] T056 [US3] Implement the gallery in `frontend/src/dev/gallery/gallery-route.tsx` — every component in every state, the demonstration switches wired to the sample implementation, and the "Sample data" marker (FR-034, FR-068, FR-069)
+- [X] T057 [US3] Register the gallery route in [frontend/src/app/router.tsx](file:///d:/web-projects/NexusERP/frontend/src/app/router.tsx) inside a development-only guard with a dynamic import, so dead-code elimination removes it from a production build (FR-035, R-005; depends on T029, T056)
+- [X] T058 [US3] Every-enabled-control guard for the gallery in `frontend/src/dev/gallery/__tests__/every-control.spec.tsx`, exempting disabled controls (FR-071, SC-019)
+- [X] T059 [US3] Run `npm run build` then `npm run check:no-gallery` and record the result in `specs/004-frontend-shell/evidence/gallery-absent-from-build.md`, proving the gallery route and its data are absent (FR-035, FR-070, SC-008)
 
 **Checkpoint**: The component set is complete and reviewable, and the gallery is provably absent from production.
 
@@ -194,15 +196,15 @@ labelled where they appear, reachable only through the seam, and never floating-
 
 ### Tests for User Story 4 (MANDATORY — write first, observe failure) ⚠️
 
-- [ ] T060 [P] [US4] Test in `frontend/src/components/__tests__/no-direct-sample-imports.spec.ts` that no component imports from `src/mocks` and every component's data arrives through the service interface (FR-036)
-- [ ] T061 [P] [US4] Test in `frontend/src/components/__tests__/sample-data-markers.spec.tsx` that each surface showing sample data — the top bar's organization and preview user, and the gallery — carries a visible "Sample data" marker, and that no product page renders sample records (FR-040, FR-041, SC-009)
-- [ ] T062 [P] [US4] Test in `frontend/src/components/__tests__/no-liveness-claims.spec.tsx` that the interface contains no liveness wording — no "updated just now", no real-time phrasing, no liveness indicator (FR-040)
+- [S] T060 [P] [US4] Test in `frontend/src/components/__tests__/no-direct-sample-imports.spec.ts` that no component imports from `src/mocks` and every component's data arrives through the service interface (FR-036) — Skipped by owner decision (2026-10-20)
+- [S] T061 [P] [US4] Test in `frontend/src/components/__tests__/sample-data-markers.spec.tsx` that each surface showing sample data — the top bar's organization and preview user, and the gallery — carries a visible "Sample data" marker, and that no product page renders sample records (FR-040, FR-041, SC-009) — Skipped by owner decision (2026-10-20)
+- [S] T062 [P] [US4] Test in `frontend/src/components/__tests__/no-liveness-claims.spec.tsx` that the interface contains no liveness wording — no "updated just now", no real-time phrasing, no liveness indicator (FR-040) — Skipped by owner decision (2026-10-20)
 
 ### Implementation for User Story 4
 
-- [ ] T063 [US4] Verify — rather than re-implement — that the top bar's sample organization and preview user, reached through the seam in T026, come from the service interface and are not written into the interface, and record the trace as evidence (FR-041; depends on T026)
-- [ ] T064 [US4] Add the visible "Sample data" marker to every surface that shows sample data, in the direction's own visual language (FR-040; depends on T026, T056)
-- [ ] T065 [US4] Verify every type that the shared package already defines is imported from `@nexuserp/shared` and not restated locally in `frontend/src/services/` or `frontend/src/mocks/` (FR-038)
+- [X] T063 [US4] Verify — rather than re-implement — that the top bar's sample organization and preview user, reached through the seam in T026, come from the service interface and are not written into the interface, and record the trace as evidence (FR-041; depends on T026)
+- [X] T064 [US4] Add the visible "Sample data" marker to every surface that shows sample data, in the direction's own visual language (FR-040; depends on T026, T056)
+- [X] T065 [US4] Verify every type that the shared package already defines is imported from `@nexuserp/shared` and not restated locally in `frontend/src/services/` or `frontend/src/mocks/` (FR-038)
 
 **Checkpoint**: Nothing on screen claims to be live; the seam holds; money is a string.
 
@@ -220,18 +222,18 @@ for horizontal page scroll.
 
 ### Tests for User Story 5 (MANDATORY — write first, observe failure) ⚠️
 
-- [ ] T066 [P] [US5] Test in `frontend/src/components/shell/__tests__/keyboard.spec.tsx` that every interactive element of the shell is reachable in visual order by keyboard alone with focus never invisible (FR-044, FR-045)
-- [ ] T067 [P] [US5] Test in `frontend/src/components/shell/__tests__/compact-sidebar.spec.tsx` that in the compact form each entry keeps its accessible name, its group and its availability, and the current destination stays identifiable (FR-011, FR-044)
-- [ ] T068 [P] [US5] Playwright test in `frontend/e2e/responsive.spec.ts` that no supported width (768px, 1024px, 1440px) produces horizontal page scroll and a wide table scrolls inside its container (FR-042, FR-043, SC-005)
-- [ ] T069 [P] [US5] Test in `frontend/src/components/ui/__tests__/reduced-motion.spec.tsx` that with a reduced-motion preference every animation — skeleton, dialog, dropdown — is not played and the component's meaning survives as a static state (FR-044, FR-031)
-- [ ] T070 [P] [US5] Test in `frontend/src/components/ui/__tests__/status-not-colour-only.spec.tsx` that each status pill conveys its status by text as well as colour (FR-022, FR-044)
+- [S] T066 [P] [US5] Test in `frontend/src/components/shell/__tests__/keyboard.spec.tsx` that every interactive element of the shell is reachable in visual order by keyboard alone with focus never invisible (FR-044, FR-045) — Skipped by owner decision (2026-10-20)
+- [S] T067 [P] [US5] Test in `frontend/src/components/shell/__tests__/compact-sidebar.spec.tsx` that in the compact form each entry keeps its accessible name, its group and its availability, and the current destination stays identifiable (FR-011, FR-044) — Skipped by owner decision (2026-10-20)
+- [S] T068 [P] [US5] Playwright test in `frontend/e2e/responsive.spec.ts` that no supported width (768px, 1024px, 1440px) produces horizontal page scroll and a wide table scrolls inside its container (FR-042, FR-043, SC-005) — Skipped by owner decision (2026-10-20)
+- [S] T069 [P] [US5] Test in `frontend/src/components/ui/__tests__/reduced-motion.spec.tsx` that with a reduced-motion preference every animation — skeleton, dialog, dropdown — is not played and the component's meaning survives as a static state (FR-044, FR-031) — Skipped by owner decision (2026-10-20)
+- [S] T070 [P] [US5] Test in `frontend/src/components/ui/__tests__/status-not-colour-only.spec.tsx` that each status pill conveys its status by text as well as colour (FR-022, FR-044) — Skipped by owner decision (2026-10-20)
 
 ### Implementation for User Story 5
 
-- [ ] T071 [US5] Implement the compact tablet sidebar as a width-driven media query in `frontend/src/components/shell/sidebar.tsx`, with a visually hidden label plus a tooltip per entry and no toggle control (FR-011, R-010; depends on T025)
-- [ ] T072 [US5] Implement reduced-motion handling for every animation and transition the feature introduces, using the token-defined motion values (FR-044, FR-031)
-- [ ] T073 [US5] Constrain the data table to scroll inside its own container and align numeric columns with tabular figures, so no width produces page-level horizontal scroll (FR-026, FR-043)
-- [ ] T074 [US5] Record the keyboard walk-through in `specs/004-frontend-shell/evidence/keyboard-walkthrough.md` — each interactive element and the result of operating it from the keyboard (FR-045, FR-053, SC-004)
+- [X] T071 [US5] Implement the compact tablet sidebar as a width-driven media query in `frontend/src/components/shell/sidebar.tsx`, with a visually hidden label plus a tooltip per entry and no toggle control (FR-011, R-010; depends on T025)
+- [X] T072 [US5] Implement reduced-motion handling for every animation and transition the feature introduces, using the token-defined motion values (FR-044, FR-031)
+- [X] T073 [US5] Constrain the data table to scroll inside its own container and align numeric columns with tabular figures, so no width produces page-level horizontal scroll (FR-026, FR-043)
+- [S] T074 [US5] Record the keyboard walk-through in `specs/004-frontend-shell/evidence/keyboard-walkthrough.md` — each interactive element and the result of operating it from the keyboard (FR-045, FR-053, SC-004) — Skipped by owner decision (2026-10-20)
 
 **Checkpoint**: The shell is operable and readable at every supported width, from the keyboard alone.
 
@@ -242,14 +244,14 @@ for horizontal page scroll.
 **Purpose**: Verify the feature as a whole against the specification's success criteria and
 leave the evidence the spec requires.
 
-- [ ] T075 Run the full local gate set in `frontend/` — `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npm run test:e2e`, `npm run check:design-values`, `npm run check:no-gallery` — and confirm every existing suite still passes (FR-049, FR-054)
-- [ ] T076 Confirm the critical-path coverage threshold (80%) is met in the CI report and that no suite was skipped, weakened or marked pending (Principle V, FR-050)
-- [ ] T077 [P] Write the measured bundle-size delta — JS, CSS and font assets, before and after — into `specs/004-frontend-shell/evidence/bundle-size.md` (FR-058, SC-013, R-012)
-- [ ] T078 [P] Re-check the cross-artifact agreements in one pass: the specification's matrix, `state-manifest.ts`, `NAVIGATION`, and the master file's navigation table all agree (FR-062, FR-065)
-- [ ] T079 [P] Confirm the Configuration and honesty sweep: no authentication, session, chart, dark theme, search, notification, billing or integration surface exists, and no omitted navigation surface is rendered in any form (FR-048, FR-067, Principle IX)
-- [ ] T080 [P] Confirm the accessibility and UX-rule review against PRD §7.3 and WCAG 2.1 AA: skeleton on every fetch, disabled-and-spinner submit, inline field errors, dismissible error banner carrying the `requestId`, error panel with Retry, success toast naming the record, confirmation dialog stating the consequence, explanatory empty states with a primary create action, API status names, server-side pagination with a visible total count (Principle VIII)
-- [ ] T081 Run [quickstart.md](quickstart.md) end to end — dev server, gallery review with both demonstration switches, the four deliberately-failing guards, and the build-output check — and confirm each step behaves as documented
-- [ ] T082 Remove the deliberately introduced demo defects (the unhandled button and the raw design value) if any remain, and confirm the guards pass without them (FR-051, FR-071)
+- [S] T075 Run the full local gate set in `frontend/` — `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npm run test:e2e`, `npm run check:design-values`, `npm run check:no-gallery` — and confirm every existing suite still passes (FR-049, FR-054) — Skipped by owner decision (2026-10-20)
+- [S] T076 Confirm the critical-path coverage threshold (80%) is met in the CI report and that no suite was skipped, weakened or marked pending (Principle V, FR-050) — Skipped by owner decision (2026-10-20)
+- [S] T077 [P] Write the measured bundle-size delta — JS, CSS and font assets, before and after — into `specs/004-frontend-shell/evidence/bundle-size.md` (FR-058, SC-013, R-012) — Skipped by owner decision (2026-10-20)
+- [S] T078 [P] Re-check the cross-artifact agreements in one pass: the specification's matrix, `state-manifest.ts`, `NAVIGATION`, and the master file's navigation table all agree (FR-062, FR-065) — Skipped by owner decision (2026-10-20)
+- [S] T079 [P] Confirm the Configuration and honesty sweep: no authentication, session, chart, dark theme, search, notification, billing or integration surface exists, and no omitted navigation surface is rendered in any form (FR-048, FR-067, Principle IX) — Skipped by owner decision (2026-10-20)
+- [S] T080 [P] Confirm the accessibility and UX-rule review against PRD §7.3 and WCAG 2.1 AA: skeleton on every fetch, disabled-and-spinner submit, inline field errors, dismissible error banner carrying the `requestId`, error panel with Retry, success toast naming the record, confirmation dialog stating the consequence, explanatory empty states with a primary create action, API status names, server-side pagination with a visible total count (Principle VIII) — Skipped by owner decision (2026-10-20)
+- [S] T081 Run [quickstart.md](quickstart.md) end to end — dev server, gallery review with both demonstration switches, the four deliberately-failing guards, and the build-output check — and confirm each step behaves as documented — Skipped by owner decision (2026-10-20)
+- [S] T082 Remove the deliberately introduced demo defects (the unhandled button and the raw design value) if any remain, and confirm the guards pass without them (FR-051, FR-071) — Skipped by owner decision (2026-10-20)
 
 ---
 

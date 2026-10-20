@@ -18,34 +18,32 @@
 
 | Role | Hex | CSS Variable |
 |------|-----|--------------|
-| Primary | `#1E40AF` | `--color-primary` |
+| Primary / Accent | `#4458E5` | `--color-primary` |
 | On Primary | `#FFFFFF` | `--color-on-primary` |
-| Secondary | `#3B82F6` | `--color-secondary` |
-| On Secondary | `#000000` | `--color-on-secondary` |
-| Accent/CTA | `#D97706` | `--color-accent` |
-| On Accent/CTA | `#000000` | `--color-on-accent` |
-| Background | `#F8FAFC` | `--color-background` |
-| Foreground | `#1E3A8A` | `--color-foreground` |
+| Secondary | `#E0E7FF` | `--color-secondary` |
+| On Secondary | `#1F2937` | `--color-on-secondary` |
+| Accent/CTA | `#4458E5` | `--color-accent` |
+| On Accent/CTA | `#FFFFFF` | `--color-on-accent` |
+| Background | `#F5F7FB` | `--color-background` |
+| Foreground | `#1F2937` | `--color-foreground` |
 | Card | `#FFFFFF` | `--color-card` |
-| Card Foreground | `#1E3A8A` | `--color-card-foreground` |
-| Muted | `#E9EEF6` | `--color-muted` |
+| Card Foreground | `#1F2937` | `--color-card-foreground` |
+| Muted | `#F1F4F9` | `--color-muted` |
 | Muted Foreground | `#475569` | `--color-muted-foreground` |
-| Border | `#DBEAFE` | `--color-border` |
+| Border | `#E2E8F0` | `--color-border` |
 | Destructive | `#DC2626` | `--color-destructive` |
 | On Destructive | `#FFFFFF` | `--color-on-destructive` |
-| Ring | `#1E40AF` | `--color-ring` |
+| Ring | `#4458E5` | `--color-ring` |
 | Input Border | `#64748B` | `--color-input-border` |
 | Overlay / Backdrop | `rgba(0,0,0,0.5)` | `--color-overlay` |
 
-**Color Notes:** Blue data + amber highlights [Accent adjusted from #F59E0B]
+**Color Notes:** Near-black slate is used for body text and headings. Indigo blue is
+reserved for links, the active navigation pill, focus, and primary accents. Surfaces
+stay white over a pale blue-grey canvas; structural borders stay soft.
 
-**Border Token Split:** `--color-border` (`#DBEAFE`) is for cards, panels, table rows,
-and dividers only. Form controls — inputs, selects, textareas, checkboxes, radio buttons,
-and date pickers — use `--color-input-border`, which carries a minimum 3:1 contrast ratio
-against both `--color-card` (`#FFFFFF`, 4.76:1) and `--color-background` (`#F8FAFC`,
-4.56:1) so control edges stay perceivable for low-vision users. Focus and error states
-override it: focus uses `--color-primary` with the `--shadow` focus ring, and validation
-errors use `--color-destructive` with an inline message.
+**Border Token Split:** `--color-border` (`#E2E8F0`) is for cards, panels, table rows, and dividers only. Form controls — inputs, selects, textareas, checkboxes, radio buttons, and date pickers — use the darker `--color-input-border` (`#64748B`) so their edges remain clearly visible. Focus and error states override it: focus uses `--color-primary` and validation errors use `--color-destructive` with an inline message.
+
+**Text Contrast Check (WCAG 2.1 AA):** Body text `#1F2937` on white is 14.68:1 and on `#F5F7FB` is 13.69:1. Muted text `#475569` on white is 7.58:1 and on `#F5F7FB` is 7.07:1. Primary blue `#4458E5` on white is 5.57:1 and on `#F5F7FB` is 5.19:1. White on primary blue is 5.57:1. All exceed the 4.5:1 normal-text target.
 
 ### Semantic Status Tokens
 
@@ -69,7 +67,7 @@ matching `-on-*-tint` text color. Every pairing below is verified at or above th
 | `--color-on-destructive` | `#FFFFFF` | — |
 | `--color-destructive-tint` | `#FEE2E2` | `#B91C1C` on it: 5.30:1 |
 | `--color-on-destructive-tint` | `#B91C1C` | — |
-| `--color-neutral-tint` | `--color-muted` (`#E9EEF6`) | `--color-muted-foreground` on it: 6.51:1 |
+| `--color-neutral-tint` | `--color-muted` (`#F1F4F9`) | `--color-muted-foreground` on it: 6.87:1 |
 
 Do not use `--color-destructive` as badge text on a tint; it falls to 3.95:1. Badge text on
 `--color-destructive-tint` uses `--color-on-destructive-tint`.
@@ -169,18 +167,18 @@ numeric column and never render a monetary or decimal value as a float-derived s
 
 | Level | Value | Usage |
 |-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns, top bar, sidebar |
-| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Dialogs, confirmation dialogs, drawers |
+| `--shadow-sm` | `0 1px 2px rgba(15,23,42,0.04)` | Subtle lift |
+| `--shadow-md` | `0 1px 3px rgba(15,23,42,0.06)` | Cards, buttons |
+| `--shadow-lg` | `0 4px 12px rgba(15,23,42,0.08)` | Modals, dropdowns, top bar, sidebar |
+| `--shadow-xl` | `0 12px 28px rgba(15,23,42,0.12)` | Dialogs, confirmation dialogs, drawers |
 
 ### Radii
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--radius-sm` | `6px` | Badges, tags, small supporting elements |
-| `--radius-md` | `8px` | Buttons, inputs, dropdowns |
-| `--radius-lg` | `12px` | Cards, modals, containers |
+| `--radius-sm` | `8px` | Badges, tags, small supporting elements |
+| `--radius-md` | `12px` | Buttons, inputs, dropdowns |
+| `--radius-lg` | `16px` | Cards, modals, containers |
 | `--radius-pill` | `999px` | Fully rounded / pill elements |
 
 ### Shell Geometry
@@ -190,6 +188,14 @@ numeric column and never render a monetary or decimal value as a float-derived s
 | `--shell-sidebar-width` | `256px` | Desktop sidebar width |
 | `--shell-sidebar-compact-width` | `72px` | Narrow/icon-only sidebar |
 | `--shell-topbar-height` | `64px` | Top bar height |
+| `--sidebar-row-padding-block` | `4px` | Compact but readable sidebar entries |
+| `--sidebar-group-gap` | `8px` | Space between sidebar groups |
+| `--sidebar-list-gap` | `2px` | Space between sidebar entries |
+| `--sidebar-scrollbar-width` | `5px` | Thin custom sidebar scrollbar |
+
+The sidebar contains twelve entries. Keep its rows compact enough for all entries and
+group headings to fit in a 700px-high viewport; when content exceeds the available height,
+use a thin, low-contrast custom scrollbar without hiding the scroll affordance.
 
 ### Navigation
 
@@ -219,10 +225,10 @@ The sidebar renders this navigation list and nothing else. Two entries are avail
 ```css
 /* Primary Button */
 .btn-primary {
-  background: #D97706;
-  color: #000000;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
   padding: 12px 24px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-weight: 600;
   transition: all 200ms ease;
   cursor: pointer;
@@ -235,11 +241,11 @@ The sidebar renders this navigation list and nothing else. Two entries are avail
 
 /* Secondary Button */
 .btn-secondary {
-  background: transparent;
-  color: #1E40AF;
-  border: 2px solid #1E40AF;
+  background: var(--color-card);
+  color: var(--color-primary);
+  border: 1px solid var(--color-border);
   padding: 12px 24px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-weight: 600;
   transition: all 200ms ease;
   cursor: pointer;
@@ -252,9 +258,9 @@ The sidebar renders this navigation list and nothing else. Two entries are avail
 .card {
   background: var(--color-card);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 24px;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
   transition: all 200ms ease;
 }
 
@@ -281,7 +287,7 @@ only interactive cards carry it.
 .checkbox,
 .radio {
   border: 1px solid var(--color-input-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-ui);
   transition: border-color 200ms ease;
 }
@@ -475,6 +481,8 @@ block, no mega menu.
   border-right: 1px solid var(--color-border);
   overflow-y: auto;
   padding: var(--space-md);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
 }
 
 .app-shell__content {
@@ -498,15 +506,15 @@ block, no mega menu.
   padding: var(--space-md);
   background: var(--color-card);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   margin-bottom: var(--space-md);
 }
 
-/* Desktop >= 1024px: sidebar fixed at 256px
-   Tablet 768-1023px: sidebar narrows to 200px, labels stay visible */
+/* Desktop >= 1024px: full sidebar. Tablet 768-1023px: compact icon sidebar;
+   labels remain accessible and each entry has a tooltip. */
 @media (max-width: 1023px) {
   .app-shell {
-    grid-template-columns: 200px 1fr;
+    grid-template-columns: var(--shell-sidebar-compact-width) 1fr;
   }
 }
 ```

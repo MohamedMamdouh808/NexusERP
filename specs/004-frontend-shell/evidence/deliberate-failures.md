@@ -1,6 +1,6 @@
 # Deliberately failing guards — both observations, per guard
 
-Four guards in this feature are meant to fail on a defect that is present on purpose, and to
+Six guards in this feature are meant to fail on a defect that is present on purpose, and to
 pass once it is removed. A guard nobody has watched fail is a guard nobody knows works, so each
 row below records the defect, the command, what was observed, and the observation after the
 defect was taken away again (FR-051, FR-061, FR-065, FR-071; quickstart "Checks").
@@ -81,10 +81,36 @@ Every enabled control in `AppShell` was activated and produced an observable cha
  ✓ src/components/shell/__tests__/every-control.spec.tsx (2 tests) 895ms
 ```
 
-## Not yet recorded here
+## Phase 5 guards — manifest, gallery controls, and production bundle
 
-The remaining guard is recorded by the task that demonstrates it:
+The per-task red and green observations for all Phase 5 state tests are in [phase5-evidence.md](phase5-evidence.md). These three checks are repeated here because they are deliberate guard demonstrations required by the feature.
 
-| Guard | Demonstrated by | Recorded |
-|---|---|---|
-| State-manifest guard (`state-manifest.guard.spec.ts`) | T046 | no |
+### State-manifest guard — T046 (FR-061, SC-014)
+
+**Defect:** `Button.default` was temporarily changed to an empty fixture string.
+
+**Command:** `npm test -- --run src/dev/gallery/__tests__/state-manifest.guard.spec.ts`
+
+**Observed with the defect:** exit code `1`; the guard named `Component Button state default` and reported a missing or empty fixture (`phase5-manifest-negative.log`).
+
+**Observed after restore:** exit code `0`; both guard tests passed (`phase5-manifest-pass.log`).
+
+### Gallery every-control guard — T058 (FR-071, SC-019)
+
+**Defect:** `toggleFailure` was temporarily made a no-op by removing its state update.
+
+**Command:** `npm test -- --run src/dev/gallery/__tests__/every-control.spec.tsx`
+
+**Observed with the defect:** exit code `1`; the test saw no visible state change after activating “Simulate failure” (`phase5-every-control-negative.log`).
+
+**Observed after restore:** exit code `0`; both tests passed, covering both demo switches, dialog cancellation, and the sample-record removal/toast flow (`phase5-every-control-pass.log`).
+
+### Gallery absent from production build — T059 (FR-035, FR-070)
+
+**Defect:** A temporary JavaScript bundle containing `nexuserp-dev-gallery-route` was supplied to the build guard.
+
+**Command:** `npm run check:no-gallery -- <temporary-assets-directory>`
+
+**Observed with the marker:** exit code `1`; the guard named the marker and bundle file (`phase5-no-gallery-negative.log`). The temporary directory was removed.
+
+**Observed on the production build:** `npm run build` exited `0`; its `check:no-gallery` step scanned the emitted JavaScript bundle and reported the gallery absent (`phase5-build.log`).

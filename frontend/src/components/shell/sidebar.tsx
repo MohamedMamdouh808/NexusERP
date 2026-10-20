@@ -38,7 +38,7 @@ export function Sidebar() {
               {group.entries.map((entry) =>
                 entry.state === 'available' ? (
                   <li key={entry.label}>
-                    <NavLink to={entry.path} end className="sidebar-nav__link">
+                    <NavLink to={entry.path} end className="sidebar-nav__link" title={entry.label}>
                       <Icon name={entry.icon} />
                       <span className="sidebar-nav__label">{entry.label}</span>
                     </NavLink>
@@ -49,7 +49,7 @@ export function Sidebar() {
                       className="sidebar-nav__link"
                       data-state="Soon"
                       aria-disabled="true"
-                      title={entry.reason}
+                      title={`${entry.label} — ${entry.reason}`}
                     >
                       <Icon name={entry.icon} />
                       <span className="sidebar-nav__label">{entry.label}</span>

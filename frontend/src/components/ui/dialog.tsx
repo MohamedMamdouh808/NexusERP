@@ -17,11 +17,11 @@ export function Dialog({ open, onClose, title, children, actions, className }: D
 
   useEffect(() => {
     if (!open) return;
-    // Focus first focusable inside dialog
-    const focusable = dialogRef.current?.querySelector<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusable = dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
     focusable?.focus();
+
+    return () => previousFocus?.focus();
   }, [open]);
 
   if (!open) return null;
@@ -30,6 +30,24 @@ export function Dialog({ open, onClose, title, children, actions, className }: D
     if (event.key === 'Escape') {
       event.preventDefault();
       onClose();
+      return;
+    }
+
+    if (event.key === 'Tab') {
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? [],
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (first === undefined || last === undefined) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
   }
 
@@ -62,3 +80,6 @@ export function Dialog({ open, onClose, title, children, actions, className }: D
     </div>
   );
 }
+
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';

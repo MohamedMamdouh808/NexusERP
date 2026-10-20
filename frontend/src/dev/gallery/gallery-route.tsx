@@ -4,6 +4,8 @@ import { FIXTURES } from './fixtures';
 import { sampleCatalogService } from '../../services/sample-catalog-service';
 import { Button, Card, Toast, ConfirmDialog } from '../../components/ui';
 
+const GALLERY_SAMPLE_RECORD_ID = 'sample-0001';
+
 export function GalleryRoute() {
   const [simulateFailure, setSimulateFailure] = useState(false);
   const [simulateSlow, setSimulateSlow] = useState(false);
@@ -91,11 +93,11 @@ export function GalleryRoute() {
           open={confirmOpen}
           destructive
           title="Delete Sample Record"
-          description="Are you sure you want to remove sample record REC-001?"
+          description={`Are you sure you want to remove sample record ${GALLERY_SAMPLE_RECORD_ID}?`}
           actionLabel="Delete Sample Record"
           onClose={() => setConfirmOpen(false)}
           onConfirm={async () => {
-            const res = await sampleCatalogService.removeRecord({ id: 'REC-001' });
+            const res = await sampleCatalogService.removeRecord({ id: GALLERY_SAMPLE_RECORD_ID });
             setConfirmOpen(false);
             setToastMessage(`Removed record: ${res.removedLabel}`);
           }}

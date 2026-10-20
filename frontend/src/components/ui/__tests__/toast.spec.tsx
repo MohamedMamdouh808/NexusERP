@@ -33,4 +33,10 @@ describe('Toast states (T044, FR-030, FR-050)', () => {
     await user.click(dismissBtn);
     expect(onDismiss).toHaveBeenCalledWith('t4');
   });
+
+  it('announces a new toast without moving focus into it', () => {
+    render(<Toast id="t5" tone="informational" message="Sync completed" onDismiss={() => {}} />);
+    expect(screen.getByRole('status')).not.toHaveFocus();
+    expect(document.activeElement).toBe(document.body);
+  });
 });

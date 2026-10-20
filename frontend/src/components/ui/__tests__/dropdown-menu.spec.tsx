@@ -54,4 +54,33 @@ describe('DropdownMenu states (T043, FR-029, FR-050)', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
   });
+
+  it('closes on outside interaction and keeps only one menu open', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <button type="button">Outside</button>
+        <DropdownMenu
+          trigger="First menu"
+          label="First actions"
+          entries={[{ kind: 'item', id: 'a', label: 'First item', onSelect: () => {} }]}
+        />
+        <DropdownMenu
+          trigger="Second menu"
+          label="Second actions"
+          entries={[{ kind: 'item', id: 'b', label: 'Second item', onSelect: () => {} }]}
+        />
+      </>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'First menu' }));
+    expect(screen.getByRole('menu', { name: 'First actions' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Second menu' }));
+    expect(screen.queryByRole('menu', { name: 'First actions' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menu', { name: 'Second actions' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Outside' }));
+    expect(screen.queryByRole('menu', { name: 'Second actions' })).not.toBeInTheDocument();
+  });
 });

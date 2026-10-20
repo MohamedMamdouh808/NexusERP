@@ -17,27 +17,27 @@
 
 :root {
   /* Colour palette (MASTER.md "Color Palette") */
-  --color-primary: #1e40af;
+  --color-primary: #4458e5;
   --color-on-primary: #ffffff;
-  --color-secondary: #3b82f6;
-  --color-on-secondary: #000000;
-  --color-accent: #d97706;
-  --color-on-accent: #000000;
-  --color-background: #f8fafc;
-  --color-foreground: #1e3a8a;
+  --color-secondary: #e0e7ff;
+  --color-on-secondary: #1f2937;
+  --color-accent: #4458e5;
+  --color-on-accent: #ffffff;
+  --color-background: #f5f7fb;
+  --color-foreground: #1f2937;
   --color-card: #ffffff;
-  --color-card-foreground: #1e3a8a;
-  --color-muted: #e9eef6;
+  --color-card-foreground: #1f2937;
+  --color-muted: #f1f4f9;
   --color-muted-foreground: #475569;
-  --color-border: #dbeafe;
+  --color-border: #e2e8f0;
   --color-destructive: #dc2626;
   --color-on-destructive: #ffffff;
-  --color-ring: #1e40af;
+  --color-ring: #4458e5;
   --color-overlay: rgba(0, 0, 0, 0.5);
 
   /*
-   * Form controls only - never cards or dividers. Carries a minimum 3:1 contrast
-   * ratio against --color-card (4.76:1) and --color-background (4.55:1).
+   * Form controls only - never cards or dividers. This edge remains substantially
+   * darker than the structural border for clear visibility on white controls.
    */
   --color-input-border: #64748b;
 
@@ -69,20 +69,31 @@
   --spacing-3xl: 64px;
 
   /* Shadow depths (MASTER.md "Shadow Depths") */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-xl: 0 12px 28px rgba(15, 23, 42, 0.12);
 
   /* Radii (MASTER.md "Radii") - --radius-* is a Tailwind 4 theme namespace, so
      `rounded-*` utilities resolve to these without renaming. */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --radius-pill: 999px;
 
   /* Shell geometry (MASTER.md "Shell Geometry") */
   --shell-sidebar-width: 256px;
   --shell-sidebar-compact-width: 72px;
   --shell-topbar-height: 64px;
+  --sidebar-row-padding-block: var(--spacing-xs);
+  --sidebar-group-gap: var(--spacing-sm);
+  --sidebar-list-gap: 2px;
+  --sidebar-scrollbar-width: 5px;
+
+  /* Motion (reduced-motion users have all motion disabled in app.css). */
+  --motion-duration-fast: 150ms;
+  --motion-duration-standard: 200ms;
+  --motion-duration-skeleton: 1.2s;
+  --motion-easing-standard: ease;
+  --motion-easing-skeleton: ease-in-out;
 }

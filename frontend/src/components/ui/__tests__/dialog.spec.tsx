@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Dialog } from '../dialog';
@@ -37,6 +38,41 @@ describe('Dialog and ConfirmDialog states (T042, FR-027, FR-028, FR-050)', () =>
       );
       await user.keyboard('{Escape}');
       expect(onClose).toHaveBeenCalled();
+    });
+
+    it('traps Tab focus and restores focus to the opener when closed', async () => {
+      const user = userEvent.setup();
+      function DialogHarness() {
+        const [open, setOpen] = useState(false);
+        return (
+          <>
+            <button type="button" onClick={() => setOpen(true)}>Open test dialog</button>
+            <Dialog open={open} onClose={() => setOpen(false)} title="Focus test">
+              <button type="button">First action</button>
+              <button type="button">Last action</button>
+            </Dialog>
+          </>
+        );
+      }
+
+      render(<DialogHarness />);
+      const opener = screen.getByRole('button', { name: 'Open test dialog' });
+      await user.click(opener);
+
+      const closeButton = screen.getByRole('button', { name: 'Close dialog' });
+      const lastAction = screen.getByRole('button', { name: 'Last action' });
+      expect(closeButton).toHaveFocus();
+
+      lastAction.focus();
+      await user.tab();
+      expect(closeButton).toHaveFocus();
+
+      await user.keyboard('{Shift>}{Tab}{/Shift}');
+      expect(lastAction).toHaveFocus();
+
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(opener).toHaveFocus();
     });
   });
 
