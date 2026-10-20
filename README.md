@@ -19,7 +19,7 @@
 - [Troubleshooting](#troubleshooting)
 - [API Contract](#working-on-the-api-contract)
 - [Documentation](#documentation)
-- [Mandatory Checks](#mandatory-checks-branch-protection)
+- [Mandatory Checks](#mandatory-checks)
 - [Verifying Check Failures](#verifying-check-failures)
 - [Legal & Compliance](#legal-and-compliance)
 
@@ -210,9 +210,15 @@ The OpenAPI document is **generated from the code** and committed at `backend/op
 
 ---
 
-## 🔒 Mandatory Checks (Branch Protection)
+## 🔒 Mandatory Checks
 
-The following GitHub Actions jobs are configured as required status checks on the `main` branch. A PR cannot be merged until all of these checks pass.
+The following GitHub Actions jobs run on every push to `main`. They are the project's evidence
+for phase exit and release. **They are not a gate on deployment.**
+
+Staging deploys are **not gated by CI checks**. Each hosting platform deploys the commit as
+soon as it appears on `main`, so a commit whose checks are failing, still running, or never run
+is deployed all the same. The check results are read after the fact. This is recorded in the
+constitution under *Branch Workflow and What It Means for Deployment*.
 
 | Check | Job | Description |
 |---|---|---|
@@ -225,9 +231,14 @@ The following GitHub Actions jobs are configured as required status checks on th
 | **Build** | `build` | Shared, API, and Web production builds |
 | **Secret Scan** | `secret-scan` | Walks the tracked files and fails on a committed secret |
 
-### Enabling Branch Protection
+### How these checks are used
 
-In the GitHub repository settings, under **Branches > Branch protection rules**, add a rule for `main` with **Require status checks to pass before merging** and select all the checks above.
+This project works on a single branch, `main`, with direct pushes and no pull requests. There
+is therefore no branch protection rule, no set of required status checks, and no merge to
+block. A red check on `main` is a defect to fix, not a deploy that was prevented.
+
+Nothing here is optional in the quality sense: a phase exit requires these checks green, as the
+constitution's phase-exit criteria state. They gate the phase and the release, not the deploy.
 
 The `workflow` job (`.github/workflows/__tests__/ci-no-deploy.spec.ts`) runs as an additional guard: it parses the workflow YAML and asserts that the pipeline pushes nothing, deploys nothing, and releases nothing.
 

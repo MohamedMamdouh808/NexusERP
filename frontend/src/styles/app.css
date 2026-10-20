@@ -14,10 +14,71 @@
  *     those names rather than inventing a parallel vocabulary.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
-
 @import 'tailwindcss';
 @import './tokens.css' theme(inline);
+
+/*
+ * Self-hosted faces (T004, research.md R-002, FR-046).
+ *
+ * The remote Google Fonts @import that used to sit above these rules was a
+ * third-party request made by the product at runtime: it disclosed every visit
+ * to another origin and made the interface's typography depend on a host the
+ * project does not control. The same faces are now served from the application's
+ * own origin, under public/fonts/, with their licences beside them.
+ *
+ * The families and weights are unchanged, so tokens.css still names them and no
+ * component changed. `font-display: swap` is kept: the text is readable
+ * immediately in the fallback face rather than invisible while the file loads.
+ *
+ * The @import rules above must stay first — CSS requires @import to precede any
+ * other rule, so these @font-face declarations follow them deliberately.
+ */
+@font-face {
+  font-family: 'Fira Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/fira-sans-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Fira Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/fira-sans-500.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Fira Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/fira-sans-600.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Fira Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/fira-sans-700.woff2') format('woff2');
+}
+
+/*
+ * Fira Code is served as one variable face covering 400–700 rather than as four
+ * static ones. The four weights Google's CSS declares for this family all
+ * resolve to the same 36,276-byte file (verified by hash, T003), so declaring
+ * one face with a weight range ships the same glyphs without four identical
+ * copies of them.
+ */
+@font-face {
+  font-family: 'Fira Code';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/fira-code-variable.woff2') format('woff2');
+}
 
 @layer base {
   html,
@@ -60,6 +121,15 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Icons (T053). The size comes from the spacing scale and the colour is
+   inherited, so an icon carries no value of its own: it tracks whatever
+   token-derived colour its context sets. */
+.icon {
+  inline-size: var(--spacing-md);
+  block-size: var(--spacing-md);
+  flex: none;
+}
+
 .app-shell {
   display: grid;
   grid-template-areas:
@@ -97,9 +167,26 @@
   padding: var(--spacing-xl);
 }
 
-/* Sidebar navigation. The active item carries --color-primary plus
-   aria-current="page" (MASTER.md "Page Pattern"). */
+/* Sidebar navigation. The active item carries the pale-blue pill with
+   --color-primary text plus aria-current="page" (MASTER.md "Sidebar Navigation").
+   An unavailable entry carries data-state="Soon" and is not a link. */
 .sidebar-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+/* Three labelled groups (T025). The heading is the group's label, and the list
+   inside is named by it, so "General", "Management" and "Settings" are groups
+   rather than decoration between rows. */
+.sidebar-nav__group + .sidebar-nav__group {
+  margin-top: var(--spacing-md);
+}
+
+.sidebar-nav__group-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -118,12 +205,17 @@
 }
 
 .sidebar-nav__link {
-  display: block;
-  padding: var(--spacing-sm) var(--spacing-sm);
-  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-pill);
   color: var(--color-foreground);
   text-decoration: none;
   font-weight: 500;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
 }
 
 .sidebar-nav__link:hover {
@@ -131,27 +223,104 @@
 }
 
 .sidebar-nav__link[aria-current='page'] {
-  background: var(--color-primary);
-  color: var(--color-on-primary);
+  background: var(--color-info-tint);
+  color: var(--color-primary);
   font-weight: 600;
 }
 
-/* A control that is deliberately inert - the organization and user placeholders.
-   Rendered as a labelled status, not as a button that would appear to work. */
-.shell-placeholder {
-  display: inline-flex;
+.sidebar-nav__link[data-state='Soon'] {
+  color: var(--color-muted-foreground);
+  cursor: not-allowed;
+}
+
+.sidebar-nav__link[data-state='Soon']:hover {
+  background: transparent;
+}
+
+.sidebar-nav__soon {
+  margin-left: auto;
+  padding: 0 var(--spacing-xs);
+  border-radius: var(--radius-pill);
+  background: var(--color-neutral-tint);
+  color: var(--color-muted-foreground);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Page header and breadcrumb, used by every page (MASTER.md "Shell Chrome"). */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.page-header__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.page-header__description {
+  margin: var(--spacing-xs) 0 0;
+  color: var(--color-muted-foreground);
+}
+
+.page-header__actions {
+  display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border: 1px dashed var(--color-input-border);
-  border-radius: 6px;
-  color: var(--color-muted-foreground);
-  font-size: 0.875rem;
 }
 
-.shell-placeholder__label {
-  font-weight: 600;
+.breadcrumb {
+  margin-bottom: var(--spacing-sm);
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+}
+
+.breadcrumb__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* The separator is drawn rather than rendered, so it carries no text for a
+   screen reader to read out between two crumbs. */
+.breadcrumb__list > li + li::before {
+  content: '/';
+  margin-right: var(--spacing-xs);
+}
+
+.breadcrumb__current {
   color: var(--color-foreground);
+  font-weight: 600;
+}
+
+/* A wide table scrolls inside this container, so the page never scrolls sideways. */
+.table-container {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-card);
+}
+
+/* The visible "Sample data" marker (FR-040). It uses the direction's own pale
+   tint rather than an alarm colour: it labels the surface, it does not warn. */
+.sample-marker {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-info);
+  border-radius: var(--radius-pill);
+  background: var(--color-info-tint);
+  color: var(--color-info);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 /* Visually hidden but available to assistive technology. */
@@ -171,7 +340,7 @@
   background: var(--color-card);
   color: var(--color-card-foreground);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
   padding: var(--spacing-lg);
 }
@@ -188,7 +357,7 @@
 .badge {
   display: inline-block;
   padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -259,10 +428,101 @@
   color: var(--color-foreground);
 }
 
-.top-bar__placeholders {
+.top-bar__account {
   display: flex;
   align-items: center;
+  gap: var(--spacing-md);
+}
+
+.top-bar__trigger-label {
+  font-weight: 600;
+}
+
+.top-bar__pending {
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+}
+
+/* The dropdown menu primitive (T051, FR-029). The trigger and the list are
+   token-backed like every other surface; nothing here carries a value of its
+   own, so the design-value guard keeps passing. */
+.menu {
+  position: relative;
+}
+
+.menu__trigger {
+  display: inline-flex;
+  align-items: center;
   gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card);
+  color: var(--color-foreground);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+/* Contrast change only, so opening a menu never shifts the layout. */
+.menu__trigger:hover,
+.menu__trigger[aria-expanded='true'] {
+  border-color: var(--color-primary);
+}
+
+.menu__list {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + var(--spacing-xs));
+  right: 0;
+  min-inline-size: 100%;
+  list-style: none;
+  margin: 0;
+  padding: var(--spacing-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+}
+
+.menu__item {
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-foreground);
+  cursor: pointer;
+}
+
+.menu__item:hover {
+  background: var(--color-info-tint);
+}
+
+/* The current choice is marked and announced (aria-checked), never by colour
+   alone. */
+.menu__item[aria-checked='true'] {
+  background: var(--color-info-tint);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* An entry that cannot act says why, in place (FR-015, FR-029). */
+.menu__item--unavailable {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.menu__item--unavailable .menu__item-label {
+  font-weight: 600;
+}
+
+.menu__item-reason {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
 }
 
 /* Health panel states. The failure state is deliberately quiet: it states what
@@ -319,15 +579,364 @@
   gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--color-input-border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--color-card);
   color: var(--color-foreground);
+  font: inherit;
   font-weight: 600;
   cursor: pointer;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
 }
 
 .button--primary {
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: var(--color-on-primary);
+}
+
+.button--secondary {
+  background: var(--color-card);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.button--danger {
+  background: var(--color-destructive);
+  border-color: var(--color-destructive);
+  color: var(--color-on-destructive);
+}
+
+/* Contrast change only - a transform here would shift layout (MASTER.md
+   anti-patterns, "Layout-shifting hovers"). */
+.button:hover:not([disabled]):not([aria-disabled='true']),
+.button:focus-visible {
+  border-color: var(--color-primary);
+}
+
+.button[disabled],
+.button[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* A control that cannot act says why, in place, without pretending to work. */
+.button__reason {
+  font-weight: 400;
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+}
+
+/* Compact sidebar at tablet widths. Driven by the available width, so no
+   collapse control exists that would do nothing at another width; each entry
+   keeps its accessible name, its group and its availability (FR-011). */
+@media (max-width: 1023px) {
+  .app-shell {
+    grid-template-columns: var(--shell-sidebar-compact-width) 1fr;
+  }
+
+  .sidebar-nav__link {
+    justify-content: center;
+  }
+
+  .sidebar-nav__group-label,
+  .sidebar-nav__label,
+  .sidebar-nav__soon {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}
+
+/*
+ * Form controls, dialogs, tables, and feedback primitives (FR-019 to FR-033).
+ * Sourced strictly from tokens.css; no raw design values.
+ */
+
+.form-control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+}
+
+.form-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.form-label__required {
+  color: var(--color-destructive);
+  margin-left: var(--spacing-xs);
+}
+
+.form-help-text {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+}
+
+.form-error {
+  font-size: 0.75rem;
+  color: var(--color-destructive);
+  font-weight: 500;
+}
+
+.input,
+.select,
+.textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-input-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-card);
+  color: var(--color-foreground);
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  transition: border-color 150ms ease;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus,
+.input:focus-visible,
+.select:focus-visible,
+.textarea:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+  border-color: var(--color-primary);
+}
+
+.input[disabled],
+.select[disabled],
+.textarea[disabled],
+.checkbox[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
+  background: var(--color-muted);
+}
+
+.input[aria-invalid='true'],
+.select[aria-invalid='true'],
+.textarea[aria-invalid='true'],
+.checkbox[aria-invalid='true'] {
+  border-color: var(--color-destructive);
+}
+
+.checkbox-container {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--color-foreground);
+}
+
+.checkbox-container--disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.checkbox {
+  width: 1rem;
+  height: 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-input-border);
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+/* Data table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+.data-table th,
+.data-table td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.data-table th {
+  background: var(--color-muted);
+  color: var(--color-foreground);
+  font-weight: 600;
+  user-select: none;
+}
+
+.data-table th button {
+  background: none;
+  border: none;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  cursor: pointer;
+  padding: 0;
+}
+
+.data-table tr:hover td {
+  background: var(--color-background);
+}
+
+.data-table__pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-card);
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+}
+
+/* Overlays: Dialog and ConfirmDialog */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background-color: var(--color-overlay);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-md);
+}
+
+.dialog {
+  background: var(--color-card);
+  color: var(--color-card-foreground);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  max-width: 32rem;
+  width: 100%;
+  padding: var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.dialog__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  bottom: var(--spacing-xl);
+  right: var(--spacing-xl);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.toast {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.toast--success {
+  background: var(--color-success-tint);
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+}
+
+.toast--failure {
+  background: var(--color-destructive-tint);
+  color: var(--color-on-destructive-tint);
+  border: 1px solid var(--color-destructive);
+}
+
+.toast--informational {
+  background: var(--color-info-tint);
+  color: var(--color-info);
+  border: 1px solid var(--color-info);
+}
+
+.toast__dismiss {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  display: inline-flex;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-3xl) var(--spacing-xl);
+  text-align: center;
+  gap: var(--spacing-md);
+}
+
+.empty-state__description {
+  color: var(--color-muted-foreground);
+  margin: 0;
+  max-width: 24rem;
+}
+
+/* Error state */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-lg);
+  border: 1px solid var(--color-destructive);
+  border-radius: var(--radius-md);
+  background: var(--color-destructive-tint);
+  color: var(--color-on-destructive-tint);
+}
+
+.error-state__message {
+  margin: 0;
+  font-weight: 600;
+}
+
+.error-state__request-id {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-family: var(--font-mono);
 }

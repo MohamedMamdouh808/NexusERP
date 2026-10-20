@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { findViolations, isExempt, stripComments } from '../check-no-raw-design-values';
+import { findViolations, isExempt, stripComments, EXEMPT_FILES } from '../check-no-raw-design-values';
 
 const webRoot = resolve(import.meta.dirname, '..', '..');
 const script = join(webRoot, 'scripts', 'check-no-raw-design-values.ts');
@@ -86,6 +86,13 @@ describe('no-raw-design-values matcher (T082)', () => {
     expect(
       findViolations([{ file: 'src/styles/tokens.css', source: ':root { --color-primary: #1e40af; }' }]),
     ).toEqual([]);
+  });
+
+  it('permits no new file exemptions in EXEMPT_FILES (T033, FR-051)', () => {
+    expect(EXEMPT_FILES).toHaveLength(1);
+    expect(isExempt('src/styles/tokens.css')).toBe(true);
+    expect(isExempt('src/components/ui/button.tsx')).toBe(false);
+    expect(isExempt('src/components/shell/app-shell.tsx')).toBe(false);
   });
 
   it('does not trip on a comment that names a colour, or on an anchor fragment', () => {

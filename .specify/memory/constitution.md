@@ -1,5 +1,98 @@
 <!--
 SYNC IMPACT REPORT
+Generated: 2026-10-20
+
+Version change: 1.0.0 -> 1.1.0
+Bump rationale: MINOR. The Development Workflow and Quality Gates section gains a new
+subsection, "Branch Workflow and What It Means for Deployment", which adds materially
+expanded guidance: a testable rule for how work reaches `main`, the selector that names the
+active feature, and the plain statement that staging deploys are not gated by CI checks. No
+principle is removed or redefined and no obligation is weakened in the principles
+themselves; the amendment records how this project actually satisfies them. MINOR rather
+than PATCH because the added guidance imposes a new, checkable rule about the repository's
+workflow and about what its documentation may claim.
+
+Modified principles: none. The text of Principles I-IX is unchanged.
+
+Added sections:
+  - Development Workflow and Quality Gates -> "Branch Workflow and What It Means for
+    Deployment": all work lands directly on `main`; no feature branch is created; the active
+    Spec Kit feature directory is selected through `.specify/feature.json`; and the
+    consequence that staging deploys are not gated by CI checks, so the mandatory checks gate
+    phase exit and release rather than deployment.
+
+Removed sections: none.
+
+Templates requiring updates:
+  - .specify/templates/plan-template.md       -> PENDING: the "**Branch**" header line still
+    prints `[###-feature-name]`
+  - .specify/templates/spec-template.md       -> PENDING: the "**Feature Branch**" header line
+    still prints `[###-feature-name]`
+  - .specify/templates/tasks-template.md      -> no change (makes no branch assumption)
+  - .specify/templates/checklist-template.md  -> no change (generic quality checklist)
+  - .specify/templates/constitution-template.md -> no change (kept as the untouched template)
+
+Runtime guidance and artifact corrections (required by the added section):
+  - README.md                                       -> corrected (Mandatory Checks section)
+  - docs/staging-deployment.md                      -> corrected (§1, §3, §6)
+  - specs/003-staging-deployment/spec.md            -> corrected (Clarifications, US2,
+    FR-010, FR-014, SC-016, Assumptions)
+  - specs/003-staging-deployment/tasks.md           -> corrected (header, T001, T004, T022,
+    T023, T024, T042)
+  - specs/003-staging-deployment/plan.md            -> corrected (branch header)
+  - specs/003-staging-deployment/research.md        -> corrected (R-015, R-006 reference)
+  - specs/003-staging-deployment/data-model.md      -> corrected ("Protect `main`" row)
+  - specs/004-frontend-shell/tasks.md               -> corrected (the open branch-workflow
+    decision is now resolved by this amendment)
+  - .github/workflows/ci.yml                        -> corrected (header comment claimed the
+    jobs are required status checks behind a branch protection rule)
+  - .specify/extensions.yml                         -> PENDING: `before_specify` registers
+    `speckit.git.feature` ("Create feature branch before specification", `optional: false`)
+  - .specify/scripts/powershell/common.ps1          -> PENDING: `Test-FeatureBranch` exits 1
+    on `main`, reached through `check-prerequisites.ps1` and `setup-plan.ps1`
+  - AGENTS.md                                       -> no change (no branch or CI-gating claim)
+
+Contrary claims still in the repository, outside the set this amendment was asked to correct
+(each falls under the added section's "MUST be corrected" rule; none was edited, because each
+is either a ratified product requirement or the history of a closed feature):
+  - docs/PRD.md:677 (Idempotency alternate flow A3) -> "A failing mandatory check blocks merge
+    and deployment", and docs/PRD.md:667 -> "test suites gate every merge". Both must be
+    restated as gating phase exit and release, not the deploy. This changes a product
+    requirement and is left to the Product Owner.
+  - specs/001-platform-foundation/tasks.md:218 (T074, completed) -> "Declare the mandatory
+    checks as required status checks and document the setup in `README.md`", T075, and the
+    Phase 3 checkpoint at :221 ("No change can merge with a mandatory check failing..."). No
+    branch protection rule exists and no required status checks were ever declared, so T074 is
+    recorded as done against a workflow this project does not use; the checkpoint's "merge"
+    language should read "phase exit and release". Left unedited so a closed feature's history
+    is not rewritten silently.
+
+Follow-up TODOs (deferred, not blocking):
+  - TODO(PRINCIPLE_V_ENFORCEMENT): Principle V states "CI MUST gate merges on ..." and "A
+    failing mandatory check blocks merge and blocks deployment". The added section records
+    that this workflow cannot mechanically provide a pre-merge gate. The principle was left
+    unchanged because redefining a principle is a MAJOR amendment, so the two sentences
+    currently describe an intent the workflow does not enforce. Product Owner and Engineering
+    Lead must decide whether Principle V is redefined (MAJOR) or the workflow is changed.
+  - TODO(BRANCH_SELECTOR_TOOLING): `.specify/scripts/powershell/common.ps1`
+    (`Test-FeatureBranch`, reached through `check-prerequisites.ps1` and `setup-plan.ps1`)
+    exits 1 on `main`, so every `/speckit.*` command that validates the branch currently
+    fails. The scripts must accept the feature directory from `.specify/feature.json`.
+  - TODO(HOOK_CONFIG): `.specify/extensions.yml` registers `before_specify` ->
+    `speckit.git.feature`, which creates a feature branch and contradicts this section.
+  - TODO(SPEC_TEMPLATES): the specification and plan templates still print a
+    `[###-feature-name]` branch header; they should print `main` and the feature directory.
+  - TODO(MISSING_DEPLOY_DEFINITIONS): docs/staging-deployment.md links
+    `../frontend/vercel.json` and `../render.yaml`; neither file exists in the repository, so
+    FR-013 of the staging feature ("the staging deploy definition MUST live in the
+    repository") is presently unmet.
+
+Source of truth: the single-branch workflow decision recorded in conversation on 2026-10-20,
+docs/PRD.md v1.0 (2026-10-17), and design-system/nexuserp/MASTER.md.
+-->
+
+<!--
+SYNC IMPACT REPORT
 Generated: 2026-10-18
 
 Version change: (template, unversioned) -> 1.0.0
@@ -300,8 +393,9 @@ plan is only achievable because P1 is conditional and P3 is refused.
   and products, then idempotency and numbering, then inventory, purchasing, sales,
   shipments, invoices, payments, and finally reports. Each stage depends only on the ones
   before it.
-- **Every change ships with its tests.** A failing mandatory CI check blocks merge and
-  deployment.
+- **Every change ships with its tests.** A failing mandatory CI check blocks phase exit and
+  blocks release; it does not block a push to `main`, and it does not block a deploy (see
+  "Branch Workflow and What It Means for Deployment" below).
 - **Migrations** are version-controlled with Prisma and validated in CI. Manual corrective
   SQL against production is prohibited.
 - **Review** verifies, per principle, that the change is tenant-scoped, permission-declared,
@@ -315,8 +409,39 @@ plan is only achievable because P1 is conditional and P3 is refused.
   Firefox 100+, Edge) at desktop and tablet sizes before each phase exit.
 - **Release-blocking conditions** in PRD Section 14 are absolute. Public launch waits until
   every one of them is cleared.
-- **Branches** follow `NNN-feature-name`. Every pull request references its spec and plan
-  and states how it complies with this constitution.
+
+### Branch Workflow and What It Means for Deployment
+
+All work lands directly on `main`. No feature branch is created, and no pull request is opened
+or required.
+
+- A feature is identified by its Spec Kit feature directory, not by a branch name. The active
+  feature directory is selected through `.specify/feature.json`, and the feature's number and
+  slug live in `specs/NNN-feature-name/`.
+- Work reaches `main` as a direct push. Review, when it happens, happens before the push;
+  nothing in the repository mechanically prevents a push that has not been reviewed.
+- **Consequence, stated plainly: staging deploys are not gated by CI checks.** The mandatory
+  checks run on a push to `main`, but they run alongside the deploy rather than in front of
+  it, because each hosting platform deploys the commit the moment it appears on `main` and no
+  required-status-check gate sits in that path. A commit whose checks are failing, still
+  running, or never run is deployed to staging all the same.
+- The mandatory checks therefore gate **phase exit and release**, not deployment. They remain
+  mandatory evidence for Principle V, for the phase-exit criteria above, and for the
+  release-blocking conditions in PRD Section 14. A red check on `main` is a defect to fix, not
+  a deploy that was prevented.
+- Branch protection, required status checks, an up-to-date-before-merging requirement, and the
+  no-direct-pushes rule are **not** part of this workflow. Any document — README, runbook,
+  feature specification, plan, or task list — that claims a deploy is gated by CI, or that a
+  failing check blocks a deploy or a merge, is inaccurate and MUST be corrected to match this
+  section.
+- The tooling MUST select the feature directory from `.specify/feature.json`. A script that
+  refuses to run unless the current branch matches `NNN-feature-name` contradicts this section.
+
+Rationale: the project is developed by one person who deploys from `main`. Pretending a
+pre-merge gate exists costs a branch per feature and buys a one-person project nothing, while
+making every tool that validates a branch name fail. Recording the workflow here, together
+with its cost, keeps the quality bar honest: the checks still run and still matter, but no
+document may claim they hold a gate they do not hold.
 
 ## Governance
 
@@ -345,4 +470,4 @@ that violates a principle does not merge by arguing that the principle is inconv
   defines the interface system. Where either conflicts with this constitution, this
   constitution prevails and the conflicting file is corrected.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-18
+**Version**: 1.1.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-20

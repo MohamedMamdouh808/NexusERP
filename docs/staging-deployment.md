@@ -32,8 +32,8 @@ the deployed artefact and the tested one cannot drift.
 ## 1. Create the projects
 
 Create these three, in this order. Nothing about the setup can be expressed in the repository:
-provider accounts, the Git integration, and the branch protection below are all set up once by a
-human with account access.
+provider accounts and the Git integration are set up once by a human with account access. There
+is no branch protection to configure — see §6.
 
 | # | Project | Plan to select | Notes |
 |---|---|---|---|
@@ -119,10 +119,12 @@ that proves it, and the appendix for what it is holding shut.
 
 ## 3. First deploy
 
-1. **Merge to `main`.** Each host deploys from the repository through its own Git integration when
-   `main` changes. A merge to `main` is the only trigger; Render is configured to deploy **only
-   after the mandatory checks pass** for the exact commit being deployed, so a commit whose checks
-   are still running is never deployed.
+1. **Push to `main`.** Each host deploys from the repository through its own Git integration when
+   `main` changes. A push to `main` is the only trigger, and it is **not gated**: a host deploys
+   the commit as soon as it appears on `main`, whatever the state of the mandatory checks. A
+   commit whose checks are still running, have failed, or were never run is deployed all the
+   same. This is the workflow's known cost — see §6 and the constitution's *Branch Workflow and
+   What It Means for Deployment*.
 2. **Migrations run as part of bringing the version up.** The service's start command applies the
    repository's pending migrations **before** the service begins listening, and the platform's
    health check is not answered until they have finished. There is no second migration route: the
@@ -133,15 +135,15 @@ that proves it, and the appendix for what it is holding shut.
 4. **Re-running a deploy that already succeeded changes no data and applies no migration twice.**
    Migrations are recorded as applied, and reference data is upserted rather than duplicated.
 
-### No manual step after the checks pass
+### No manual step after the push
 
-Once the mandatory checks are green on a merge to `main`, updating staging requires no human action.
-A deploy that needs a human is a deploy that gets skipped.
+Once a change is on `main`, updating staging requires no human action. A deploy that needs a
+human is a deploy that gets skipped.
 
 ### The failing-migration rehearsal (do this once, and record it)
 
 Staging has to demonstrably survive a bad migration, not merely claim it would. Deliberately add a
-migration that fails, merge it, and observe:
+migration that fails, push it to `main`, and observe:
 
 | What to observe | Expected |
 |---|---|
@@ -170,7 +172,7 @@ Work through these once, after the first deploy. Each one is checkable from outs
 | 3 | The response is same-origin | Open the browser's network panel on the staging address | Zero blocked or cross-origin requests caused by the interface's API calls |
 | 4 | Database major version | `SELECT version();` in the Supabase SQL editor, or the project's settings page | PostgreSQL **17** |
 | 5 | The data surface is closed | `sh scripts/check-supabase-data-api.sh` with `SUPABASE_PROJECT_REF` and `SUPABASE_ACCESS_TOKEN` set | **Both** assertions hold: an anonymous request naming a known table at the project's own REST surface is refused and discloses no rows, **and** the project reports its Data API **disabled** |
-| 6 | Branch protection actually blocks | See §6 | A pull request carrying a deliberately failing check cannot be merged |
+| 6 | The deploy is not gated | Push a commit to `main` and watch the hosts pick it up before the checks finish | The deploy starts as soon as the push lands, whatever the checks are doing — see §6 |
 | 7 | No secret in the repository | `node scripts/check-secrets.mjs` | Zero findings, and the deploy definitions contain no secret value |
 
 Check 5 has **two** assertions on purpose. A mistyped address, a missing project, or an unrelated
@@ -200,44 +202,35 @@ effect in a new migration and deploy again. Use the rollback button for a bad *a
 
 ---
 
-## 6. Protect `main`
+## 6. What is *not* protected, and why
 
-Branch protection is a **required part** of this setup, not optional configuration. It is what makes
-"a deploy runs only after the checks pass" true: the hosts deploy on push, so the commits they can
-see must only ever be commits that already passed.
+**Staging deploys are not gated by CI checks.** There is no branch protection on `main`, no set of
+required status checks, and no pull-request requirement. The project works on a single branch,
+`main`, with direct pushes, so there is no merge for a check to block. Each host deploys the
+commit the moment it appears on `main`; the mandatory checks run alongside the deploy, never in
+front of it.
 
-Configure, on `main`:
+The consequence, stated plainly: **a commit whose checks are failing, still running, or never run
+reaches staging.** Reading the check results after the push, and rolling back if they are red
+(§5), is the recovery step — not a gate.
 
-1. **Every mandatory check is a required status check.** Every job in
-   [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — Lint, Type check, Unit tests,
-   Integration tests (real PostgreSQL), Migration validation, Contract drift, Build, Secret scan,
-   and Workflow assertions. A job that is not required is a job that can fail while the merge
-   proceeds.
-2. **The branch must be up to date before merging**, so a merge is tested against the tip it lands
-   on.
-3. **No direct pushes.** Changes reach `main` through a pull request only.
+What the mandatory checks still do:
 
-### Verify it, do not assume it
+- They are the evidence for a phase exit and for the release-blocking conditions. A red check on
+  `main` is a defect to fix, not a deploy that was prevented.
+- They run on every push to `main`, and on any pull request if one is ever opened.
 
-An unverified protection setting is indistinguishable from an absent one. So demonstrate the
-refusal **once** and record it here:
+**Nothing to configure.** Do not add a branch protection rule. A rule requiring status checks
+would contradict the constitution's *Branch Workflow and What It Means for Deployment*, and it
+would block the direct pushes this workflow relies on.
 
-| Step | Expected |
-|---|---|
-| Open a throwaway pull request that contains a deliberately failing mandatory check | The merge is blocked, and the blocking check is named |
-| Attempt to push directly to `main` | Rejected |
-| Close the pull request without merging | The branch is unchanged |
+A pipeline that deploys is still not how any of this is achieved: the pipeline's terminal action
+stays verification, and no workflow step deploys, publishes, restarts, or releases anything in a
+hosted environment.
 
-> **Recorded result:** _pending — to be filled in when staging is set up, with the pull request
-> number, the date, and the check that blocked it._
-
-A pipeline that deploys is not how this is achieved: the pipeline's terminal action stays
-verification, and no workflow step deploys, publishes, restarts, or releases anything in a hosted
-environment.
-
-**Frontend preview deployments.** Pull-request previews may be produced. A preview must not read,
-write, or migrate the staging database — it is a build of the interface, and nothing in the
-interface reaches the database except through the service it is pointed at.
+**Frontend preview deployments.** A preview may be produced if a pull request is ever opened. A
+preview must not read, write, or migrate the staging database — it is a build of the interface,
+and nothing in the interface reaches the database except through the service it is pointed at.
 
 ---
 

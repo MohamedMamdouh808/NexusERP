@@ -54,7 +54,7 @@ The version-controlled description of a hosted component. Two instances exist, o
 | variable **names** it needs | declared under `envVars` | none — the interface reads no hostname (FR-005) |
 | variable **values** it carries | only non-secret values; secrets use `sync: false` or `generateValue: true` | none that are secret |
 | health path | `healthCheckPath: /api/v1/health` | not applicable; the host has no health probe |
-| deploy trigger | `autoDeployTrigger: checksPass` | Git integration on push to `main` |
+| deploy trigger | `autoDeployTrigger: commit` — the deploy is **not** gated by checks (FR-010) | Git integration on push to `main` |
 | secret content | **zero** | **zero** |
 
 The last row is the invariant the unit specifications enforce (FR-028): a deploy definition may
@@ -153,7 +153,7 @@ address, and from a bad deploy back to a good one.
 | First deploy | Including that it applies the full migration history from an empty database | FR-037, edge case |
 | Verify | Health at the staging address; the database major version; the data-surface check | FR-002, FR-021, FR-025 |
 | Roll back | The procedure, and what a rollback cannot undo | FR-041 |
-| Protect `main` | Branch protection: required status checks, up-to-date branch, no direct pushes — and its verification by an attempted forbidden merge | FR-010, SC-016 |
+| Not gated | The statement that staging deploys are **not** gated by CI checks: no branch protection, no required status checks, no pull request, direct pushes to `main` — carrying the observed behaviour rather than the assertion | FR-010, SC-016 |
 | Plan and cost | Each component, its plan, what the plan includes, its cost, and any upgrade marked **not purchased** | FR-038 |
 | Backup | Only what the providers actually give, explicitly what they do not, and the retention gap recorded as an open product-requirements decision | FR-039 |
 | Out of scope | A production environment, a custom domain, paid upgrades, backups beyond the providers', a monitoring vendor, and authentication | FR-040 |

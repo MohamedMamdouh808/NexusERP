@@ -19,7 +19,7 @@ than a guessed field name; that is recorded in the decision that introduces the 
 `buildCommand: npm ci && npm run build --workspace @nexuserp/shared && npm run build --workspace
 @nexuserp/api` and `startCommand: npm run db:migrate && npm run start --workspace @nexuserp/api`
 — with `plan: free`, `healthCheckPath: /api/v1/health`, and
-`autoDeployTrigger: checksPass`. No image-build settings (a build path or a build context) are
+`autoDeployTrigger: commit`. No image-build settings (a build path or a build context) are
 declared, because there is no image and no second build. Every runtime variable the service
 consumes is declared under `envVars` as a name plus exactly one of: a non-secret `value`,
 `sync: false` (a secret whose value is entered once in the Render Dashboard), or
@@ -32,9 +32,10 @@ than typed into a dashboard. `runtime: node` is used because the deploy is produ
 the repository's own build and start commands, the same commands the pipeline tests, so there is
 no second build to drift from the verified one. Root placement is Render's default lookup for a
 Blueprint, so no extra registration step stands between the repository and the deployed service.
-`autoDeployTrigger: checksPass` is Render's setting for "deploy this service only once the
-commit's checks have succeeded", which is the mechanism FR-010's branch protection depends on
-being paired with. `sync: false` is Render's "prompt for the value in the Dashboard" mode:
+`autoDeployTrigger: commit` is Render's setting for "deploy this service as soon as a commit
+landed on the branch". It is what FR-010 requires after its correction: the deploy is **not**
+gated by the mandatory checks, so the service must not wait for them. `sync: false` is Render's
+"prompt for the value in the Dashboard" mode:
 the value is never in the repository and is entered once by a human with account access, which
 is exactly FR-027's requirement that a secret exist only in the platform's secret store.
 `generateValue: true` produces a randomized, base64-encoded 256-bit value in the platform —
@@ -52,9 +53,10 @@ value out of every artefact, including this document.
 - **Declaring the secrets with placeholder `value:` entries.** Rejected outright: it would
   place a secret-shaped value in a version-controlled file, which FR-028 forbids and which
   the feature's own unit assertion is written to catch.
-- **`autoDeployTrigger: commit`.** Rejected: it deploys on push, which can deploy a commit
-  whose checks have not finished, contradicting FR-010 and the reason `checksPass` is named
-  in the requirements.
+- **`autoDeployTrigger: checksPass`.** Rejected: it holds the service's deploy until the commit's
+  checks report success, which gates the backend deploy on CI and contradicts FR-010's corrected
+  text and the constitution's branch-workflow section. It would also make the two hosts behave
+  differently — Render gated, Vercel not — while the runbook claimed neither was.
 
 ---
 
@@ -308,7 +310,7 @@ parsed shape, not substrings.
 **Rationale.** The repository deliberately carries no YAML dependency, and adding one to assert
 on a file whose schema a provider validates anyway would be a dependency bought for a test.
 The precedent is established and load-bearing: `ci-no-deploy.spec.ts` documents why it
-hand-parses, and the same reasoning applies here — a substring search for `checksPass` would
+hand-parses, and the same reasoning applies here — a substring search for `autoDeployTrigger` would
 pass on a commented-out line, and a search for `healthCheckPath` would pass on a value nested
 under the wrong service. The JSON specification needs no parser at all. Structural assertions
 are also what make the secret assertion honest: the test inspects the *values* attached to
@@ -490,39 +492,40 @@ the tree the pipeline tested.
 
 ---
 
-## R-015 — The deploy trigger: branch protection does the gating, the hosts do the deploying
+## R-015 — The deploy trigger: the hosts deploy on push, and no gate stands in front of them
 
-**Decision.** No workflow step deploys, pushes, restarts, or releases anything. The trigger is
-the combination of two settings that live outside the repository: **branch protection on
-`main`** (every mandatory check declared a required status check, the branch required to be up
-to date before merging, and direct pushes disallowed) and each host's own Git integration
-deploying on push. The Blueprint's `autoDeployTrigger: checksPass` is the Render half of "wait
-for the commit's checks". The runbook documents the one-time branch-protection setup and
-requires verifying it by attempting to merge a pull request that carries a deliberately failing
-mandatory check.
+**Decision.** No workflow step deploys, pushes, restarts, or releases anything — that refusal is
+unchanged, and FR-011 still holds. The trigger is each host's own Git integration deploying on a
+push to `main`, and nothing else. There is no branch protection on `main` and no required status
+check: the project works on a single branch with direct pushes (see the constitution's "Branch
+Workflow and What It Means for Deployment"). The Blueprint therefore declares
+`autoDeployTrigger: commit`, so Render deploys as soon as the commit lands rather than waiting for
+the checks.
 
-**Rationale.** FR-010 requires a deploy to run only for a commit whose mandatory checks have
-completed successfully, and it explicitly requires that this be enforced by branch protection
-rather than by making the pipeline deploy. The reason is structural: a pipeline that deploys
-cannot be the thing that proves the commit was safe to deploy, because it would have to run
-after the checks and would therefore be a second, unguarded path to the environment. Branch
-protection inverts this — the only commits that reach `main` are merges whose result already
-passed — so the hosts' push-based deploy is safe by construction, and FR-011 ("the pipeline MUST
-still never deploy") stays true. `checksPass` is the same idea at the platform level: Render
-holds the deploy until the commit's checks report success, which closes the window between a
-merge and the checks' completion. Verifying the protection by attempting the forbidden merge is
-what keeps it from being an unchecked claim (SC-016).
+**Rationale.** FR-010, as corrected, requires the opposite of a gate: a deploy MUST NOT be gated
+by the mandatory checks, and the documents MUST say so plainly. The earlier version of this
+decision — branch protection declaring every check a required status check, with
+`autoDeployTrigger: checksPass` as Render's half of "wait for the checks" — depended on a
+pull-request workflow this project does not use, so it described a mechanism that could never be
+configured and a claim that could never be true. The structural reason for the pipeline's
+deploy-freedom is unchanged: a pipeline that deploys would be a second, unguarded path to the
+environment and would have to hold credentials for it, so verification stays its terminal action
+(FR-011, FR-050a). What is recorded instead is the cost, stated rather than hidden: a commit whose
+checks are failing, still running, or never run reaches staging, so the checks are read after the
+push rather than before it. SC-016 now asks for that statement to exist in the runbook and the
+README, verified by review, instead of for a forbidden merge to be demonstrated.
 
 **Alternatives rejected.**
 - **A deploy job in the pipeline.** Rejected: it contradicts FR-011 and the foundation's
   FR-050a, and it would need credentials, making the pipeline a credential holder for a hosted
   environment it must never touch.
-- **`autoDeployTrigger: commit` and relying on the merge alone.** Rejected: it deploys on push,
-  so a commit whose checks are still running can be deployed before they finish, which FR-010
-  forbids.
-- **Documenting branch protection without verifying it.** Rejected: SC-016 requires the
-  forbidden merge to be demonstrated and recorded, because an unverified protection setting is
-  indistinguishable from an absent one.
+- **`autoDeployTrigger: checksPass` with branch protection.** Rejected: it would gate the backend
+  deploy on CI while the frontend host progressed regardless, it contradicts FR-010's corrected
+  text and the constitution's branch-workflow section, and with no pull requests the
+  required-status-check list it depends on could never be enforced.
+- **Documenting a gate that is not configured.** Rejected: that is the defect this amendment
+  corrects. A documented gate that does not exist is worse than no gate, because it transfers
+  trust to a mechanism nobody runs.
 - **Manual deploys.** Rejected by FR-014: a deploy that needs a human is one that is skipped.
 
 ---
@@ -531,8 +534,9 @@ what keeps it from being an unchecked claim (SC-016).
 
 **Decision.** The deployment runbook is `docs/staging-deployment.md`, beside `docs/PRD.md`. It
 carries, as required sections: creating the three projects; every variable with the platform
-that sets it; the first deploy; verification; rollback; the one-time branch-protection setup
-and its verification; the plan-and-cost table with upgrades marked **not purchased**; and the
+that sets it; the first deploy; verification; rollback; the statement that the deploy is not gated
+by CI checks, carrying the observation rather than the assertion; the plan-and-cost table with
+upgrades marked **not purchased**; and the
 backup statement. It states as observed behaviour the entry-plan effects a reviewer will see —
 a database project that pauses when idle, a service instance that stops when idle, a cold start
 on the next request, and any plan-level limit on deploy history; the free plan has no pre-deploy

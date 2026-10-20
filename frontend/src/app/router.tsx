@@ -1,8 +1,16 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import type { RouteObject } from 'react-router-dom';
 
 import { AppShell } from '../components/shell/app-shell';
+import { Breadcrumb } from '../components/shell/breadcrumb';
+import { PageHeader } from '../components/shell/page-header';
 import { HealthPanel } from '../features/health/health-panel';
+
+const DevGallery =
+  import.meta.env.DEV
+    ? lazy(() => import('../dev/gallery/gallery-route').then((m) => ({ default: m.GalleryRoute })))
+    : null;
 
 /**
  * The route table, exported so a test can assert that every navigation
@@ -13,6 +21,8 @@ export const routes: RouteObject[] = [
     path: '/',
     element: (
       <AppShell>
+        <Breadcrumb />
+        <PageHeader title="Overview" />
         <Overview />
       </AppShell>
     ),
@@ -21,11 +31,24 @@ export const routes: RouteObject[] = [
     path: '/health',
     element: (
       <AppShell>
-        <h1>System health</h1>
+        <Breadcrumb />
+        <PageHeader title="System health" />
         <HealthPanel />
       </AppShell>
     ),
   },
+  ...(DevGallery
+    ? [
+        {
+          path: '/dev/gallery',
+          element: (
+            <Suspense fallback={<div>Loading gallery...</div>}>
+              <DevGallery />
+            </Suspense>
+          ),
+        },
+      ]
+    : []),
   { path: '*', element: <Navigate to="/" replace /> },
 ];
 
@@ -38,12 +61,9 @@ export const router = createBrowserRouter(routes);
 
 function Overview() {
   return (
-    <>
-      <h1>Overview</h1>
-      <p>
-        The platform foundation is running. Business modules - sales, purchasing, inventory and
-        invoicing - are added by later features.
-      </p>
-    </>
+    <p>
+      The platform foundation is running. Business modules - sales, purchasing, inventory and
+      invoicing - are added by later features.
+    </p>
   );
 }

@@ -1,6 +1,5 @@
-import { ERROR_CODES } from '@nexuserp/shared';
-
 import { Card, Skeleton, StatusBadge } from '../../components/ui';
+import { isRateLimited } from '../../lib/api-client';
 import { useHealth } from './use-health';
 
 /**
@@ -48,14 +47,13 @@ export function HealthPanel() {
 
   if (data.kind === 'failed') {
     const { failure } = data;
-    const isRateLimited = failure.status === 429 || failure.code === ERROR_CODES.TOO_MANY_REQUESTS;
 
     return (
       <Card title="System health">
         <div className="health-panel__error" role="alert">
           <p>{failure.message}</p>
 
-          {isRateLimited && failure.retryAfterSeconds !== null && (
+          {isRateLimited(failure) && failure.retryAfterSeconds !== null && (
             <p className="health-panel__retry-after">
               Too many requests. Try again in {failure.retryAfterSeconds} seconds.
             </p>

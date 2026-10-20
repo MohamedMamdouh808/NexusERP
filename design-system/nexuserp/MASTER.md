@@ -35,6 +35,7 @@
 | On Destructive | `#FFFFFF` | `--color-on-destructive` |
 | Ring | `#1E40AF` | `--color-ring` |
 | Input Border | `#64748B` | `--color-input-border` |
+| Overlay / Backdrop | `rgba(0,0,0,0.5)` | `--color-overlay` |
 
 **Color Notes:** Blue data + amber highlights [Accent adjusted from #F59E0B]
 
@@ -172,6 +173,42 @@ numeric column and never render a monetary or decimal value as a float-derived s
 | `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
 | `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns, top bar, sidebar |
 | `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Dialogs, confirmation dialogs, drawers |
+
+### Radii
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--radius-sm` | `6px` | Badges, tags, small supporting elements |
+| `--radius-md` | `8px` | Buttons, inputs, dropdowns |
+| `--radius-lg` | `12px` | Cards, modals, containers |
+| `--radius-pill` | `999px` | Fully rounded / pill elements |
+
+### Shell Geometry
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--shell-sidebar-width` | `256px` | Desktop sidebar width |
+| `--shell-sidebar-compact-width` | `72px` | Narrow/icon-only sidebar |
+| `--shell-topbar-height` | `64px` | Top bar height |
+
+### Navigation
+
+The sidebar renders this navigation list and nothing else. Two entries are available in v1; all others are marked `Soon`.
+
+| Group | Entry | State |
+|-------|-------|-------|
+| General | Overview | available |
+| General | Sales Orders | Soon |
+| General | Inventory | Soon |
+| General | Reports | Soon |
+| Management | Products | Soon |
+| Management | Customers & Suppliers | Soon |
+| Management | Purchasing | Soon |
+| Management | Invoicing | Soon |
+| Management | Users & Roles | Soon |
+| Settings | Organization | Soon |
+| Settings | Audit Log | Soon |
+| Settings | System Health | available |
 
 ---
 

@@ -6,7 +6,7 @@ description: "Task list for the NexusERP staging deployment"
 # Tasks: Staging Deployment
 
 **Feature**: Staging Deployment (`003-staging-deployment`)
-**Branch**: `003-staging-deployment`
+**Branch**: `main` (single-branch workflow — no feature branch is created)
 **Input**: Design documents from `/specs/003-staging-deployment/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/, quickstart.md
 
@@ -77,9 +77,9 @@ another feature names that feature explicitly.
 **Purpose**: Establish the ground the feature stands on. It adds no project, package, or
 scaffolding, so setup is verification rather than creation.
 
-- [ ] T001 Verify the feature branch is `003-staging-deployment` and the working tree is clean
-  (`git branch --show-current`, `git status --short`), so every later diff is attributable to
-  this feature.
+- [ ] T001 Verify the working tree is clean **on `main`** (`git branch --show-current` reports
+  `main`, `git status --short` is empty), so every later diff is attributable to this feature.
+  The feature is identified by `specs/003-staging-deployment/`, not by a branch.
 - [ ] T002 [P] Confirm neither `render.yaml` nor `vercel.json` exists anywhere in the repository
   (`Glob **/render.yaml`, `Glob **/vercel.json`), so the definition specifications written in
   T006 and T007 are observed failing because the artefact is absent rather than because of a
@@ -97,13 +97,11 @@ decide whether the work that follows is describing the repository that actually 
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Merge `002-repo-restructure` into `main` (or confirm it is already merged), then
-  create or refresh `003-staging-deployment` from that `main`. **Why blocking**: every deploy
-  definition, path, and command in this feature describes the post-restructure layout
-  (`backend/`, `frontend/`, `database/`, `shared/`), both hosts deploy from `main`, and the
-  branch protection in T022 protects `main` (FR-009, FR-010, FR-013). A definition merged onto a
-  branch the hosts never build is a definition that is never applied — and the failure is
-  silent.
+- [ ] T004 Confirm the post-restructure layout is what `main` carries — `002-repo-restructure` is
+  already merged and the working tree on `main` is current. **Why blocking**: every deploy
+  definition, path, and command in this feature describes that layout (`backend/`, `frontend/`,
+  `database/`, `shared/`), and both hosts deploy from `main` (FR-009, FR-013). A definition that
+  is not on `main` is a definition the hosts never build — and the failure is silent.
 - [ ] T005 Record the pre-change baseline of the existing gate set on `main`, one command at a
   time: `npm ci`, `npm run db:generate`, `npm run typecheck`, `npm run lint`, `npm test`,
   `npm run test:integration`, `npm run build`, and
@@ -141,12 +139,14 @@ and confirm a successful response whose database check is ok.
   `plan: free`; `healthCheckPath` **equals the route derived from source** — the global prefix
   read from `backend/src/main.ts`'s `setGlobalPrefix('api/v1')` composed with the health
   controller's declared path in `backend/src/platform/health/health.controller.ts` — rather than
-  a second copy of the literal; `autoDeployTrigger` is `checksPass`; `PORT` is absent; no
+  a second copy of the literal; `autoDeployTrigger` is **`commit`**; `PORT` is absent; no
   `preDeployCommand` is present; and the plain values carry no wildcard cross-origin rule. Fails
   while `render.yaml` does not exist. See
   [contracts/deploy-definitions.md](contracts/deploy-definitions.md) §1 and
   [research.md R-008](research.md). (FR-013, FR-015, FR-023, FR-024, FR-034; the
-  `checksPass` assertion serves FR-010, authored here because the definition is authored once.)
+  `autoDeployTrigger` assertion serves FR-010 — it must be `commit`, because a `checksPass` trigger
+  would hold the backend deploy for the checks and contradict FR-010's corrected text. Authored
+  here because the definition is authored once.)
 
 - [ ] T007 [P] [US1] Write FAILING unit test `backend/scripts/__tests__/vercel-config.spec.ts`.
   Assert on the parsed JSON: `rewrites` is a non-empty ordered array; the **first** rewrite's
@@ -185,7 +185,7 @@ and confirm a successful response whose database check is ok.
   `nexuserp-api-staging`, `runtime: node`, `plan: free`, `buildCommand: npm ci && npm run build
   --workspace @nexuserp/shared && npm run build --workspace @nexuserp/api`, `startCommand: npm
   run db:migrate && npm run start --workspace @nexuserp/api`, `healthCheckPath: /api/v1/health`,
-  `autoDeployTrigger: checksPass`, and an `envVars` list carrying `NODE_ENV: production`,
+  `autoDeployTrigger: commit`, and an `envVars` list carrying `NODE_ENV: production`,
   `LOG_LEVEL: info`, `CORS_ORIGINS`, `TRUST_PROXY: "1"` as plain values, `DATABASE_URL` as
   `sync: false`, and `SESSION_SECRET`/`CSRF_SECRET` as `generateValue: true`. **No `PORT`** — the
   platform provides it and declaring it here would override the platform's value (FR-034). **No
@@ -261,21 +261,21 @@ applied the full migration history from an empty database.
 
 ---
 
-## Phase 4: User Story 2 - A Merge Ships It (Priority: P1)
+## Phase 4: User Story 2 - A Push Ships It (Priority: P1)
 
-**Goal**: Once the mandatory checks pass on a merge to `main`, staging updates by itself. No
-dashboard is opened, no deploy command is run, nothing is copied by hand — and the pipeline still
-deploys nothing.
+**Goal**: Once a change is on `main`, staging updates by itself — whether or not the mandatory
+checks have passed by then. No dashboard is opened, no deploy command is run, nothing is copied by
+hand — and the pipeline still deploys nothing.
 
-**Independent Test**: Merge a trivial change into `main` with all mandatory checks green and,
-with no manual step, confirm the version serving on staging is the merge commit.
+**Independent Test**: Push a trivial change to `main` and, with no manual step, confirm the version
+serving on staging is that commit.
 
 ### Tests for User Story 2 (MANDATORY - write first, observe failure) ⚠️
 
-> **NOTE**: The definition-side assertion for this story — `autoDeployTrigger: checksPass` — is
-> carried by T006, because the Blueprint is authored once and parsing it twice would be a second
-> copy of the same assertion. The tasks below cover the two properties T006 cannot: the
-> pipeline's deploy-freedom, and the protection that actually holds the gate.
+> **NOTE**: The assertion this story used to carry — `autoDeployTrigger: checksPass` — is no longer
+> a property of the system: the deploy is not gated by checks. T006 is corrected accordingly. The
+> tasks below cover the two properties that remain: the pipeline's deploy-freedom, and the
+> demonstration that no gate stands in front of a deploy.
 
 - [ ] T020 [P] [US2] Extend `.github/workflows/__tests__/ci-no-deploy.spec.ts` so it keeps
   proving the pipeline's deploy-freedom after this feature edits the workflow: assert no job
@@ -293,29 +293,28 @@ with no manual step, confirm the version serving on staging is the merge commit.
   `DATABASE_URL` is present in the preview's environment and no `db:migrate` step runs there —
   so the preview is view-only with respect to staging data. (FR-012)
 
-- [ ] T022 [US2] Set up branch protection on `main`: every mandatory check declared a **required
-  status check**, the branch **required to be up to date before merging**, and **direct pushes
-  disallowed**. The required list is the nine existing checks plus the `Secret scan` job T038
-  adds, so this task depends on T038. This is a one-time, human, provider-side setup that cannot
-  be expressed in the repository, which is why it is a task rather than a file. (depends on T038)
-  (FR-010)
+- [ ] T022 [US2] Establish that `main` carries **no** branch protection: no required status checks,
+  no up-to-date-before-merging requirement, and no restriction on direct pushes. If a rule exists
+  from an earlier setup, remove it — it would both contradict the constitution's branch-workflow
+  section and block the direct pushes the workflow relies on. Record what the provider's settings
+  page shows. This is a one-time, human, provider-side action that cannot be expressed in the
+  repository, which is why it is a task rather than a file. (FR-010)
 
-- [ ] T023 [US2] Verify the protection rather than asserting it: a pull request carrying a
-  deliberately failing mandatory check must be **unable to merge** — record the observed refusal,
-  including which check was reported and which setting refused the merge. An unverified
-  protection setting is indistinguishable from an absent one, so this observation is the
-  evidence SC-016 asks for. (depends on T022) (FR-010, SC-016)
+- [ ] T023 [US2] Demonstrate that the deploy is **not** gated, rather than asserting it: push a
+  commit to `main` while its mandatory checks are still running and record that the hosts begin
+  deploying before the checks report — then record the same for a commit whose checks fail. An
+  ungated path that has only ever been described, never observed, is indistinguishable from a gated
+  one, so this observation is the evidence SC-016 asks for. (FR-010, SC-016)
 
-- [ ] T024 [US2] Confirm each host deploys on push to `main` and that a merge ships with no
-  manual step. Render holds the deploy until the commit's checks report success
-  (`autoDeployTrigger: checksPass`, asserted by T006); the Vercel project's production branch is
-  `main`. Then merge a trivial change whose checks are green and confirm, with no manual action,
-  that the version serving on staging is the merge commit. Confirm in the other direction as
-  well: a change whose checks are failing or incomplete reaches no staging component. (depends on
-  T022) (FR-009, FR-014, SC-001)
+- [ ] T024 [US2] Confirm each host deploys on push to `main` and that a push ships with no manual
+  step. Render deploys the commit on push with no check-completion trigger; the Vercel project's
+  production branch is `main`. Then push a trivial change and confirm, with no manual action, that
+  the version serving on staging is that commit. Confirm in the other direction as well: a change
+  whose checks are failing or incomplete still reaches staging, so the red check is a defect to fix
+  rather than a deploy that was prevented. (FR-009, FR-014, SC-001)
 
-**Checkpoint**: The release path is automatic and its gate is verified, and the pipeline still
-deploys nothing.
+**Checkpoint**: The release path is automatic, it is recorded that no gate stands in front of it,
+and the pipeline still deploys nothing.
 
 ---
 
@@ -340,14 +339,15 @@ applied migration.
 
 ### Verification for User Story 3
 
-- [ ] T026 [US3] Rehearse the deliberately failing migration against staging. Do it **without
-  weakening the permanent protection**: branch protection will refuse to merge a migration that
-  fails the `Migration validation` check, so rehearse by temporarily pointing the Render
-  service's deploy branch at a rehearsal branch carrying a migration that cannot apply, rather
-  than by relaxing the protection on `main`. Observe and record exactly what happens: the deploy
-  aborts, and — the point of the exercise — **what the staging address does while the attempt
-  ends**. Record any interruption honestly; the requirement is **restoration, not continuity**,
-  and a free instance does not promise an interruption-free replacement. (FR-016, FR-044, SC-004)
+- [ ] T026 [US3] Rehearse the deliberately failing migration against staging **on `main`**, because
+  the push to `main` is now the real path rather than a way around a gate: nothing refuses to
+  deploy a migration that fails the `Migration validation` check (FR-010). Add a migration that
+  cannot apply, push it, and observe and record exactly what happens: the deploy aborts, and — the
+  point of the exercise — **what the staging address does while the attempt ends**. Record any
+  interruption honestly; the requirement is **restoration, not continuity**, and a free instance
+  does not promise an interruption-free replacement. Then remove the failing migration with a
+  follow-up commit pushed to `main`, and record when staging returned to a good version. (FR-016,
+  FR-044, SC-004)
 
 - [ ] T027 [US3] Inspect the database's applied-migration history after the failed deploy: the
   failed migration must **not** be recorded as applied and no partial change may be left behind.
@@ -357,9 +357,9 @@ applied migration.
 
 - [ ] T028 [US3] Confirm the staging address still serves the **previously deployed** version
   once the attempt ends — not the failed one, and not a half-live combination — and that the
-  new version never took traffic because it did not pass the platform health check. Then restore
-  the service's deploy branch to `main` and delete the rehearsal branch. (depends on T026)
-  (FR-016, FR-018)
+  new version never took traffic because it did not pass the platform health check. Then confirm
+  the follow-up commit from T026 has returned staging to a good version on `main`. (depends on
+  T026) (FR-016, FR-018)
 
 - [ ] T029 [US3] Confirm a re-run of an already-successful deploy changes no data and applies no
   migration twice: deploy the restored commit a second time and compare the database's applied
@@ -512,11 +512,13 @@ address, then perform a rollback.
   actually observed during the T026 rehearsal rather than claiming zero downtime: the requirement
   is restoration, not continuity. (depends on T026) (FR-041, FR-016, SC-004)
 
-- [ ] T042 [US6] Add the branch-protection section: required status checks (listing the ten
-  checks, including the secret scan), the branch required to be up to date before merging, direct
-  pushes disallowed, the reason this — rather than a deploy step — is what gates the deploy, and
-  the verification by an attempted forbidden merge from T023, with its observed refusal recorded.
-  (depends on T023) (FR-010, SC-016)
+- [ ] T042 [US6] Add the section that states plainly that **staging deploys are not gated by CI
+  checks**: no branch protection on `main`, no required status checks, no pull request, direct
+  pushes the only route — and, in the same place, what the mandatory checks do instead (they are the
+  evidence for a phase exit and for the release-blocking conditions, and a red check on `main` is a
+  defect to fix rather than a deploy that was prevented). Record the observation from T023 rather
+  than the claim it replaces. Do **not** instruct the reader to configure branch protection. (FR-010,
+  SC-016)
 
 - [ ] T043 [US6] Add the plan-and-cost table: each component, the plan selected, what that plan
   includes, and its cost — and any upgrade marked **not purchased**, so the table cannot be read
@@ -635,9 +637,9 @@ document's silence is not read as a guarantee.
 
 - **US1 (P1)**: Can start after Foundational — no dependency on another story. It provisions the
   three hosted components every other story observes.
-- **US2 (P1)**: Can start after Foundational — **one dependency on US5**: T022 declares the
-  secret-scan job (T038, US5) a required status check, so the branch protection cannot be
-  completed before that job exists. T020's pipeline assertion is independent.
+- **US2 (P1)**: Can start after Foundational — **no dependency on another story**. T022 removes any
+  branch-protection rule rather than declaring a required-status-check list, so it no longer waits
+  on the secret-scan job (T038, US5). T020's pipeline assertion is independent.
 - **US3 (P1)**: Can start after Foundational — its rehearsal (T026) needs US1's deployed service
   and its `main` deploy path, so it follows T024 in practice, though it tests a different
   property.
@@ -682,7 +684,7 @@ Task: "Write FAILING unit test backend/scripts/__tests__/vercel-config.spec.ts t
 Task: "Write FAILING unit test backend/scripts/__tests__/trust-proxy.spec.ts that asserts TRUST_PROXY defaults to off and rejects an invalid hop count by name"
 
 # Launch the two independent definitions together:
-Task: "Create render.yaml at the repository root with runtime node, plan free, the repository's own build and start commands, healthCheckPath /api/v1/health, autoDeployTrigger checksPass, and no PORT"
+Task: "Create render.yaml at the repository root with runtime node, plan free, the repository's own build and start commands, healthCheckPath /api/v1/health, autoDeployTrigger commit, and no PORT"
 Task: "Create frontend/vercel.json with the API rewrite first, the SPA fallback second, and the shared-then-frontend build command"
 
 # Launch the two provider projects together once the database exists:
@@ -716,7 +718,7 @@ Task: "Update .env.example with every variable, a safe placeholder, the platform
 
 1. Complete Setup + Foundational → the repository on `main` is the one the definitions describe
 2. Add US1 → a live staging address exists
-3. Add US2 → a merge ships it, with the gate verified rather than assumed
+3. Add US2 → a push ships it, with the absence of a gate observed rather than assumed
 4. Add US3 → the deploy path cannot quietly destroy the environment
 5. Add US4 → the database is reachable only through the product
 6. Add US5 → the configuration is legible and secret-free
@@ -735,7 +737,8 @@ split is by *artifact family* rather than by story:
    - Developer C: US4 (the data-surface check) and US3 (the migration rehearsal), which both
      need US1's deployed environment and can proceed as soon as it exists
    - Developer D: US6 (the runbook), which needs the artifacts the others produce
-3. US2 closes last among the P1 stories, because its branch protection names every check
+3. US2 can close as soon as US1's hosts are live: it removes protection rather than completing a
+   required-status-check list, so nothing else stands in front of it
 
 ---
 
@@ -751,22 +754,21 @@ split is by *artifact family* rather than by story:
 - **Manual, provider-side tasks are tasks.** Several steps in US1, US2, US3, and US4 are
   performed in a dashboard and cannot be expressed as a file (creating the three projects,
   entering a secret once, setting the Root Directory, enabling the outside-source-files setting,
-  branch protection). They are listed as tasks because the feature's success criteria are
-  observed there, and US6 is what makes them repeatable.
+  removing any branch-protection rule). They are listed as tasks because the feature's success
+  criteria are observed there, and US6 is what makes them repeatable.
 - **Nothing in this feature deploys from the pipeline.** The one workflow edit (T038) adds a
   verification step only, and `ci-no-deploy.spec.ts` keeps asserting it (T020)
 - **Two deliberate non-changes**: `frontend/vite.config.ts`, and the workflow, which gains only a
   verification step and never a deploy step. A task that would have to modify either to pass is a
   task that has misread the plan
 - Avoid: vague tasks, same-file conflicts between stories, and cross-story dependencies that
-  break independence — the two that exist (T022 → T038, T041 → T026) are declared above rather
-  than discovered
+  break independence — the one that exists (T041 → T026) is declared above rather than discovered
 
 ---
 
 **Generated**: 2026-10-19
 **Feature**: `003-staging-deployment`
-**Branch**: `003-staging-deployment`
+**Branch**: `main` (single-branch workflow — no feature branch is created)
 **Spec**: `specs/003-staging-deployment/spec.md`
 **Plan**: `specs/003-staging-deployment/plan.md`
 **Total Tasks**: 57 tasks across 9 phases (3 setup, 2 foundational, 14 + 5 + 5 + 4 + 6 + 10 user

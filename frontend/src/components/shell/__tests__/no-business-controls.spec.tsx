@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { routes } from '../../../app/router';
 import { renderWithProviders } from '../../../test/render';
 import { AppShell } from '../app-shell';
-import { NAV_ITEMS } from '../nav-items';
+import { NAVIGATION } from '../navigation';
 
 /**
  * T078. A control that implies a business action the platform cannot perform is a
@@ -30,16 +30,20 @@ describe('No control implying an unavailable business action (T078)', () => {
   });
 
   it('offers no navigation entry that is not a route the application serves', () => {
-    for (const item of NAV_ITEMS) {
-      const router = createMemoryRouter(routes, { initialEntries: [item.path] });
-      const matched = router.state.matches.at(-1);
+    for (const group of NAVIGATION) {
+      for (const item of group.entries) {
+        if (item.state === 'available') {
+          const router = createMemoryRouter(routes, { initialEntries: [item.path] });
+          const matched = router.state.matches.at(-1);
 
-      expect(matched, `${item.path} must resolve`).toBeDefined();
-      // '*' is the catch-all that redirects home: reaching it means the entry
-      // advertised a destination the application does not have.
-      expect(matched?.route.path, `${item.path} must not fall through to the catch-all`).toBe(
-        item.path,
-      );
+          expect(matched, `${item.path} must resolve`).toBeDefined();
+          // '*' is the catch-all that redirects home: reaching it means the entry
+          // advertised a destination the application does not have.
+          expect(matched?.route.path, `${item.path} must not fall through to the catch-all`).toBe(
+            item.path,
+          );
+        }
+      }
     }
   });
 
@@ -65,10 +69,12 @@ describe('No control implying an unavailable business action (T078)', () => {
     );
 
     const marketing =
-      /\b(pricing|plans|features|testimonials|customers|blog|demo|contact sales|get started|sign up|sign in|log in|free trial)\b/i;
+      /\b(pricing|plans|features|testimonials|blog|demo|contact sales|get started|sign up|sign in|log in|free trial)\b/i;
 
-    for (const item of NAV_ITEMS) {
-      expect(item.label).not.toMatch(marketing);
+    for (const group of NAVIGATION) {
+      for (const item of group.entries) {
+        expect(item.label).not.toMatch(marketing);
+      }
     }
 
     const nav = screen.getByRole('navigation', { name: 'Main' });
@@ -80,12 +86,17 @@ describe('No control implying an unavailable business action (T078)', () => {
   it('shows only the destinations this feature can actually serve', () => {
     // The design system groups the sidebar by module. Everything outside the two
     // working destinations belongs to a later feature and must not appear yet.
-    expect(NAV_ITEMS.map((item) => item.path)).toEqual(['/', '/health']);
+    const availablePaths = NAVIGATION.flatMap((g) => g.entries)
+      .filter((e) => e.state === 'available')
+      .map((e) => e.path);
+    expect(availablePaths).toEqual(['/', '/health']);
   });
 
   it('records the permission each destination will require, without filtering on one yet', () => {
-    for (const item of NAV_ITEMS) {
-      expect(item).toHaveProperty('permission');
+    for (const group of NAVIGATION) {
+      for (const item of group.entries) {
+        expect(item).toHaveProperty('permission');
+      }
     }
   });
 });

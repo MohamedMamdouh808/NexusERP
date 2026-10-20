@@ -1,6 +1,6 @@
 # Implementation Plan: Staging Deployment
 
-**Branch**: `003-staging-deployment` | **Date**: 2026-10-19 | **Spec**: [spec.md](spec.md)
+**Branch**: `main` (single-branch workflow — no feature branch is created) | **Date**: 2026-10-19 | **Spec**: [spec.md](spec.md)
 **Input**: Feature specification from `/specs/003-staging-deployment/spec.md`
 
 ## Summary
@@ -8,8 +8,8 @@
 Make the verified build from the platform foundation actually run. Three hosted
 components — Vercel for the interface, Render for the service, Supabase for
 PostgreSQL 17 — are configured entirely from version-controlled definitions that carry no
-secret values, so that a merge to `main` updates staging with no manual step and a failing
-migration cannot take the environment down.
+secret values, so that a push to `main` updates staging with no manual step — though it is not
+gated by the checks — and a failing migration cannot take the environment down.
 
 The specification's six user stories deliver four things:
 
@@ -56,7 +56,8 @@ altered, or dropped by this feature.
 
 - **Unit** (Jest `unit` project, no database, no server) — `render-blueprint.spec.ts` and
   `vercel-config.spec.ts` parse the two definitions and assert that the health path equals the
-  route the service actually serves, that `autoDeployTrigger` is `checksPass`, that the API
+  route the service actually serves, that `autoDeployTrigger` is `commit` (so the deploy is not
+  held for the checks, per FR-010), that the API
   rewrite precedes the single-page fallback, and that no secret-looking value is present;
   `trust-proxy.spec.ts` pins the new configuration's parsing and its off-by-default behavior.
 - **Documented runnable check** — `scripts/check-supabase-data-api.sh` proves the data surface

@@ -1,7 +1,10 @@
 name: CI
 
-# Mandatory checks. These jobs are declared as required status checks in the branch
-# protection rule (T074), so a PR cannot merge with any of them failing.
+# Mandatory checks. These jobs run on every push to `main`. They are not declared as required
+# status checks and there is no branch protection rule: the project works on a single branch
+# with direct pushes and no pull requests, so nothing here holds a gate. A failing check is a
+# defect to fix, not a deploy that was prevented. See the constitution's "Branch Workflow and
+# What It Means for Deployment" and README.md -> "Mandatory Checks".
 #
 # No job here pushes an image to a registry, deploys anything, or produces a release.
 # T111 and `.github/workflows/__tests__/ci-no-deploy.spec.ts` assert that structurally

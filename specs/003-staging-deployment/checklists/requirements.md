@@ -47,7 +47,7 @@
   from a documented default, and each resolution is recorded in Assumptions: entry plans because
   paid upgrades are excluded; migrations applied by the platform's start command; a
   forward-only rollback limit; the provider's two connection addresses; and the one-time human
-  setup of accounts, Git integrations, and branch protection.
+  setup of accounts and Git integrations.
 - **Deliberate honesty is load-bearing.** FR-039, FR-045, and the Assumptions entries on
   provider-given backups, idle/paused entry-plan behavior, and the "migration applied but health
   check failed" window exist so the plan and tasks cannot quietly upgrade them into guarantees.

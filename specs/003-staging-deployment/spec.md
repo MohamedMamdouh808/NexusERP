@@ -1,10 +1,10 @@
 # Feature Specification: Staging Deployment
 
-**Feature Branch**: `003-staging-deployment`
+**Feature Branch**: `main` (single-branch workflow — no feature branch is created)
 **Created**: 2026-10-19
 **Status**: Draft
 **MoSCoW Priority**: P0 (P3 is never implemented in v1 — Principle IX)
-**Input**: User description: "Deploy the existing foundation (health endpoint and application shell) to a staging environment on Supabase (PostgreSQL), Render (backend service) and Vercel (frontend), so every later feature ships through the same path." Requirements: HTTPS-reachable staging with the database on PostgreSQL major version 17; a single browser origin where the frontend keeps calling relative `/api` paths and the frontend host forwards `/api/*` to the backend; deploy only from merges to `main` after every required check passes, with the pipeline still never deploying or publishing anything; migrations run on deploy and fail safely so a failing migration leaves the previous version serving; the managed database's Data API disabled with a documented anonymous-request check; every environment variable listed with where it is set and secrets only in platform secret stores; local development runs the frontend and the backend directly on the developer's machine against a local PostgreSQL 17, with no container runtime anywhere; the platform health check on `/api/v1/health` with unhealthy deploys never taking traffic; and a deployment runbook, a plan and cost table, and an honest backup statement. Out of scope: a production environment, a custom domain, paid plan upgrades, backups beyond what the provider gives, a monitoring vendor, and authentication.
+**Input**: User description: "Deploy the existing foundation (health endpoint and application shell) to a staging environment on Supabase (PostgreSQL), Render (backend service) and Vercel (frontend), so every later feature ships through the same path." Requirements: HTTPS-reachable staging with the database on PostgreSQL major version 17; a single browser origin where the frontend keeps calling relative `/api` paths and the frontend host forwards `/api/*` to the backend; deploy only from pushes to `main`, which is not gated by the mandatory checks, with the pipeline still never deploying or publishing anything; migrations run on deploy and fail safely so a failing migration leaves the previous version serving; the managed database's Data API disabled with a documented anonymous-request check; every environment variable listed with where it is set and secrets only in platform secret stores; local development runs the frontend and the backend directly on the developer's machine against a local PostgreSQL 17, with no container runtime anywhere; the platform health check on `/api/v1/health` with unhealthy deploys never taking traffic; and a deployment runbook, a plan and cost table, and an honest backup statement. Out of scope: a production environment, a custom domain, paid plan upgrades, backups beyond what the provider gives, a monitoring vendor, and authentication.
 
 ---
 
@@ -27,10 +27,14 @@
 - Q: Which service plan does staging run on? → A: The backend host's free instance; cold starts are
   accepted.
 - Q: What guarantees that a commit reaching `main` has already passed every mandatory check, given
-  that each host deploys on push rather than on check completion? → A: Branch protection on `main` —
-  the mandatory checks declared as required status checks, the branch required to be up to date
-  before merging, and direct pushes disallowed — so the only commits that reach `main` are merges
-  whose result already passed, and the hosts deploy those on push.
+  that each host deploys on push rather than on check completion? → A: Nothing guarantees it. The
+  project works on a single branch, `main`, with direct pushes and no pull requests, so there is no
+  branch protection rule to declare required status checks and no merge for a check to block. The
+  mandatory checks run on the push, alongside the deploy rather than in front of it, and a commit
+  whose checks are failing, still running, or never run reaches staging. The checks gate the phase
+  exit and the release, not the deploy. The earlier answer to this question — branch protection
+  with required status checks — described a workflow this project does not use and is corrected
+  here. See the constitution's "Branch Workflow and What It Means for Deployment".
 - Q: What must the deliberately failing migration rehearsal on staging demonstrate, given staging
   runs on a free instance? → A: Restoration, not continuity — the failed deploy is discarded, the
   previous version remains the deployed version and answers the staging address once the attempt
@@ -75,30 +79,31 @@ can see the product on a public HTTPS address.
 
 ---
 
-### User Story 2 - A Merge Ships It (Priority: P1)
+### User Story 2 - A Push Ships It (Priority: P1)
 
-Mohamed merges a change into `main`. Once the mandatory checks pass on that merge, staging updates
-by itself. He never opens the hosting dashboards, never runs a deploy command, and never copies a
-build artifact by hand. The same path carries the next feature, and the one after it.
+Mohamed pushes a change to `main`. Staging updates by itself, whether or not the mandatory checks
+have passed by then. He never opens the hosting dashboards, never runs a deploy command, and never
+copies a build artifact by hand. The same path carries the next feature, and the one after it.
 
 **Why this priority**: A deploy that needs a human is a deploy that is skipped when a human is
-busy, and it lets an unverified change reach the environment. Automating the path is what makes it
-trustworthy.
+busy. The checks still run and still matter — they are the evidence for the phase exit and the
+release — but they cannot hold a gate the single-branch workflow does not provide.
 
-**Independent Test**: Merge a trivial change into `main` with all mandatory checks green and, with
-no manual step, confirm the deployed version on staging is the merge commit. Deliverable value: a
-repeatable release path.
+**Independent Test**: Push a trivial change to `main` and, with no manual step, confirm the deployed
+version on staging is that commit. Deliverable value: a repeatable release path.
 
 **Acceptance Scenarios**:
 
-1. **Given** every mandatory check is green on `main`, **When** the checks finish, **Then** the
-   frontend and backend hosts each deploy the merged commit without any manual action.
-2. **Given** a change whose mandatory checks are failing or incomplete, **When** it is merged
-   (or attempted), **Then** no staging component deploys it.
+1. **Given** a change is pushed to `main`, **When** the push lands, **Then** the
+   frontend and backend hosts each deploy the pushed commit without any manual action, and without
+   waiting for the checks to finish.
+2. **Given** a change whose mandatory checks are failing or incomplete, **When** it is pushed to
+   `main`, **Then** it is still deployed to staging — the red check is a defect to fix, not a
+   deploy that was prevented.
 3. **Given** the repository's automation, **When** any workflow runs, **Then** it neither deploys
    nor publishes anything; the hosting platforms are the only deployers.
-4. **Given** a pull request, **When** it is opened or updated, **Then** a frontend preview may be
-   produced and it never reads, writes, or migrates the staging database.
+4. **Given** a pull request, if one is ever opened, **When** it is opened or updated, **Then** a
+   frontend preview may be produced and it never reads, writes, or migrates the staging database.
 
 ---
 
@@ -283,24 +288,23 @@ address, then perform a rollback. Deliverable value: reproducibility and honest 
 **Deploy path**
 
 - **FR-009**: Each host MUST deploy from the repository through its own Git integration when `main`
-  changes, so a merge to `main` is the only trigger.
-- **FR-010**: A deploy MUST run only after every mandatory check has completed successfully for the
-  exact commit being deployed, and MUST NOT run for a commit whose checks are failing or incomplete.
-  This MUST be enforced by the repository's branch protection on `main`: every mandatory check
-  declared as a required status check, the branch required to be up to date before merging, and
-  direct pushes disallowed — so the only commits that can reach `main`, and therefore the only
-  commits the hosts can deploy on push, are merges that already passed. The pipeline MUST NOT be
-  made to deploy in order to achieve this, and branch protection is a required part of the feature
-  rather than optional configuration.
+  changes, so a push to `main` is the only trigger.
+- **FR-010**: A deploy is triggered by the push to `main` and MUST NOT be gated by the mandatory
+  checks. There MUST be no branch protection on `main` and no set of required status checks, because
+  the project works on a single branch with direct pushes and no pull requests; a commit whose
+  checks are failing, still running, or never run is deployed to staging. This is a recorded cost of
+  the workflow, stated rather than qualified: the mandatory checks are the evidence for the phase
+  exit and for the release-blocking conditions, and they do not hold a gate over deployment. The
+  runbook and the README MUST state this plainly and MUST NOT claim that a deploy is gated by CI.
+  The pipeline MUST NOT be made to deploy in order to achieve anything.
 - **FR-011**: The repository's pipeline MUST still never deploy, publish, restart, or release
   anything in a hosted environment, preserving the foundation's rule that verification is the
   pipeline's terminal action; no workflow step may push or publish a build artefact.
-- **FR-012**: Frontend preview deployments for pull requests MAY be produced, and a preview MUST NOT
-  read, write, or migrate the staging database.
+- **FR-012**: Frontend preview deployments MAY be produced if a pull request is ever opened, and a
+  preview MUST NOT read, write, or migrate the staging database.
 - **FR-013**: The staging deploy definition MUST live in the repository as version-controlled
   configuration.
-- **FR-014**: Once the mandatory checks pass on a merge to `main`, updating staging MUST require no
-  manual step.
+- **FR-014**: Once a change is on `main`, updating staging MUST require no manual step.
 
 **Migrations on deploy**
 
@@ -482,8 +486,9 @@ address, then perform a rollback. Deliverable value: reproducibility and honest 
 
 ### Measurable Outcomes
 
-- **SC-001**: A merge to `main` whose mandatory checks are green updates staging with zero manual
-  actions, verified by comparing the version serving on staging with the merged commit.
+- **SC-001**: A push to `main` updates staging with zero manual actions, verified by comparing the
+  version serving on staging with the pushed commit — and the update begins without waiting for the
+  mandatory checks, since they do not gate the deploy.
 - **SC-002**: Loading the staging address over HTTPS renders the application shell and reports the
   database as reachable, with zero blocked or cross-origin requests caused by the interface's API
   calls.
@@ -514,8 +519,9 @@ address, then perform a rollback. Deliverable value: reproducibility and honest 
 - **SC-015**: The documentation states the plan and cost of each component, marks any upgrade as not
   purchased, and claims no backup, availability, or recovery protection beyond what the providers
   give, verified by review.
-- **SC-016**: A pull request carrying a deliberately failing mandatory check cannot be merged into
-  `main`, demonstrated once during staging setup and recorded in the runbook.
+- **SC-016**: The runbook and the README state plainly that staging deploys are not gated by CI
+  checks, and no repository document claims that a deploy is gated by a required status check;
+  verified by review.
 
 ---
 
@@ -570,12 +576,11 @@ address, then perform a rollback. Deliverable value: reproducibility and honest 
 - The environment's seed data is development-and-test reference data. Staging is not production, but
   the runbook states which seed content, if any, is loaded into staging and must not be confused
   with real records.
-- The provider accounts, the repository's Git integrations, and the branch protection that enforces
-  FR-010 — required status checks, an up-to-date branch before merging, and no direct pushes — are
-  set up once by a human with account access, because none of them can be expressed in the
-  repository. That one-time setup is what the runbook documents, and the runbook MUST include
-  verifying it: a pull request carrying a deliberately failing mandatory check must be unable to
-  merge. After that setup the path is automatic (FR-014).
+- The provider accounts and the repository's Git integrations are set up once by a human with
+  account access, because none of them can be expressed in the repository. That one-time setup is
+  what the runbook documents. No branch protection is configured and none is required: the project
+  works on a single branch with direct pushes, so the mandatory checks do not gate a deploy
+  (FR-010). After that setup the path is automatic (FR-014).
 - Adding a secret scan to the mandatory checks is a verification action and does not make the
   pipeline a deployer, so the foundation's rule that the pipeline never deploys (FR-050a) remains
   true.
@@ -589,7 +594,7 @@ address, then perform a rollback. Deliverable value: reproducibility and honest 
 
 This feature is the terminal step the platform foundation deferred to it: the foundation produced a
 verified build and stopped at verification, and this feature makes that build run. Its
-value is the path rather than the address — once a merge to `main` updates staging by itself, every
+value is the path rather than the address — once a push to `main` updates staging by itself, every
 later feature reaches a reviewer without a deployment ceremony, and the fail-safe migration behavior
 means the path cannot quietly destroy the environment it serves.
 

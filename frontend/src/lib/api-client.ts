@@ -35,6 +35,20 @@ export type ApiResult<T> =
   | { readonly ok: false; readonly failure: ApiFailure };
 
 /**
+ * True when a failure is a rate limit rather than a generic problem (T014).
+ *
+ * The rule was stated inline in the health panel and needed a second time by the
+ * sample service's simulated 429, so it lives here - beside the client that reads
+ * `Retry-After` - rather than being restated per caller (research.md R-007). The
+ * status is checked as well as the code because a proxy or a gateway can answer
+ * 429 without a body this application can read, in which case the code falls back
+ * to the transport's.
+ */
+export function isRateLimited(failure: Pick<ApiFailure, 'status' | 'code'>): boolean {
+  return failure.status === 429 || failure.code === ERROR_CODES.TOO_MANY_REQUESTS;
+}
+
+/**
  * The HTTP-date form required by `Retry-After` (RFC 7231 IMF-fixdate), checked
  * strictly and deliberately not left to `Date.parse`.
  *

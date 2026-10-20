@@ -27,7 +27,7 @@ repository root; elsewhere it must be registered by path.
 | start command | `npm run db:migrate && npm run start --workspace @nexuserp/api` | FR-015 — migrations run here, before the service listens |
 | plan | `free` | The specification's chosen entry plan; its limits are documented, not engineered around |
 | health path | `/api/v1/health` | FR-023 — and the test also asserts this **equals the route the service actually serves** |
-| deploy trigger | `checksPass` | FR-010 |
+| deploy trigger | `commit` — `checksPass` would hold the deploy for CI and contradict FR-010 | FR-010 |
 | every `envVars` entry | has a `key`, and exactly one of `value`, `sync: false`, `generateValue: true` | FR-028 |
 | secret-bearing entries | `sync: false` or `generateValue: true`, and **no** `value` | FR-027, FR-028 |
 | `SESSION_SECRET`, `CSRF_SECRET` | `generateValue: true` | Platform-generates a 256-bit value; never transmitted to a human |
@@ -63,7 +63,7 @@ services:
     buildCommand: npm ci && npm run build --workspace @nexuserp/shared && npm run build --workspace @nexuserp/api
     startCommand: npm run db:migrate && npm run start --workspace @nexuserp/api
     healthCheckPath: /api/v1/health
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: commit
     envVars:
       - key: NODE_ENV
         value: production

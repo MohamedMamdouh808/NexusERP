@@ -55,7 +55,7 @@ describe('AppShell (T076)', () => {
     );
 
     const nav = screen.getByRole('navigation', { name: 'Main' });
-    expect(within(nav).getByRole('link', { name: 'System health' })).toHaveAttribute(
+    expect(within(nav).getByRole('link', { name: 'System Health' })).toHaveAttribute(
       'aria-current',
       'page',
     );

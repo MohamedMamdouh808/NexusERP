@@ -33,10 +33,11 @@
   --color-destructive: #dc2626;
   --color-on-destructive: #ffffff;
   --color-ring: #1e40af;
+  --color-overlay: rgba(0, 0, 0, 0.5);
 
   /*
    * Form controls only - never cards or dividers. Carries a minimum 3:1 contrast
-   * ratio against --color-card (4.76:1) and --color-background (4.56:1).
+   * ratio against --color-card (4.76:1) and --color-background (4.55:1).
    */
   --color-input-border: #64748b;
 
@@ -73,7 +74,15 @@
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
   --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
 
-  /* Shell geometry (MASTER.md "Page Pattern" .app-shell) */
+  /* Radii (MASTER.md "Radii") - --radius-* is a Tailwind 4 theme namespace, so
+     `rounded-*` utilities resolve to these without renaming. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* Shell geometry (MASTER.md "Shell Geometry") */
   --shell-sidebar-width: 256px;
+  --shell-sidebar-compact-width: 72px;
   --shell-topbar-height: 64px;
 }
