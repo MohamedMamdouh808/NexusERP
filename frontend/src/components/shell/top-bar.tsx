@@ -72,9 +72,27 @@ export function TopBar() {
     },
   ];
 
+  const previewUserInitials =
+    previewUser.data?.name
+      .trim()
+      .split(/\s+/)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() ?? '';
+
   return (
     <header className="app-shell__topbar">
-      <span className="top-bar__brand">NexusERP</span>
+      <span className="top-bar__brand">
+        <svg className="top-bar__logomark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <rect x="1" y="1" width="30" height="30" rx="8" fill="var(--color-primary)" />
+          <rect x="7" y="7" width="8" height="8" rx="2" fill="var(--color-on-primary)" />
+          <rect x="17" y="7" width="8" height="8" rx="2" fill="var(--color-secondary)" />
+          <rect x="7" y="17" width="8" height="8" rx="2" fill="var(--color-secondary)" />
+          <rect x="17" y="17" width="8" height="8" rx="2" fill="var(--color-on-primary)" />
+        </svg>
+        <span>NexusERP</span>
+      </span>
 
       <div className="top-bar__account">
         <span className="sample-marker">Sample data</span>
@@ -87,11 +105,11 @@ export function TopBar() {
           <>
             <DropdownMenu
               label="Sample organization"
-              className="top-bar__menu"
+              className="top-bar__organization-menu"
               trigger={
                 <>
-                  <span className="top-bar__trigger-label">Sample organization:</span>
-                  <span>{activeOrganization.name}</span>
+                  <span className="sr-only">Sample organization: </span>
+                  <span className="top-bar__organization-name">{activeOrganization.name}</span>
                   <Icon name="chevronDown" />
                 </>
               }
@@ -100,11 +118,17 @@ export function TopBar() {
 
             <DropdownMenu
               label="Preview user"
-              className="top-bar__menu"
+              className="top-bar__user-menu"
               trigger={
                 <>
-                  <span className="top-bar__trigger-label">Preview user:</span>
-                  <span>{previewUser.data.role}</span>
+                  <span className="sr-only">Preview user: </span>
+                  <span className="top-bar__avatar" aria-hidden="true">
+                    {previewUserInitials}
+                  </span>
+                  <span className="top-bar__user-copy">
+                    <span className="top-bar__user-name">{previewUser.data.name}</span>
+                    <span className="top-bar__user-status">{previewUser.data.role}</span>
+                  </span>
                   <Icon name="chevronDown" />
                 </>
               }

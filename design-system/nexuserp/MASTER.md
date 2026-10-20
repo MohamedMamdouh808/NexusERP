@@ -72,6 +72,29 @@ matching `-on-*-tint` text color. Every pairing below is verified at or above th
 Do not use `--color-destructive` as badge text on a tint; it falls to 3.95:1. Badge text on
 `--color-destructive-tint` uses `--color-on-destructive-tint`.
 
+### Dashboard Chart Tokens
+
+Charts use this palette for product bars, sales, and order series. Status charts use
+the matching status token through the chart status aliases below. Every chart also
+has a visible legend and a text summary, so colour never carries a value by itself.
+
+| Token | Value | Use |
+|---|---|---|
+| `--color-chart-1` | `--color-primary` | Top product bars and sales series |
+| `--color-chart-2` | `--color-info` | Orders series |
+| `--color-chart-3` | `--color-success` | Supporting product series |
+| `--color-chart-4` | `--color-warning` | Supporting product series |
+| `--color-chart-5` | `--color-muted-foreground` | Supporting product series |
+| `--color-chart-status-draft` | `--color-muted-foreground` | Draft orders |
+| `--color-chart-status-confirmed` | `--color-info` | Confirmed orders |
+| `--color-chart-status-shipped` | `--color-success` | Shipped orders |
+| `--color-chart-status-cancelled` | `--color-destructive` | Cancelled orders |
+
+The dashboard chart frame is `--chart-height` high and its activity filter uses
+`--activity-filter-width`. At desktop widths, KPI cards form
+four columns and the three chart cards share a row. Tablet uses two columns; narrow
+screens use one column without page-level horizontal scrolling.
+
 ### Status Badge Mapping
 
 One mapping, used by every list, detail page, report, badge, and PDF/print view. Status

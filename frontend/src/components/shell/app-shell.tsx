@@ -18,7 +18,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <a className="sr-only" href="#main-content">
-        Skip to content
+        Skip to main content
       </a>
       <TopBar />
       <Sidebar />

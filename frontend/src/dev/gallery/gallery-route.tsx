@@ -9,6 +9,7 @@ const GALLERY_SAMPLE_RECORD_ID = 'sample-0001';
 export function GalleryRoute() {
   const [simulateFailure, setSimulateFailure] = useState(false);
   const [simulateSlow, setSimulateSlow] = useState(false);
+  const [simulateEmptyData, setSimulateEmptyData] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -22,6 +23,12 @@ export function GalleryRoute() {
     const next = !simulateSlow;
     setSimulateSlow(next);
     sampleCatalogService.simulateSlowResponse = next;
+  }
+
+  function toggleEmptyData() {
+    const next = !simulateEmptyData;
+    setSimulateEmptyData(next);
+    sampleCatalogService.simulateEmptyData = next;
   }
 
   return (
@@ -41,26 +48,21 @@ export function GalleryRoute() {
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700 }}>
-            Component Gallery
-          </h1>
+          <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 700 }}>Component Gallery</h1>
           <p style={{ margin: 'var(--spacing-xs) 0 0', color: 'var(--color-muted-foreground)' }}>
             Exhaustive review of all design system primitives across declared states.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
           <span className="sample-marker">Sample data</span>
-          <Button
-            variant={simulateFailure ? 'danger' : 'secondary'}
-            onClick={toggleFailure}
-          >
+          <Button variant={simulateFailure ? 'danger' : 'secondary'} onClick={toggleFailure}>
             {simulateFailure ? 'Disable Failures' : 'Simulate failure'}
           </Button>
-          <Button
-            variant={simulateSlow ? 'danger' : 'secondary'}
-            onClick={toggleSlow}
-          >
+          <Button variant={simulateSlow ? 'danger' : 'secondary'} onClick={toggleSlow}>
             {simulateSlow ? 'Disable Delay' : 'Simulate slow response'}
+          </Button>
+          <Button variant={simulateEmptyData ? 'danger' : 'secondary'} onClick={toggleEmptyData}>
+            {simulateEmptyData ? 'Show sample data' : 'Simulate empty data'}
           </Button>
         </div>
       </div>
@@ -149,11 +151,21 @@ export function GalleryRoute() {
                       gap: 'var(--spacing-sm)',
                     }}
                   >
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-muted-foreground)' }}>
+                    <div
+                      style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: 'var(--color-muted-foreground)',
+                      }}
+                    >
                       State: <code>{state}</code>
                     </div>
                     <div style={{ padding: 'var(--spacing-xs) 0' }}>
-                      {renderer ? renderer() : <span style={{ color: 'var(--color-destructive)' }}>Missing fixture</span>}
+                      {renderer ? (
+                        renderer()
+                      ) : (
+                        <span style={{ color: 'var(--color-destructive)' }}>Missing fixture</span>
+                      )}
                     </div>
                   </div>
                 );

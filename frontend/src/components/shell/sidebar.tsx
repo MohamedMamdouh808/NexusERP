@@ -49,7 +49,7 @@ export function Sidebar() {
                       className="sidebar-nav__link"
                       data-state="Soon"
                       aria-disabled="true"
-                      title={`${entry.label} — ${entry.reason}`}
+                      title={entry.reason}
                     >
                       <Icon name={entry.icon} />
                       <span className="sidebar-nav__label">{entry.label}</span>

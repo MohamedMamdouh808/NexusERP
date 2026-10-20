@@ -41,7 +41,7 @@ describe('AppShell (T076)', () => {
 
     await user.tab();
 
-    const skip = screen.getByRole('link', { name: /skip to content/i });
+    const skip = screen.getByRole('link', { name: /skip to main content/i });
     expect(skip).toHaveFocus();
     expect(skip).toHaveAttribute('href', '#main-content');
   });

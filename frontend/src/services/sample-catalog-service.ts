@@ -30,9 +30,11 @@ import { DEFAULT_ERROR_MESSAGES, ERROR_CODES, ERROR_CODE_STATUS } from '@nexuser
 
 import type { ApiFailure } from '../lib/api-client';
 import { compareDecimal } from '../lib/format';
-import { SAMPLE_RECORDS } from '../mocks/sample-data';
+import { SAMPLE_DASHBOARD_SUMMARIES, SAMPLE_RECORDS } from '../mocks/sample-data';
 import type {
   CatalogService,
+  DashboardPeriod,
+  DashboardSummary,
   ListQuery,
   Page,
   RemoveRecordInput,
@@ -40,8 +42,8 @@ import type {
   SampleRecord,
 } from './catalog-service';
 
-/** The three operations this service performs. Recorded in the call log. */
-export type CatalogOperation = 'listRecords' | 'getRecord' | 'removeRecord';
+/** Service operations recorded in the call log. */
+export type CatalogOperation = 'getDashboardSummary' | 'listRecords' | 'getRecord' | 'removeRecord';
 
 /** One recorded call. Read by the every-enabled-control guard (FR-071). */
 export interface CallRecord {
@@ -101,6 +103,8 @@ export interface SampleCatalogService extends CatalogService {
   failureKind: FailureKind;
   /** When on, the next call is delayed so the loading state is visible (FR-069). */
   simulateSlowResponse: boolean;
+  /** When on, dashboard reads return an empty first-use result. */
+  simulateEmptyData: boolean;
   /** Every call made, oldest first. Read by the guard (FR-071). */
   readonly calls: readonly CallRecord[];
   /** Restores the initial rows and switches. Used by tests; nothing is persisted. */
@@ -118,6 +122,7 @@ const controls = {
   simulateFailure: false,
   failureKind: 'error' as FailureKind,
   simulateSlowResponse: false,
+  simulateEmptyData: false,
 };
 
 function nextRequestId(): string {
@@ -195,6 +200,38 @@ async function beforeCall(operation: CatalogOperation, detail: string): Promise<
   }
 }
 
+async function getDashboardSummary(period: DashboardPeriod): Promise<DashboardSummary> {
+  await beforeCall('getDashboardSummary', period);
+
+  const summary = copyDashboardSummary(SAMPLE_DASHBOARD_SUMMARIES[period]);
+  if (!controls.simulateEmptyData) {
+    return summary;
+  }
+
+  return {
+    ...summary,
+    topSellingProducts: [],
+    salesOrdersTrend: [],
+    ordersByStatus: [],
+    recentActivity: [],
+    empty: true,
+  };
+}
+
+function copyDashboardSummary(summary: DashboardSummary): DashboardSummary {
+  return {
+    ...summary,
+    sales: { ...summary.sales },
+    activeOrders: { ...summary.activeOrders },
+    lowStockItems: { ...summary.lowStockItems },
+    outstandingInvoices: { ...summary.outstandingInvoices },
+    topSellingProducts: summary.topSellingProducts.map((item) => ({ ...item })),
+    salesOrdersTrend: summary.salesOrdersTrend.map((item) => ({ ...item })),
+    ordersByStatus: summary.ordersByStatus.map((item) => ({ ...item })),
+    recentActivity: summary.recentActivity.map((item) => ({ ...item })),
+  };
+}
+
 /** Sorts a copy of the rows. Money is compared as a decimal string (Principle IV). */
 function sorted(records: readonly SampleRecord[], query: ListQuery): SampleRecord[] {
   const sort = query.sort;
@@ -256,6 +293,7 @@ function reset(): void {
   controls.simulateFailure = false;
   controls.failureKind = 'error';
   controls.simulateSlowResponse = false;
+  controls.simulateEmptyData = false;
 }
 
 /**
@@ -263,6 +301,7 @@ function reset(): void {
  * the gallery can flip them without a setter per switch.
  */
 export const sampleCatalogService: SampleCatalogService = {
+  getDashboardSummary,
   listRecords,
   getRecord,
   removeRecord,
@@ -286,6 +325,12 @@ export const sampleCatalogService: SampleCatalogService = {
   },
   set simulateSlowResponse(value: boolean) {
     controls.simulateSlowResponse = value;
+  },
+  get simulateEmptyData(): boolean {
+    return controls.simulateEmptyData;
+  },
+  set simulateEmptyData(value: boolean) {
+    controls.simulateEmptyData = value;
   },
   reset,
 };

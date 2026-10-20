@@ -55,6 +55,17 @@
   --color-on-destructive-tint: #b91c1c;
   --color-neutral-tint: var(--color-muted);
 
+  /* Dashboard chart palette (MASTER.md "Dashboard Chart Tokens") */
+  --color-chart-1: var(--color-primary);
+  --color-chart-2: var(--color-info);
+  --color-chart-3: var(--color-success);
+  --color-chart-4: var(--color-warning);
+  --color-chart-5: var(--color-muted-foreground);
+  --color-chart-status-draft: var(--color-muted-foreground);
+  --color-chart-status-confirmed: var(--color-info);
+  --color-chart-status-shipped: var(--color-success);
+  --color-chart-status-cancelled: var(--color-destructive);
+
   /* Typography (MASTER.md "Typography") */
   --font-ui: "Fira Sans", system-ui, sans-serif;
   --font-mono: "Fira Code", ui-monospace, monospace;
@@ -89,6 +100,8 @@
   --sidebar-group-gap: var(--spacing-sm);
   --sidebar-list-gap: 2px;
   --sidebar-scrollbar-width: 5px;
+  --chart-height: 240px;
+  --activity-filter-width: 192px;
 
   /* Motion (reduced-motion users have all motion disabled in app.css). */
   --motion-duration-fast: 150ms;

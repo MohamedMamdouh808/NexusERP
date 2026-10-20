@@ -30,6 +30,12 @@ describe('Every enabled control guard for gallery (T058, FR-071, SC-019)', () =>
     expect(visibleState(container)).not.toBe(before);
     await user.click(screen.getByRole('button', { name: 'Disable Delay' }));
 
+    const empty = screen.getByRole('button', { name: 'Simulate empty data' });
+    before = visibleState(container);
+    await user.click(empty);
+    expect(visibleState(container)).not.toBe(before);
+    await user.click(screen.getByRole('button', { name: 'Show sample data' }));
+
     const openDialog = screen.getByRole('button', { name: 'Trigger Row Removal Dialog' });
     before = visibleState(container);
     await user.click(openDialog);
@@ -38,7 +44,9 @@ describe('Every enabled control guard for gallery (T058, FR-071, SC-019)', () =>
 
     const dialog = screen.getByRole('alertdialog', { name: 'Delete Sample Record' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByRole('alertdialog', { name: 'Delete Sample Record' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('alertdialog', { name: 'Delete Sample Record' }),
+    ).not.toBeInTheDocument();
 
     await user.click(openDialog);
     before = visibleState(container);

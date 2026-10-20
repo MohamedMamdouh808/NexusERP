@@ -62,12 +62,59 @@ export interface RemoveRecordResult {
   readonly removedLabel: string;
 }
 
+export type DashboardPeriod = 'this-month' | 'last-month';
+
+export interface DashboardMetric<T> {
+  readonly value: T;
+  readonly changeDirection: 'up' | 'down';
+  /** Precomputed in sample data; never derived from a money amount in the UI. */
+  readonly changePercent: number;
+  readonly measure: string;
+}
+
+export interface DashboardActivity {
+  readonly [key: string]: unknown;
+  readonly id: string;
+  readonly time: string;
+  readonly activity: string;
+  readonly category: 'Sales' | 'Orders' | 'Inventory' | 'Invoices';
+  readonly user: string;
+  /** Verbatim API status name. */
+  readonly status: string;
+}
+
+export interface DashboardSummary {
+  readonly period: DashboardPeriod;
+  readonly sales: DashboardMetric<DecimalString>;
+  readonly activeOrders: DashboardMetric<number>;
+  readonly lowStockItems: DashboardMetric<number>;
+  readonly outstandingInvoices: DashboardMetric<DecimalString>;
+  readonly topSellingProducts: readonly { readonly product: string; readonly unitsSold: number }[];
+  readonly salesOrdersTrend: readonly {
+    readonly date: string;
+    readonly sales: DecimalString;
+    readonly orders: number;
+  }[];
+  readonly ordersByStatus: readonly {
+    readonly status: 'DRAFT' | 'CONFIRMED' | 'SHIPPED' | 'CANCELLED';
+    readonly count: number;
+  }[];
+  readonly recentActivity: readonly DashboardActivity[];
+  readonly empty: boolean;
+}
+
+export interface DashboardQuerySwitches {
+  /** Returns an honest first-use result with no dashboard records. */
+  readonly empty: boolean;
+}
+
 /**
  * The interface the sample implementation satisfies today and the REST client
- * satisfies later. It is intentionally small: three operations the gallery can
- * exercise end to end beat a wide surface nothing calls.
+ * satisfies later. It stays focused on the dashboard summary and the list,
+ * detail, and mutation operations the shell and gallery exercise.
  */
 export interface CatalogService {
+  getDashboardSummary(period: DashboardPeriod): Promise<DashboardSummary>;
   listRecords(query: ListQuery): Promise<Page<SampleRecord>>;
   getRecord(id: string): Promise<SampleRecord>;
   /** Removes the sample row in memory; resolves with the removed record's label

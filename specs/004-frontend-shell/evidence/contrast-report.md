@@ -1,3 +1,5 @@
+> The palette changed in the tuning pass; `frontend/src/styles/tokens.css` contains the current values.
+
 # Contrast evidence
 
 Required by FR-004 and FR-052 and asserted by SC-003: every text, border and focus pair this

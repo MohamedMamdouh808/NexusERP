@@ -6,11 +6,11 @@ import { AppShell } from '../components/shell/app-shell';
 import { Breadcrumb } from '../components/shell/breadcrumb';
 import { PageHeader } from '../components/shell/page-header';
 import { HealthPanel } from '../features/health/health-panel';
+import { OverviewPage } from '../features/overview/overview-page';
 
-const DevGallery =
-  import.meta.env.DEV
-    ? lazy(() => import('../dev/gallery/gallery-route').then((m) => ({ default: m.GalleryRoute })))
-    : null;
+const DevGallery = import.meta.env.DEV
+  ? lazy(() => import('../dev/gallery/gallery-route').then((m) => ({ default: m.GalleryRoute })))
+  : null;
 
 /**
  * The route table, exported so a test can assert that every navigation
@@ -22,8 +22,7 @@ export const routes: RouteObject[] = [
     element: (
       <AppShell>
         <Breadcrumb />
-        <PageHeader title="Overview" />
-        <Overview />
+        <OverviewPage />
       </AppShell>
     ),
   },
@@ -58,12 +57,3 @@ export const routes: RouteObject[] = [
  * authentication and a stub sign-in screen would imply one (research.md R-015).
  */
 export const router = createBrowserRouter(routes);
-
-function Overview() {
-  return (
-    <p>
-      The platform foundation is running. Business modules - sales, purchasing, inventory and
-      invoicing - are added by later features.
-    </p>
-  );
-}
