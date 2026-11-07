@@ -1,1 +1,3 @@
-{"feature_directory": "specs/004-frontend-shell"}
+{
+  "feature_directory": "specs/005-auth-sessions-org"
+}

@@ -18,8 +18,9 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force",
+    "db:reset": "tsx scripts/db-reset-guard.ts && npx prisma migrate reset --force",
     "check:migrations": "tsx scripts/check-migration-history.ts",
+    "check:rls": "tsx scripts/check-rls.ts",
     "check:schema-numeric-types": "tsx scripts/check-schema-numeric-types.ts"
   },
   "prisma": {

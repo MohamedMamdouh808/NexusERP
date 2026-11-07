@@ -121,18 +121,20 @@ async function upsertRoleTemplate(
 export async function seed(target: PrismaClient = prisma): Promise<SeedSummary> {
   assertCatalogIsWellFormed();
 
-  // One transaction: a partial seed is impossible (Constitution Principle III).
-  await target.$transaction(async () => {
-    const permissionIdByCode = new Map<string, string>();
+  // Sequential upserts, each auto-committed individually. A single long-lived
+  // transaction is not safe against Supabase's session pooler, which kills idle
+  // transactions after a few seconds; the seed makes ~98 round trips and would be
+  // terminated mid-transaction. The seed is idempotent by construction (upserts keyed
+  // on natural unique keys), so re-running completes any partial load safely.
+  const permissionIdByCode = new Map<string, string>();
 
-    for (const permission of PERMISSION_CATALOG) {
-      permissionIdByCode.set(permission.code, await upsertPermission(target, permission));
-    }
+  for (const permission of PERMISSION_CATALOG) {
+    permissionIdByCode.set(permission.code, await upsertPermission(target, permission));
+  }
 
-    for (const role of ROLE_TEMPLATES) {
-      await upsertRoleTemplate(target, role, permissionIdByCode);
-    }
-  });
+  for (const role of ROLE_TEMPLATES) {
+    await upsertRoleTemplate(target, role, permissionIdByCode);
+  }
 
   const [permissionCount, roleCount, grantCount] = await Promise.all([
     target.permission.count(),

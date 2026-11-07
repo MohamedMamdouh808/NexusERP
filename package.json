@@ -31,11 +31,12 @@
     "db:migrate": "npm run db:migrate --workspace @nexuserp/database",
     "db:migrate:dev": "npm run db:migrate:dev --workspace @nexuserp/database",
     "db:seed": "npm run db:seed --workspace @nexuserp/database",
-    "db:reset": "npm run db:reset --workspace @nexuserp/database",
+    "db:reset": "node scripts/with-root-env.mjs npm run db:reset --workspace @nexuserp/database",
     "openapi:generate": "npm run openapi:generate --workspace @nexuserp/api",
     "openapi:diff": "npm run openapi:diff --workspace @nexuserp/api",
     "check:schema-numeric-types": "npm run check:schema-numeric-types --workspace @nexuserp/database",
     "check:migrations": "npm run check:migrations --workspace @nexuserp/database",
+    "check:rls": "npm run check:rls --workspace @nexuserp/database",
     "check:boundaries": "tsx scripts/check-boundaries.ts",
     "check:structure": "tsx scripts/check-structure.ts",
     "check:secrets": "node scripts/check-secrets.mjs"
