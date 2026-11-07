@@ -97,14 +97,14 @@ describe('The navigation list and the master file agree (T018)', () => {
   it('uses only the two state words the design system defines', () => {
     const states = [...new Set(masterNavigationTable().map((row) => row.state))].sort();
 
-    expect(states).toEqual(['Soon', 'available']);
+    expect(states).toEqual(['available']);
   });
 
-  it('keeps two entries available and every group populated', () => {
+  it('keeps twelve entries available and every group populated', () => {
     const rows = masterNavigationTable();
     const available = rows.filter((row) => row.state === 'available').map((row) => row.label);
 
-    expect(available).toEqual(['Overview', 'System Health']);
+    expect(available).toEqual(['Overview', 'Sales Orders', 'Inventory', 'Reports', 'Products', 'Customers & Suppliers', 'Purchasing', 'Invoicing', 'Users & Roles', 'Organization', 'Audit Log', 'System Health']);
     for (const group of NAVIGATION) {
       expect(group.entries.length, `${group.name} must hold at least one entry`).toBeGreaterThan(0);
     }

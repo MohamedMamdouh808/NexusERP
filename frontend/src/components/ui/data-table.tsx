@@ -24,7 +24,7 @@ export interface DataTableProps<T> {
   readonly className?: string;
 }
 
-export function DataTable<T extends Record<string, unknown> = Record<string, unknown>>({
+export function DataTable<T extends object = Record<string, unknown>>({
   columns,
   data,
   loading = false,
@@ -104,9 +104,9 @@ export function DataTable<T extends Record<string, unknown> = Record<string, unk
             </tr>
           ) : (
             data.map((row, index) => (
-              <tr key={(row.id as string) ?? index}>
+              <tr key={(row as { id?: string }).id ?? index}>
                 {columns.map((col) => {
-                  const val = row[col.key];
+                  const val = (row as Record<string, unknown>)[col.key];
                   return (
                     <td key={col.key} className={col.numeric ? 'numeric-cell' : undefined}>
                       {col.render ? col.render(row) : (val as ReactNode)}

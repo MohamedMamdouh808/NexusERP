@@ -12,6 +12,12 @@ export interface ConfirmDialogProps {
   readonly actionLabel?: string;
   readonly destructive?: boolean;
   readonly loading?: boolean;
+  /**
+   * An error shown inside the dialog as a banner. The dialog stays open, so a
+   * refused action is visible with its retry button still offered - used by the
+   * all-or-nothing confirmations that can be refused with reasons.
+   */
+  readonly error?: string;
 }
 
 export function ConfirmDialog({
@@ -23,6 +29,7 @@ export function ConfirmDialog({
   actionLabel = 'Confirm',
   destructive = false,
   loading = false,
+  error,
 }: ConfirmDialogProps) {
   const titleId = useId();
   const descId = useId();
@@ -71,6 +78,11 @@ export function ConfirmDialog({
         <p id={descId} style={{ color: 'var(--color-muted-foreground)', margin: 0 }}>
           {description}
         </p>
+        {error !== undefined && error !== '' && (
+          <p className="confirm-dialog__error" role="alert">
+            {error}
+          </p>
+        )}
         <div className="dialog__actions">
           <Button disabled={loading} onClick={onClose}>
             Cancel

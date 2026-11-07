@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import type { InputHTMLAttributes } from 'react';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -7,7 +8,16 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   readonly error?: string;
 }
 
-export function Input({ id, label, helpText, error, required, className, ...props }: InputProps) {
+/**
+ * Accepts a ref: form libraries such as react-hook-form register inputs by
+ * attaching their ref through this component, so it must reach the native
+ * input element (a plain function component drops it, which leaves the form
+ * library unable to read, write or validate the field).
+ */
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+  { id, label, helpText, error, required, className, ...props },
+  ref,
+) {
   const helpId = helpText ? `${id}-help` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [helpId, errorId].filter(Boolean).join(' ') || undefined;
@@ -25,6 +35,7 @@ export function Input({ id, label, helpText, error, required, className, ...prop
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy}
         {...props}
+        ref={ref}
       />
       {helpText && (
         <span id={helpId} className="form-help-text">
@@ -38,4 +49,4 @@ export function Input({ id, label, helpText, error, required, className, ...prop
       )}
     </div>
   );
-}
+});

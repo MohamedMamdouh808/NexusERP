@@ -62,7 +62,7 @@ describe('AppShell (T076)', () => {
     expect(within(nav).getByRole('link', { name: 'Overview' })).not.toHaveAttribute('aria-current');
   });
 
-  it('keeps the sidebar present rather than replacing it with a hamburger on a narrow viewport', () => {
+  it('provides a mobile navigation trigger while keeping navigation in the shell', () => {
     renderWithProviders(
       <AppShell>
         <p>content</p>
@@ -70,6 +70,39 @@ describe('AppShell (T076)', () => {
     );
 
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /menu/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open navigation menu/i })).toBeInTheDocument();
+  });
+
+  it('locks background scrolling while the mobile drawer is open and closes on overlay activation', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <AppShell>
+        <p>content marker</p>
+      </AppShell>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /open navigation menu/i }));
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(screen.getByRole('button', { name: /close navigation menu/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /close navigation menu/i }));
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it('closes the mobile drawer after navigation and on Escape', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <AppShell>
+        <p>content marker</p>
+      </AppShell>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /open navigation menu/i }));
+    await user.click(screen.getByRole('link', { name: 'System Health' }));
+    expect(screen.getByRole('button', { name: /open navigation menu/i })).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(screen.getByRole('button', { name: /open navigation menu/i }));
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('button', { name: /open navigation menu/i })).toHaveAttribute('aria-expanded', 'false');
   });
 });

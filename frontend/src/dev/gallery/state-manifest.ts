@@ -91,7 +91,7 @@ export const CHECKBOX_STATES = [
 export type CheckboxState = (typeof CHECKBOX_STATES)[number];
 
 /**
- * Badge is keyed by status name, so each of the design system's fourteen names
+ * Badge is keyed by status name, so each of the design system's eighteen names
  * counts as one state rather than as a single open-ended row (FR-059, FR-060).
  * The set is the status mapping as it stands, including its P1-marked
  * `PARTIALLY_SHIPPED`, because FR-022 renders a name from that mapping verbatim.
@@ -111,6 +111,11 @@ export const BADGE_STATUSES = [
   'ACTIVE',
   'CONSUMED',
   'RELEASED',
+  // Payment lifecycle statuses (Invoicing module, FR-022)
+  'RECORDED',
+  'REVERSED',
+  'USER_ACTIVE',
+  'USER_DEACTIVATED',
 ] as const;
 export type BadgeStatus = (typeof BADGE_STATUSES)[number];
 
@@ -425,6 +430,22 @@ const BADGE: Record<BadgeState, StateEntry> = {
   RELEASED: {
     fixture: 'Badge.RELEASED',
     assertion: "the visible text is 'RELEASED' verbatim and data-tone is the tone the status mapping assigns",
+  },
+  RECORDED: {
+    fixture: 'Badge.RECORDED',
+    assertion: "the visible text is 'RECORDED' verbatim and data-tone is the tone the status mapping assigns",
+  },
+  REVERSED: {
+    fixture: 'Badge.REVERSED',
+    assertion: "the visible text is 'REVERSED' verbatim and data-tone is the tone the status mapping assigns",
+  },
+  USER_ACTIVE: {
+    fixture: 'Badge.USER_ACTIVE',
+    assertion: "the visible text is 'USER_ACTIVE' verbatim and data-tone is the tone the status mapping assigns",
+  },
+  USER_DEACTIVATED: {
+    fixture: 'Badge.USER_DEACTIVATED',
+    assertion: "the visible text is 'USER_DEACTIVATED' verbatim and data-tone is the tone the status mapping assigns",
   },
   'conveys-more-than-colour': {
     fixture: 'Badge.conveys-more-than-colour',

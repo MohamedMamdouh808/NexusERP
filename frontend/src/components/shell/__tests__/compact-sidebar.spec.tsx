@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen } from '@testing-library/react';
 import { Sidebar } from '../sidebar';
 import { NAVIGATION } from '../navigation';
+import { renderWithProviders } from '../../../test/render';
 
 describe('Compact sidebar tablet responsiveness (T067, FR-011, FR-044)', () => {
   it('renders all navigation entries preserving accessible names and availability attributes in compact form', () => {
-    render(
-      <MemoryRouter initialEntries={['/']}>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderWithProviders(<Sidebar />);
 
     // Each entry in NAVIGATION must have an accessible name and correct state/aria attributes
     for (const group of NAVIGATION) {
@@ -30,11 +26,7 @@ describe('Compact sidebar tablet responsiveness (T067, FR-011, FR-044)', () => {
   });
 
   it('keeps current destination identifiable via aria-current="page"', () => {
-    render(
-      <MemoryRouter initialEntries={['/']}>
-        <Sidebar />
-      </MemoryRouter>,
-    );
+    renderWithProviders(<Sidebar />);
 
     const activeLink = screen.getByRole('link', { current: 'page' });
     expect(activeLink).toHaveTextContent(/Overview/i);

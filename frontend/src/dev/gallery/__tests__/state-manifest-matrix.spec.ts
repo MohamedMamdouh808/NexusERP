@@ -32,7 +32,7 @@ describe('State manifest matrix parity (T047, FR-060, FR-062, SC-001, SC-011)', 
     return rows.flatMap((cells) => {
       const label = cells[2].toLowerCase();
       if (component === 'Badge' && label.startsWith('one state per status name')) {
-        const statuses = label.match(/\b(?:draft|confirmed|issued|partially_received|partially_shipped|partially_paid|received|shipped|paid|cancelled|void|active|consumed|released)\b/gi) ?? [];
+        const statuses = label.match(/\b(?:draft|confirmed|issued|partially_received|partially_shipped|partially_paid|received|shipped|paid|cancelled|void|active|consumed|released|recorded|reversed|user_active|user_deactivated)\b/gi) ?? [];
         return statuses.map((status) => status.toUpperCase());
       }
       return [aliases[label] ?? label.replace(/\s+/g, '-')];

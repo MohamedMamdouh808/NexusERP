@@ -84,12 +84,13 @@ describe('No control implying an unavailable business action (T078)', () => {
   });
 
   it('shows only the destinations this feature can actually serve', () => {
-    // The design system groups the sidebar by module. Everything outside the two
-    // working destinations belongs to a later feature and must not appear yet.
+    // The design system groups the sidebar by module. Every entry here is a
+    // destination the application really serves, in navigation-list order;
+    // modules a later feature owns are marked Soon rather than linked.
     const availablePaths = NAVIGATION.flatMap((g) => g.entries)
       .filter((e) => e.state === 'available')
       .map((e) => e.path);
-    expect(availablePaths).toEqual(['/', '/health']);
+    expect(availablePaths).toEqual(['/', '/sales', '/inventory', '/reports', '/products', '/contacts', '/purchasing', '/invoicing', '/users', '/settings/organization', '/audit-log', '/health']);
   });
 
   it('records the permission each destination will require, without filtering on one yet', () => {

@@ -7,9 +7,11 @@ export interface ToastProps {
   readonly tone: ToastTone;
   readonly message: string;
   readonly onDismiss: (id: string) => void;
+  readonly actionLabel?: string;
+  readonly onAction?: () => void;
 }
 
-export function Toast({ id, tone, message, onDismiss }: ToastProps) {
+export function Toast({ id, tone, message, onDismiss, actionLabel, onAction }: ToastProps) {
   const role = tone === 'failure' ? 'alert' : 'status';
 
   return (
@@ -18,6 +20,11 @@ export function Toast({ id, tone, message, onDismiss }: ToastProps) {
         name={tone === 'success' ? 'success' : tone === 'failure' ? 'danger' : 'info'}
       />
       <span>{message}</span>
+      {actionLabel && onAction && (
+        <button type="button" className="toast__action" onClick={onAction}>
+          {actionLabel}
+        </button>
+      )}
       <button
         type="button"
         className="toast__dismiss"

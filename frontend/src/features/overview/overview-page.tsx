@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bar,
   BarChart,
@@ -25,8 +26,11 @@ import {
   Select,
   Skeleton,
 } from '../../components/ui';
+import { Sparkline } from '../../components/ui/sparkline';
+import { ActionCenter } from './action-center';
+import { WeekReview } from './week-review';
 import type { Column } from '../../components/ui';
-import { formatMoney } from '../../lib/format';
+import { formatMoneyGrouped } from '../../lib/format';
 import type {
   DashboardActivity,
   DashboardPeriod,
@@ -39,7 +43,7 @@ const PERIOD_OPTIONS = [
   { value: 'last-month', label: 'Last month' },
 ] as const;
 
-const CATEGORIES = ['All categories', 'Sales', 'Orders', 'Inventory', 'Invoices'] as const;
+const CATEGORIES = ['All categories', 'Sales', 'Orders', 'Inventory', 'Invoices', 'Administration'] as const;
 
 const ACTIVITY_COLUMNS: readonly Column<DashboardActivity>[] = [
   { key: 'time', header: 'Time' },
@@ -121,27 +125,36 @@ function MetricCard({
   direction,
   percent,
   monetary = false,
+  sparkValues,
+  sparkLabel,
 }: {
   title: string;
   value: string | number;
   measure: string;
-  direction: 'up' | 'down';
-  percent: number;
+  direction: 'up' | 'down' | null;
+  percent: number | null;
   monetary?: boolean;
+  sparkValues?: readonly number[];
+  sparkLabel?: string;
 }) {
   return (
     <Card title={title} className="overview-kpi">
       <div className="overview-kpi__value">
         {monetary ? (
           <>
-            <span className="overview-kpi__currency">USD</span> {formatMoney(String(value))}
+            <span className="overview-kpi__currency">USD</span> {formatMoneyGrouped(String(value))}
           </>
         ) : (
           value
         )}
       </div>
-      <ChangeChip direction={direction} percent={percent} />
-      <p className="overview-kpi__measure">{measure}</p>
+      {direction !== null && percent !== null && (
+        <ChangeChip direction={direction} percent={percent} />
+      )}
+      <div className="overview-kpi__footer">
+        {sparkValues !== undefined && sparkLabel && <Sparkline values={sparkValues} label={sparkLabel} />}
+        <p className="overview-kpi__measure">{measure}</p>
+      </div>
     </Card>
   );
 }
@@ -165,18 +178,15 @@ function ProductChart({ summary }: { summary: DashboardSummary }) {
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={summary.topSellingProducts}
-            margin={{ top: 8, right: 8, bottom: 24, left: 0 }}
+            margin={{ top: 8, right: 8, bottom: 4, left: 0 }}
           >
             <CartesianGrid stroke="var(--color-border)" vertical={false} />
-            <XAxis
-              dataKey="product"
-              angle={-24}
-              textAnchor="end"
-              interval={0}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+            {/*
+              The legend under this chart names every product beside its count,
+              so the axis carries no labels: at card width the rotated names
+              collided and clipped instead of informing.
+            */}
+            <YAxis allowDecimals={false} width={40} tickLine={false} axisLine={false} />
             <Tooltip formatter={(value) => [`${value} units`, 'Units sold']} />
             <Bar dataKey="unitsSold" name="Units sold" radius={[4, 4, 0, 0]}>
               {summary.topSellingProducts.map((item, index) => (
@@ -207,13 +217,13 @@ function ProductChart({ summary }: { summary: DashboardSummary }) {
 function TrendChart({ summary }: { summary: DashboardSummary }) {
   const totalOrders = summary.salesOrdersTrend.reduce((total, point) => total + point.orders, 0);
   const trendText = summary.salesOrdersTrend
-    .map((point) => `${point.date}: USD ${formatMoney(point.sales)} sales, ${point.orders} orders`)
+    .map((point) => `${point.date}: USD ${formatMoneyGrouped(point.sales)} sales, ${point.orders} orders`)
     .join('; ');
 
   return (
     <Card
       title="Sales and orders"
-      description={`USD ${formatMoney(summary.sales.value)} total sales · ${totalOrders} total orders`}
+      description={`USD ${formatMoneyGrouped(summary.sales.value)} total sales · ${totalOrders} total orders`}
       className="overview-chart-card"
     >
       <div
@@ -230,20 +240,24 @@ function TrendChart({ summary }: { summary: DashboardSummary }) {
             <XAxis dataKey="date" tickLine={false} axisLine={false} />
             <YAxis
               yAxisId="sales"
-              tickFormatter={(value) => formatMoney(String(value))}
+              width={76}
+              domain={[0, 'auto']}
+              tickFormatter={(value) => formatMoneyGrouped(String(value))}
               tickLine={false}
               axisLine={false}
             />
             <YAxis
               yAxisId="orders"
               orientation="right"
+              width={32}
+              domain={[0, 'auto']}
               allowDecimals={false}
               tickLine={false}
               axisLine={false}
             />
             <Tooltip
               formatter={(value, name) =>
-                name === 'Sales' ? [`USD ${formatMoney(String(value))}`, name] : [value, name]
+                name === 'Sales' ? [`USD ${formatMoneyGrouped(String(value))}`, name] : [value, name]
               }
             />
             <Line
@@ -379,6 +393,8 @@ function DashboardContent({ summary }: { summary: DashboardSummary }) {
           percent={summary.sales.changePercent}
           measure={summary.sales.measure}
           monetary
+          sparkValues={summary.salesOrdersTrend.map((point) => Number(point.sales))}
+          sparkLabel="Sales trend across the selected period"
         />
         <MetricCard
           title="Active Orders"
@@ -386,6 +402,8 @@ function DashboardContent({ summary }: { summary: DashboardSummary }) {
           direction={summary.activeOrders.changeDirection}
           percent={summary.activeOrders.changePercent}
           measure={summary.activeOrders.measure}
+          sparkValues={summary.salesOrdersTrend.map((point) => point.orders)}
+          sparkLabel="Orders trend across the selected period"
         />
         <MetricCard
           title="Low Stock Items"
@@ -402,6 +420,10 @@ function DashboardContent({ summary }: { summary: DashboardSummary }) {
           measure={summary.outstandingInvoices.measure}
           monetary
         />
+      </div>
+      <div className="overview-page__intelligence">
+        <ActionCenter />
+        <WeekReview />
       </div>
       <div className="overview-page__charts">
         <ProductChart summary={summary} />
@@ -437,6 +459,7 @@ function DashboardContent({ summary }: { summary: DashboardSummary }) {
 }
 
 export function OverviewPage() {
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<DashboardPeriod>('this-month');
   const { data, isPending, isError, error, refetch } = useDashboard(period);
   const apiFailure =
@@ -448,25 +471,19 @@ export function OverviewPage() {
     <section className="overview-page" aria-label="Overview dashboard">
       <PageHeader
         title="Overview"
-        secondaryActions={[
-          <div className="overview-page__header-controls" key="overview-controls">
-            <div className="overview-period-select">
-              <Select
-                id="overview-period"
-                label="Period"
-                options={PERIOD_OPTIONS}
-                value={period}
-                onChange={(event) => setPeriod(event.target.value as DashboardPeriod)}
-              />
-            </div>
-            <div className="overview-sample-marker">
-              <span className="sample-marker">Sample data</span>
-              <span>Figures are illustrative, not live</span>
-            </div>
-          </div>,
-        ]}
+        leading={
+          <div className="overview-period-select">
+            <Select
+              id="overview-period"
+              label="Period"
+              options={PERIOD_OPTIONS}
+              value={period}
+              onChange={(event) => setPeriod(event.target.value as DashboardPeriod)}
+            />
+          </div>
+        }
         primaryAction={
-          <Button variant="primary" disabled reason="Arrives with Sales Orders">
+          <Button variant="primary" onClick={() => navigate('/sales/new')}>
             New Sales Order
           </Button>
         }

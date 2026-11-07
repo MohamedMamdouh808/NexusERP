@@ -79,6 +79,27 @@ export function compareDecimal(a: string, b: string, scale: Scale): number {
 }
 
 /**
+ * Inserts thousands separators into the integer part of a decimal string.
+ * "12500.00" -> "12,500.00"   "8500.0000" -> "8,500.0000"
+ * Pure string work, never a float.
+ */
+export function groupThousands(value: string): string {
+  const sign = value.startsWith('-');
+  const abs = sign ? value.slice(1) : value;
+  const [intPart = '0', fracPart = ''] = abs.split('.');
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${sign ? '-' : ''}${grouped}${fracPart === '' ? '' : `.${fracPart}`}`;
+}
+
+/**
+ * Formats a monetary value (scale 2) with thousands separators, for table
+ * columns where the total must be readable at a glance.
+ */
+export function formatMoneyGrouped(value: string): string {
+  return groupThousands(formatDecimal(value, 2));
+}
+
+/**
  * Formats a monetary value (scale 2) for display.
  */
 export function formatMoney(value: string): string {

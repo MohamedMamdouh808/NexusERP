@@ -54,7 +54,6 @@ export function GalleryRoute() {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
-          <span className="sample-marker">Sample data</span>
           <Button variant={simulateFailure ? 'danger' : 'secondary'} onClick={toggleFailure}>
             {simulateFailure ? 'Disable Failures' : 'Simulate failure'}
           </Button>

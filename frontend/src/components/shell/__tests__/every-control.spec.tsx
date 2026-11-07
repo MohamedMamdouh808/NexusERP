@@ -44,12 +44,35 @@ describe('Every enabled control guard for the shell (T023, FR-071, SC-019)', () 
     const controls = container.querySelectorAll<HTMLElement>('button, a[href]');
     expect(controls.length).toBeGreaterThan(0);
 
-    for (const control of Array.from(controls)) {
-      const isAriaDisabled = control.getAttribute('aria-disabled') === 'true';
-      const isDisabled = control.hasAttribute('disabled');
-      if (isDisabled || isAriaDisabled) {
-        continue;
-      }
+    // Content-area controls are clicked first. A shell navigation replaces the
+    // page below <main>, which detaches the initial page's controls, while the
+    // top bar and sidebar stay mounted: clicking a detached node dispatches
+    // into nowhere, so a working content control would look dead. The control
+    // list is re-collected after every click so a control rendered by a page
+    // the previous click navigated to is still observed, and a control detached
+    // by that navigation belongs to the earlier render it was tested in.
+    const contentArea = container.querySelector('#main-content');
+    const seen = new WeakSet<HTMLElement>();
+    let clicked = 0;
+    for (let pass = 0; pass < 500; pass += 1) {
+      const controls = Array.from(
+        container.querySelectorAll<HTMLElement>('button, a[href]'),
+      ).sort((a, b) => {
+        const aInContent = contentArea?.contains(a) === true ? 0 : 1;
+        const bInContent = contentArea?.contains(b) === true ? 0 : 1;
+        return aInContent - bInContent;
+      });
+
+      const control = controls.find((candidate) => {
+        if (seen.has(candidate)) return false;
+        if (!container.contains(candidate)) return false;
+        if (candidate.getAttribute('aria-disabled') === 'true') return false;
+        if (candidate.hasAttribute('disabled')) return false;
+        return true;
+      });
+      if (control === undefined) break;
+      seen.add(control);
+      clicked += 1;
 
       const initialUrl = router.state.location.pathname + router.state.location.search + router.state.location.hash;
       const initialDom = container.innerHTML;
@@ -72,6 +95,8 @@ describe('Every enabled control guard for the shell (T023, FR-071, SC-019)', () 
         `Control "${control.textContent?.trim() || control.getAttribute('aria-label') || control.tagName}" produced no observable change`,
       ).toBe(true);
     }
+
+    expect(clicked).toBeGreaterThan(0);
   });
 
   it('fails when an enabled control produces no observable change (negative control)', async () => {

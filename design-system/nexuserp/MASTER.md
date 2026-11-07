@@ -111,11 +111,18 @@ names and values are identical to the API response.
 | RECEIVED | `--color-success-tint` | `--color-success` | success |
 | SHIPPED | `--color-success-tint` | `--color-success` | success |
 | PAID | `--color-success-tint` | `--color-success` | success |
+| USER_ACTIVE | `--color-success-tint` | `--color-success` | success |
+| USER_DEACTIVATED | `--color-muted` | `--color-muted-foreground` | neutral |
+| RECORDED | `--color-success-tint` | `--color-success` | success |
+| REVERSED | `--color-muted` | `--color-muted-foreground` | neutral |
 | CANCELLED | `--color-destructive-tint` | `--color-on-destructive-tint` | destructive |
 | VOID | `--color-destructive-tint` | `--color-on-destructive-tint` | destructive |
 
 Reservation states (`ACTIVE`, `CONSUMED`, `RELEASED`) follow the same semantics:
 ACTIVE = info, CONSUMED = success, RELEASED = neutral.
+
+Stock states (`In stock`, `Low stock`, `Out of stock`) follow the same semantics:
+In stock = success, Low stock = warning, Out of stock = destructive.
 
 ### Typography
 
@@ -127,7 +134,8 @@ ACTIVE = info, CONSUMED = success, RELEASED = neutral.
 
 **CSS Import:**
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
+/* Self-hosted under public/fonts/ (see frontend/src/styles/app.css for the
+   @font-face declarations). No third-party font request is made at runtime. */
 ```
 
 **Font Usage Rules**
@@ -199,22 +207,38 @@ numeric column and never render a monetary or decimal value as a float-derived s
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--radius-sm` | `8px` | Badges, tags, small supporting elements |
-| `--radius-md` | `12px` | Buttons, inputs, dropdowns |
-| `--radius-lg` | `16px` | Cards, modals, containers |
-| `--radius-pill` | `999px` | Fully rounded / pill elements |
+| `--radius-sm` | `8px` | Inputs, selects, buttons, menu items, small supporting elements |
+| `--radius-md` | `10px` | Cards, modal dialogs, dropdowns |
+| `--radius-lg` | `14px` | Large dialogs, page-level containers |
+| `--radius-pill` | `999px` | Badges, tags, sidebar entries, fully rounded elements |
 
 ### Shell Geometry
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--shell-sidebar-width` | `256px` | Desktop sidebar width |
+| `--shell-sidebar-width` | `220px` | Desktop sidebar width |
 | `--shell-sidebar-compact-width` | `72px` | Narrow/icon-only sidebar |
 | `--shell-topbar-height` | `64px` | Top bar height |
 | `--sidebar-row-padding-block` | `4px` | Compact but readable sidebar entries |
 | `--sidebar-group-gap` | `8px` | Space between sidebar groups |
-| `--sidebar-list-gap` | `2px` | Space between sidebar entries |
+| `--sidebar-list-gap` | `4px` | Space between sidebar entries |
 | `--sidebar-scrollbar-width` | `5px` | Thin custom sidebar scrollbar |
+
+### Sidebar Color Tokens
+
+The sidebar is a dark slate panel over the light canvas, so page navigation reads
+as applied chrome and the working surfaces carry the content light. Its colour set
+is defined once in `tokens.css` and referenced by the shell styles:
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--color-sidebar-bg` | `#101828` | Sidebar background |
+| `--color-sidebar-text` | `#f1f4f9` | Sidebar entry and group-heading text |
+| `--color-sidebar-text-muted` | `rgba(225, 232, 244, 0.62)` | Muted sidebar text (group headings) |
+| `--color-sidebar-active-bg` | `rgba(103, 121, 239, 0.24)` | Active entry pill background |
+| `--color-sidebar-hover-bg` | `rgba(255, 255, 255, 0.06)` | Entry hover background |
+| `--color-sidebar-soon-bg` | `rgba(225, 232, 244, 0.10)` | Unavailable entry background |
+| `--color-sidebar-soon-text` | `rgba(225, 232, 244, 0.62)` | Unavailable entry text |
 
 The sidebar contains twelve entries. Keep its rows compact enough for all entries and
 group headings to fit in a 700px-high viewport; when content exceeds the available height,
@@ -222,21 +246,21 @@ use a thin, low-contrast custom scrollbar without hiding the scroll affordance.
 
 ### Navigation
 
-The sidebar renders this navigation list and nothing else. Two entries are available in v1; all others are marked `Soon`.
+The sidebar renders this navigation list and nothing else. All twelve listed destinations are available; only destinations without an implemented page are marked `Soon`.
 
 | Group | Entry | State |
 |-------|-------|-------|
 | General | Overview | available |
-| General | Sales Orders | Soon |
-| General | Inventory | Soon |
-| General | Reports | Soon |
-| Management | Products | Soon |
-| Management | Customers & Suppliers | Soon |
-| Management | Purchasing | Soon |
-| Management | Invoicing | Soon |
-| Management | Users & Roles | Soon |
-| Settings | Organization | Soon |
-| Settings | Audit Log | Soon |
+| General | Sales Orders | available |
+| General | Inventory | available |
+| General | Reports | available |
+| Management | Products | available |
+| Management | Customers & Suppliers | available |
+| Management | Purchasing | available |
+| Management | Invoicing | available |
+| Management | Users & Roles | available |
+| Settings | Organization | available |
+| Settings | Audit Log | available |
 | Settings | System Health | available |
 
 ---
@@ -457,10 +481,14 @@ block, no mega menu.
   usability, not security). The active item carries `--color-primary` plus
   `aria-current="page"`, and sidebar navigation is keyboard operable with a visible focus
   ring.
-- **Top bar:** Organization switcher (switches the active tenant, revalidates membership and
-  permissions, and never takes a tenant scope from the URL or query string) and user menu
-  (name, email, roles, logout). The tenant name is always visible here so a user always
-  knows which organization they are acting in.
+- **Top bar:** From inline start to inline end — the NexusERP logo, the
+  centred search control (opens the command palette), the organization switcher
+  (switches the active tenant, revalidates membership and permissions, and never
+  takes a tenant scope from the URL or query string), and the user menu
+  (profile) closing the bar. The tenant name is always visible here so a user
+  always knows which organization they are acting in. The appearance
+  settings (theme, language direction) live on the preview profile page, not in
+  the top bar.
 - **Content area:** Page header carries the title, the record type or number, and the
   single primary action. The filters bar holds search, status filter, date-range filter, and
   a "Clear filters" action. The body is either a data table or a form — never both on one
@@ -544,13 +572,35 @@ block, no mega menu.
 
 ### Layout Targets (v1)
 
-- **Light mode only.** v1 ships no dark theme, no theme switcher, and no `prefers-color-scheme`
-  variant. Every token above is defined once as a light-mode value. Dark mode is a P2 item and
-  requires a contrast re-verification of every token pair.
-- **Desktop and tablet only.** Supported widths are 768px (tablet portrait) through 1440px
-  and wider. Phone layouts are out of scope for v1; do not design a 375px breakpoint and do
-  not add one later without a layout review.
+- **Light mode is the default; dark mode ships as a preference.** The preview
+  profile page owns the appearance settings: **Light** and **Dark** themes plus
+  layout direction — **English (left to right)** and **العربية (right to
+  left)**. The choice is component state on `<html>` (`data-theme`, `dir`) and
+  is persisted in the browser only — it carries no session, no tenant change
+  and nothing server-side. Every dark value lives in
+  `frontend/src/styles/tokens.css` under `[data-theme='dark']`; components keep
+  reading `var(--token)` and never branch on the theme in markup. A dark token
+  pair whose contrast has not been verified is a bug, and printing re-asserts
+  the light "ink" values so a dark session never prints a page of solid ink.
+- **Responsive 320–1920px.** Full sidebar ≥ 1200px/tablet compact sidebar
+  768–1023px by default is desktop-first; phones and tablets draw the same
+  modules with the mobile navigation drawer, wrapped toolbars and horizontally
+  scrollable shared tables (`.table-container`). No route may cause page-level
+  horizontal overflow at any supported width, including mid-point widths such
+  as 375px, 568px and 844px landscape.
 - **Supported browsers:** Chrome 100+, Safari 15+, Firefox 100+, Edge (Chromium).
+
+### Keyboard & Commands (v1)
+
+- **Command palette.** `Ctrl + K` (or the `Search…` control in the top bar) opens
+  a palette over the same navigation list as the sidebar plus the create actions
+  each page owns; typing beyond two characters searches the sample records and
+  lists them by document number. It closes on Escape, on backdrop click and on
+  route change, and it never fabricates data beyond what the service exposes.
+- **`g` then a module key** jumps to that module (`o` overview, `s` sales,
+  `i` inventory, `p` products, `c` contacts, `r` reports, `v` invoicing,
+  `u` users) when no field has focus. Focus states remain visible; shortcuts do
+  not bypass the skip link.
 
 ### UX Rules (PRD Section 7.3 — mandatory for every feature)
 
@@ -601,7 +651,7 @@ contrast, visible focus, full keyboard operation, and accessible error messages.
 - ❌ **Ad-hoc status colours** — never pick a badge colour outside the Status Badge Mapping table
 - ❌ **Left-aligned numeric columns or proportional digits in tables** — right-align with tabular numerals and Fira Code
 - ❌ **Redescribing document numbers** — render `PO-`, `GR-`, `SO-`, `SH-`, `INV-`, `PAY-` numbers verbatim in Fira Code
-- ❌ **Dark mode or theme switching in v1** — light mode only until P2
+- ❌ **Theme values outside the token file** — dark/print palettes and density rules live in `tokens.css`/`app.css` via `var()`; no component branches on theme in markup or hardcodes a colour
 - ❌ **Client-side tenant switching** — the organization switcher goes through the server, which revalidates membership
 
 ---
@@ -614,15 +664,15 @@ Before delivering any UI code, verify:
 - [ ] All icons from consistent icon set (Heroicons/Lucide)
 - [ ] `cursor-pointer` on all clickable elements
 - [ ] Hover states with smooth transitions (150-300ms)
-- [ ] Light mode only; no dark theme or theme switcher in v1
+- [ ] Light mode default; theme and direction only through `data-theme`/`dir` tokens, changed only by the Appearance settings on the preview profile page (Light, Dark, English LTR, Arabic RTL)
 - [ ] Text contrast 4.5:1 minimum — solid badges and tints both verified
 - [ ] Form controls use `--color-input-border`; cards and dividers use `--color-border`
 - [ ] Status badges follow the Status Badge Mapping table, with the API status name as the label
 - [ ] Focus states visible for keyboard navigation
 - [ ] `prefers-reduced-motion` respected
-- [ ] Responsive: 768px, 1024px, 1440px (desktop and tablet; no phone layout in v1)
+- [ ] Responsive: 320px–1920px (mobile drawer below 768px, compact sidebar 768–1023px, full sidebar above)
 - [ ] No content hidden behind fixed navbars
-- [ ] No horizontal scroll at 768px, 1024px, or 1440px
+- [ ] No horizontal page scroll at any supported width; wide tables scroll inside `.table-container`
 - [ ] Skeleton loaders on every data fetch; submit buttons disabled with a spinner in flight
 - [ ] Inline field errors; dismissible error banner carrying the `requestId`
 - [ ] Success toast naming the affected record on every create, post, and transition

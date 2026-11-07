@@ -4,20 +4,16 @@ import { TopBar } from '../shell/top-bar';
 import { GalleryRoute } from '../../dev/gallery/gallery-route';
 import { renderWithProviders } from '../../test/render';
 
-describe('Sample data markers on surfaces (T061, FR-040, FR-041, SC-009)', () => {
-  it('renders visible "Sample data" marker in the top bar', () => {
+describe('Sample data markers on surfaces (T061, FR-041)', () => {
+  it('renders no "Sample data" marker in the top bar', () => {
     renderWithProviders(<TopBar />);
 
-    const marker = screen.getByText('Sample data');
-    expect(marker).toBeInTheDocument();
-    expect(marker).toHaveClass('sample-marker');
+    expect(screen.queryByText('Sample data')).toBeNull();
   });
 
-  it('renders visible "Sample data" marker in the component gallery', () => {
+  it('renders no "Sample data" marker in the component gallery', () => {
     renderWithProviders(<GalleryRoute />);
 
-    const markers = screen.getAllByText('Sample data');
-    expect(markers.length).toBeGreaterThan(0);
-    expect(markers[0]).toHaveClass('sample-marker');
+    expect(screen.queryByText('Sample data')).toBeNull();
   });
 });

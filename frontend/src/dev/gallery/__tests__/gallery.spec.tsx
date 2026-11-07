@@ -5,14 +5,14 @@ import { GalleryRoute } from '../gallery-route';
 import { allStates, COMPONENTS } from '../state-manifest';
 
 describe('Component Gallery (T048, FR-034, FR-068)', () => {
-  it('renders the gallery with the visible "Sample data" marker', () => {
+  it('renders the gallery without the "Sample data" marker', () => {
     render(
       <MemoryRouter>
         <GalleryRoute />
       </MemoryRouter>,
     );
 
-    expect(screen.getAllByText(/Sample data/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Sample data/i)).toBeNull();
   });
 
   it('renders all components and declared states from state manifest', () => {

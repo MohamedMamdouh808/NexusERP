@@ -21,6 +21,11 @@ export const STATUS_TO_TONE: Record<BadgeStatus, StatusTone> = {
   ACTIVE: 'success',
   CONSUMED: 'neutral',
   RELEASED: 'info',
+  // Payment lifecycle statuses (Invoicing module)
+  RECORDED: 'success',
+  REVERSED: 'neutral',
+  USER_ACTIVE: 'success',
+  USER_DEACTIVATED: 'neutral',
 };
 
 export interface BadgeProps {

@@ -47,10 +47,10 @@ describe('TopBar (T077)', () => {
     expect(screen.getByRole('button', { name: /^Preview user:/ })).toBeVisible();
   });
 
-  it('carries the visible "Sample data" marker the whole top bar falls under', async () => {
+  it('renders no visible "Sample data" marker in the top bar', async () => {
     await renderTopBar();
 
-    expect(screen.getByText('Sample data')).toBeVisible();
+    expect(screen.queryByText('Sample data')).toBeNull();
   });
 
   it('presents neither value as a record', async () => {
@@ -104,18 +104,12 @@ describe('TopBar (T077)', () => {
     );
   });
 
-  it('renders the user-menu entries that would need a session as disabled, with the reason', async () => {
+  it('offers the preview profile destination without implying an authenticated session', async () => {
     const { user } = await renderTopBar();
 
     await user.click(screen.getByRole('button', { name: /^Preview user:/ }));
 
-    const entries = await screen.findAllByRole('menuitem');
-    expect(entries.length).toBeGreaterThan(0);
-
-    for (const entry of entries) {
-      expect(entry).toHaveAttribute('aria-disabled', 'true');
-      expect(entry).toHaveTextContent(/authentication is not part of this feature/i);
-    }
+    expect(await screen.findByRole('menuitem', { name: 'Preview profile' })).toBeVisible();
   });
 
   it('offers no control, link or wording implying a session exists', async () => {

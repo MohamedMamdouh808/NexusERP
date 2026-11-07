@@ -23,8 +23,8 @@
  * The remote Google Fonts @import that used to sit above these rules was a
  * third-party request made by the product at runtime: it disclosed every visit
  * to another origin and made the interface's typography depend on a host the
- * project does not control. The same faces are now served from the application's
- * own origin, under public/fonts/, with their licences beside them.
+ * project does not control. The faces are served from the application's own
+ * origin, under public/fonts/, with their licences beside them.
  *
  * The families and weights are unchanged, so tokens.css still names them and no
  * component changed. `font-display: swap` is kept: the text is readable
@@ -66,11 +66,8 @@
 }
 
 /*
- * Fira Code is served as one variable face covering 400–700 rather than as four
- * static ones. The four weights Google's CSS declares for this family all
- * resolve to the same 36,276-byte file (verified by hash, T003), so declaring
- * one face with a weight range ships the same glyphs without four identical
- * copies of them.
+ * Fira Code is served as one variable face covering 400-700 rather than as four
+ * static ones.
  */
 @font-face {
   font-family: 'Fira Code';
@@ -85,6 +82,7 @@
   body,
   #root {
     height: 100%;
+    overflow: hidden;
   }
 
   body,
@@ -138,29 +136,67 @@
   grid-template-columns: var(--shell-sidebar-width) 1fr;
   grid-template-rows: var(--shell-topbar-height) 1fr;
   height: 100vh;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
   background: var(--color-background);
 }
 
+/*
+ * Top bar: the brand on the inline start, the search control truly centred
+ * between two equal fluid tracks, and the organization and user menus closing
+ * the bar on the inline end.
+ */
 .app-shell__topbar {
   grid-area: topbar;
   background: var(--color-card);
-  border-bottom: 1px solid var(--color-border);
-  box-shadow: var(--shadow-lg);
+  border-bottom: 0.5px solid var(--color-border);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-lg);
+  min-width: 0;
+  position: relative;
+  z-index: 50;
+}
+
+.top-bar__start {
+  grid-column: 1;
+  justify-self: start;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--spacing-lg);
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.app-shell__topbar .top-bar__command {
+  grid-column: 2;
+  justify-self: center;
+}
+
+.top-bar__right {
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  min-width: 0;
 }
 
 .app-shell__sidebar {
   grid-area: sidebar;
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
+  background: var(--color-sidebar-bg);
+  border: none;
+  box-shadow: none;
   overflow-y: auto;
-  padding: var(--spacing-md);
+  padding: var(--spacing-md) 0;
   scrollbar-width: thin;
   scrollbar-color: var(--color-border) transparent;
+  /* Sticky at full viewport height below the top bar. */
+  position: sticky;
+  top: var(--shell-topbar-height);
+  height: calc(100vh - var(--shell-topbar-height));
+  color: var(--color-sidebar-text);
 }
 
 .app-shell__sidebar::-webkit-scrollbar {
@@ -173,7 +209,7 @@
 
 .app-shell__sidebar::-webkit-scrollbar-thumb {
   border-radius: var(--radius-pill);
-  background: var(--color-border);
+  background: var(--color-sidebar-text-muted);
 }
 
 .app-shell__content {
@@ -181,11 +217,18 @@
   min-width: 0;
   overflow-y: auto;
   padding: var(--spacing-xl);
+  overscroll-behavior: contain;
 }
 
-/* Sidebar navigation. The active item carries the pale-blue pill with
-   --color-primary text plus aria-current="page" (MASTER.md "Sidebar Navigation").
-   An unavailable entry carries data-state="Soon" and is not a link. */
+.mobile-navigation__trigger,
+.mobile-navigation__overlay {
+  display: none;
+}
+
+/* Sidebar navigation. The active item carries the indigo-tinted pill with a
+   3px leading edge from --color-primary plus aria-current="page" (MASTER.md
+   "Sidebar Navigation"). An unavailable entry carries data-state="Soon" and is
+   not a link. */
 .sidebar-nav {
   list-style: none;
   margin: 0;
@@ -226,26 +269,30 @@
   gap: var(--spacing-sm);
   padding: var(--sidebar-row-padding-block) var(--spacing-sm);
   border-radius: var(--radius-pill);
-  color: var(--color-foreground);
+  color: var(--color-sidebar-text);
   text-decoration: none;
   font-weight: 500;
+  cursor: pointer;
+  border-left: 3px solid transparent;
   transition:
     background-color var(--motion-duration-standard) var(--motion-easing-standard),
     color var(--motion-duration-standard) var(--motion-easing-standard);
 }
 
 .sidebar-nav__link:hover {
-  background: var(--color-muted);
+  background: transparent;
+  color: var(--color-sidebar-text);
 }
 
 .sidebar-nav__link[aria-current='page'] {
-  background: var(--color-info-tint);
-  color: var(--color-primary);
+  background: var(--color-sidebar-active-bg);
+  color: var(--color-sidebar-text);
   font-weight: 600;
+  border-left: 3px solid var(--color-primary);
 }
 
 .sidebar-nav__link[data-state='Soon'] {
-  color: var(--color-muted-foreground);
+  color: var(--color-sidebar-text-muted);
   cursor: not-allowed;
 }
 
@@ -257,8 +304,8 @@
   margin-left: auto;
   padding: 0 var(--spacing-xs);
   border-radius: var(--radius-pill);
-  background: var(--color-neutral-tint);
-  color: var(--color-muted-foreground);
+  background: var(--color-sidebar-soon-bg);
+  color: var(--color-sidebar-soon-text);
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -276,8 +323,18 @@
 
 .page-header__title {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.page-header__leading-block {
+  min-width: 0;
+}
+
+/* The leading control reads under the title, not beside it. */
+.page-header__leading {
+  margin-top: var(--spacing-sm);
 }
 
 .page-header__description {
@@ -329,16 +386,403 @@
   background: var(--color-card);
 }
 
-/* The visible "Sample data" marker (FR-040). It uses the direction's own pale
-   tint rather than an alarm colour: it labels the surface, it does not warn. */
-.sample-marker {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border: 1px solid var(--color-info);
-  border-radius: var(--radius-pill);
-  background: var(--color-info-tint);
-  color: var(--color-info);
+/* Small square kebab trigger used inside DropdownMenu (avoids button-in-button).
+   It is a quiet row-level control: no border, colour on hover only, so the
+   indent column of a dense table stays calm. */
+.kebab-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin: calc(var(--spacing-xs) * -1);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted-foreground);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-duration-standard) var(--motion-easing-standard),
+    color var(--motion-duration-standard) var(--motion-easing-standard);
+}
+
+.kebab-trigger:focus-visible {
+  color: var(--color-foreground);
+  outline: 2px solid var(--color-ring);
+  outline-offset: 1px;
+}
+
+.kebab-trigger:hover {
+  background: var(--color-muted);
+  color: var(--color-foreground);
+}
+
+/* Horizontal filter toolbar on list pages. */
+.contacts-page__toolbar,
+.products-page__toolbar {
+  display: flex;
+  align-items: end;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.contacts-page__toolbar .form-control,
+.products-page__toolbar .form-control {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: auto;
+  flex: 1;
+}
+
+.contacts-page__toolbar .form-label,
+.products-page__toolbar .form-label {
   font-size: 0.75rem;
+  margin-bottom: var(--spacing-xs);
+}
+
+/* Tab strip shared by multi-tab feature pages (Inventory, Purchasing). */
+.tab-strip {
+  display: flex;
+  gap: var(--spacing-sm);
+  border-bottom: 0.5px solid var(--color-border);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-xs);
+}
+
+.tab-strip__tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: var(--spacing-xs) var(--spacing-md);
+  font: inherit;
+  font-weight: 500;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+}
+
+.tab-strip__tab:hover {
+  color: var(--color-foreground);
+}
+
+.tab-strip__tab--active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+/* Monospace SKU and right-aligned quantities with tabular numerals. */
+.mono {
+  font-family: var(--font-mono);
+}
+
+.qty {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+.qty.available {
   font-weight: 600;
+}
+
+.qty-sign--success {
+  color: var(--color-success);
+}
+
+.qty-sign--destructive {
+  color: var(--color-destructive);
+}
+
+/* Horizontal toolbars on inventory and purchasing tabs. */
+.stock-balances__toolbar,
+.movements__toolbar,
+.warehouses__toolbar,
+.purchase-orders__toolbar,
+.goods-receipts__toolbar {
+  display: flex;
+  align-items: end;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-md);
+}
+
+.stock-balances__toolbar .form-control,
+.movements__toolbar .form-control,
+.warehouses__toolbar .form-control,
+.purchase-orders__toolbar .form-control,
+.goods-receipts__toolbar .form-control {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: auto;
+  flex: 1;
+}
+
+.stock-balances__toolbar .form-label,
+.movements__toolbar .form-label,
+.warehouses__toolbar .form-label,
+.purchase-orders__toolbar .form-label,
+.goods-receipts__toolbar .form-label {
+  font-size: 0.75rem;
+  margin-bottom: var(--spacing-xs);
+}
+
+/* Movements permanent-records note. */
+.movements__note {
+  margin: var(--spacing-xs) 0 var(--spacing-md);
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+}
+
+/* Adjust stock dialog preview and consequence. */
+.adjust-preview {
+  margin: var(--spacing-sm) 0;
+  padding: var(--spacing-sm);
+  background: var(--color-muted);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+}
+
+.adjust-preview p {
+  margin: 0;
+}
+
+.adjust-consequence {
+  margin-top: var(--spacing-sm);
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  font-style: italic;
+}
+
+/* Form error text. */
+.form-error {
+  margin-top: var(--spacing-xs);
+  font-size: 0.75rem;
+  color: var(--color-destructive);
+}
+
+/* Table width constraint: fits a 1180px window without sideways scroll. */
+.table-container {
+  max-width: 1180px;
+}
+
+/* The line items editor shared by the Purchasing and Sales order forms: the
+   grid, the per-line read-only total and the order total panel are one
+   component, so both documents render the same editor. */
+
+.line-items-editor {
+  border-top: 0.5px solid var(--color-border);
+  padding-top: var(--spacing-md);
+}
+
+.line-items-editor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.line-items-editor__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.line-items-editor__empty {
+  color: var(--color-muted-foreground);
+  font-size: 0.875rem;
+  margin: var(--spacing-xs) 0 var(--spacing-sm);
+}
+
+.line-items-editor__line {
+  display: grid;
+  grid-template-columns: minmax(160px, 2fr) minmax(110px, 1fr) minmax(110px, 1fr) minmax(110px, 1fr) auto;
+  gap: var(--spacing-sm);
+  align-items: end;
+}
+
+.line-items-editor__line--head {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  align-items: end;
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 0.5px solid var(--color-border);
+  margin-bottom: var(--spacing-xs);
+}
+
+.line-items-editor__line--head .form-label {
+  font-size: 0.75rem;
+  margin-bottom: 0;
+}
+
+.line-items-editor__line-total .qty {
+  display: block;
+  padding-bottom: var(--spacing-xs);
+}
+
+.line-items-editor__line-remove {
+  white-space: nowrap;
+}
+
+.line-items-editor__totals {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+  border-top: 0.5px solid var(--color-border);
+  font-size: 0.875rem;
+}
+
+.line-items-editor__totals .qty {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+/* A sales line carries one extra read-only cell - the live availability in the
+   chosen shipping warehouse - so the grid gains a column. */
+.line-items-editor__line--with-note {
+  grid-template-columns: minmax(160px, 2fr) minmax(110px, 1fr) minmax(110px, 1fr) minmax(110px, 1fr) minmax(110px, 1fr) auto;
+}
+
+/* The live availability note itself; the warning form replaces it when the
+   quantity typed exceeds what is available. */
+.line-items-editor__note {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--color-muted-foreground);
+  padding-bottom: var(--spacing-xs);
+}
+
+.line-items-editor__note--warning {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+/* --- Purchasing ------------------------------------------------------------ */
+
+/* Order form: header fields, then the line-items editor. */
+.order-form__header-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.order-form__actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+}
+
+/* Receive-goods dialog rows. */
+.receive-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-sm) 0;
+}
+
+.receive-lines__row {
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.receive-lines__product {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: baseline;
+  font-size: 0.875rem;
+}
+
+.receive-lines__figures {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+}
+
+.receive-status-note {
+  font-size: 0.875rem;
+  margin: var(--spacing-xs) 0;
+}
+
+/* Purchase order detail page. */
+.order-detail-page__actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.order-detail-page__status {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.order-detail-page__details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: var(--spacing-lg);
+  row-gap: var(--spacing-xs);
+  margin: 0;
+}
+
+.order-detail-page__details dt {
+  color: var(--color-muted-foreground);
+  font-size: 0.875rem;
+}
+
+.order-detail-page__details dd {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.order-detail-page__total {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+  border-top: 0.5px solid var(--color-border);
+}
+
+.order-detail-page__total .qty {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.order-detail-page__receipts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.order-detail-page__receipts li {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+  padding: var(--spacing-xs) 0;
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.order-detail-page__receipts-empty {
+  color: var(--color-muted-foreground);
+  font-size: 0.875rem;
 }
 
 /* Visually hidden but available to assistive technology. */
@@ -357,15 +801,14 @@
 .card {
   background: var(--color-card);
   color: var(--color-card-foreground);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  border: 0.5px solid var(--color-border);
+  border-radius: var(--radius-md);
   padding: var(--spacing-lg);
 }
 
 .card__title {
   margin: 0 0 var(--spacing-md);
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 600;
 }
 
@@ -373,13 +816,14 @@
    "Status Badge Mapping"; the anti-pattern list forbids using
    --color-destructive as badge text on a tint. */
 .badge {
-  display: inline-block;
-  padding: var(--spacing-xs) var(--spacing-sm);
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
   border-radius: var(--radius-pill);
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .badge[data-tone='success'] {
@@ -462,6 +906,11 @@
 
 .top-bar__organization-name {
   white-space: nowrap;
+  /* The clamp rules below narrow this name on purpose; without a clip the
+     text paints straight through the gap onto the user menu. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .top-bar__user-menu .menu__trigger {
@@ -492,6 +941,12 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  white-space: nowrap;
+}
+
+.top-bar__right .top-bar__user-menu,
+.top-bar__right .top-bar__organization-menu {
+  flex: none;
 }
 
 .top-bar__user-name {
@@ -505,6 +960,44 @@
 .top-bar__pending {
   font-size: 0.875rem;
   color: var(--color-muted-foreground);
+}
+
+/* The centred-search grid only holds while the right-side group fits its
+   track. Below that the account copy steps down: the organization label and
+   the user name/role shrink or hide, leaving avatar-sized controls, so nothing
+   can bleed across the search control's track. These rules must sit AFTER the
+   base top-bar definitions above to win the cascade. */
+@media (max-width: 1280px) {
+  .top-bar__user-copy {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .top-bar__organization-name {
+    max-width: clamp(2.5rem, 10vw, 5rem);
+  }
+
+  .top-bar__organization-menu .menu__trigger {
+    padding-inline: var(--spacing-sm);
+  }
+
+  .top-bar__right {
+    gap: var(--spacing-xs);
+  }
+}
+
+/* On phones the drawer trigger leads, and the search control joins the start
+   of the bar between the brand and the account cluster. */
+@media (max-width: 639px) {
+  .app-shell__topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .app-shell__topbar .top-bar__command {
+    justify-self: start;
+    margin-inline-start: var(--spacing-sm);
+  }
 }
 
 /* The dropdown menu primitive (T051, FR-029). The trigger and the list are
@@ -560,13 +1053,13 @@
 }
 
 .menu__item:hover {
-  background: var(--color-info-tint);
+  background: var(--color-secondary);
 }
 
 /* The current choice is marked and announced (aria-checked), never by colour
    alone. */
 .menu__item[aria-checked='true'] {
-  background: var(--color-info-tint);
+  background: var(--color-secondary);
   color: var(--color-primary);
   font-weight: 600;
 }
@@ -871,6 +1364,98 @@
   color: var(--color-muted-foreground);
 }
 
+/* Invoicing reuses the shared table, token palette, and compact dashboard rhythm. */
+.sample-banner {
+  display: inline-flex;
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.invoice-metrics { display: flex; flex-wrap: wrap; gap: var(--spacing-lg); margin: var(--spacing-md) 0; }
+.invoice-metrics > div { display: grid; gap: var(--spacing-xs); min-width: 10rem; }
+.invoice-metrics span { color: var(--color-muted-foreground); font-size: 0.875rem; }
+.invoice-metrics strong { font-size: 1.125rem; }
+.invoice-toolbar, .payment-fields, .invoice-header-actions, .payment-submit { display: flex; align-items: end; flex-wrap: wrap; gap: var(--spacing-md); }
+.invoice-toolbar { padding: var(--spacing-md) 0; }
+.invoice-toolbar .form-control { min-width: 10rem; flex: 1; }
+.invoice-toggle { display: inline-flex; align-items: center; gap: var(--spacing-sm); min-height: 2.75rem; cursor: pointer; }
+.invoice-toggle input { accent-color: var(--color-primary); }
+.invoice-overdue { display: inline-block; margin-left: var(--spacing-xs); padding: var(--spacing-xs); border-radius: var(--radius-sm); background: var(--color-destructive-tint); color: var(--color-on-destructive-tint); font-size: 0.75rem; white-space: nowrap; }
+/* Invoice and payment tables: document numbers, dates, amounts and status
+   stay on one line each, and a wide table scrolls horizontally inside the
+   shared .table-container exactly like every other list page - the page itself
+   never scrolls sideways. */
+.invoices-table .data-table { font-size: 0.8125rem; }
+.invoices-table .data-table th, .invoices-table .data-table td { padding: var(--spacing-sm) var(--spacing-md); white-space: nowrap; }
+.invoice-actions { display: flex; flex-wrap: wrap; gap: var(--spacing-xs); }
+.invoice-actions a, .invoice-actions button { border: 0; padding: 0; background: transparent; color: var(--color-primary); font: inherit; text-decoration: underline; cursor: pointer; }
+.invoicable-orders { display: grid; gap: var(--spacing-sm); }
+.invoicable-orders button { display: grid; grid-template-columns: 1fr 1fr auto; gap: var(--spacing-md); align-items: center; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--spacing-md); background: var(--color-card); color: var(--color-foreground); text-align: left; cursor: pointer; }
+.invoice-details-grid { display: grid; grid-template-columns: minmax(8rem, 0.35fr) 1fr; gap: var(--spacing-sm) var(--spacing-lg); margin: 0; }
+.invoice-details-grid dt { color: var(--color-muted-foreground); }
+.invoice-details-grid dd { margin: 0; }
+.due-date-editor { display: flex; flex-wrap: wrap; align-items: end; gap: var(--spacing-sm); }
+.invoice-totals { display: grid; grid-template-columns: 1fr auto; gap: var(--spacing-sm) var(--spacing-lg); margin: var(--spacing-lg) 0 0 auto; max-width: 22rem; }
+.invoice-totals strong { text-align: right; font-variant-numeric: tabular-nums; }
+.invoice-permanent { color: var(--color-muted-foreground); }
+.payment-fields .form-control { flex: 1 1 12rem; }
+.allocation-input { display: flex; flex-wrap: wrap; gap: var(--spacing-xs); align-items: center; }
+.allocation-input input { width: 7rem; padding: var(--spacing-sm); border: 1px solid var(--color-input-border); border-radius: var(--radius-sm); text-align: right; font-variant-numeric: tabular-nums; }
+.payment-submit { justify-content: flex-end; margin: var(--spacing-md) 0; }
+.sales-invoice-link { color: var(--color-primary); font-family: var(--font-mono); }
+.report-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--spacing-md); margin-bottom: var(--spacing-lg); }
+.report-kpis .card { display: grid; gap: var(--spacing-sm); }
+.report-kpis strong { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.report-kpis span { color: var(--color-muted-foreground); font-size: .8rem; }
+.report-status-list { display: flex; flex-wrap: wrap; gap: var(--spacing-lg); }
+.report-status-list > div { display: inline-flex; align-items: center; gap: var(--spacing-sm); }
+.profile-details { display: grid; grid-template-columns: minmax(8rem, .4fr) 1fr; gap: var(--spacing-md); }
+.profile-details dt { color: var(--color-muted-foreground); }
+.profile-details dd { margin: 0; }
+
+/* Appearance settings on the preview profile: two option groups rendered as
+   selectable cards, selected state carried by tokens only. */
+.profile-appearance { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--spacing-md); }
+.profile-appearance__options { display: grid; gap: var(--spacing-sm); border: 0; padding: 0; margin: 0; min-width: 0; }
+.profile-appearance__options legend { padding: 0; margin: 0 0 var(--spacing-sm); font-weight: 650; color: var(--color-foreground); }
+.profile-appearance__option { display: grid; gap: var(--spacing-xs); min-height: 2.75rem; width: 100%; text-align: start; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-card); color: var(--color-foreground); padding: var(--spacing-sm) var(--spacing-md); cursor: pointer; transition: border-color var(--motion-duration-fast) var(--motion-easing-standard), background var(--motion-duration-fast) var(--motion-easing-standard); }
+.profile-appearance__option:hover { border-color: var(--color-primary); }
+.profile-appearance__option--selected { border-color: var(--color-primary); background: var(--color-muted); box-shadow: inset 0 0 0 1px var(--color-primary); }
+.profile-appearance__option:focus-visible { outline: 2px solid var(--color-ring); outline-offset: var(--spacing-xs); }
+.profile-appearance__option-label { font-weight: 650; }
+.profile-appearance__option-detail { font-size: .8125rem; color: var(--color-muted-foreground); }
+@media (max-width: 767px) { .profile-appearance { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 767px) { .report-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.admin-toolbar, .settings-fields { display: flex; align-items: end; flex-wrap: wrap; gap: var(--spacing-md); padding: var(--spacing-md) 0; }
+.admin-toolbar .form-control, .settings-fields .form-control { flex: 1 1 12rem; min-width: 10rem; }
+.settings-fields { align-items: start; }
+.settings-notice { margin: var(--spacing-sm) 0; padding: var(--spacing-sm) var(--spacing-md); border-inline-start: 3px solid var(--color-primary); background: var(--color-muted); color: var(--color-muted-foreground); }
+.module-table { width: 100%; }
+.module-switch { display: inline-flex; align-items: center; gap: var(--spacing-sm); }
+.module-switch input { inline-size: var(--spacing-lg); block-size: var(--spacing-lg); accent-color: var(--color-primary); }
+.role-badges { display: flex; flex-wrap: wrap; gap: var(--spacing-xs); }
+.permission-fieldset { display: grid; gap: var(--spacing-xs); min-width: 0; margin: var(--spacing-md) 0; padding: var(--spacing-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.permission-fieldset legend { padding-inline: var(--spacing-xs); color: var(--color-muted-foreground); font-weight: 600; }
+.permission-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--spacing-md); }
+.audit-toolbar .form-control { flex: 1 1 9rem; }
+.audit-detail-summary { display: grid; grid-template-columns: minmax(7rem, .35fr) 1fr; gap: var(--spacing-sm) var(--spacing-md); margin: 0 0 var(--spacing-lg); }
+.audit-detail-summary dt { color: var(--color-muted-foreground); }
+.audit-detail-summary dd { margin: 0; overflow-wrap: anywhere; }
+.numeric-cell { font-variant-numeric: tabular-nums; }
+@media (max-width: 767px) { .permission-groups { grid-template-columns: minmax(0, 1fr); } }
+@media print {
+  body, #root { height: auto; overflow: visible; }
+  .app-shell__topbar, .app-shell__sidebar, .breadcrumb, .invoice-header-actions, .dialog-backdrop, .toast, .sample-banner { display: none !important; }
+  .app-shell { display: block; height: auto; background: var(--color-card); }
+  .app-shell__content { overflow: visible; padding: 0; }
+  .invoice-detail { color: var(--color-foreground); }
+  .invoice-detail .card { break-inside: avoid; box-shadow: none; }
+}
+
 /* Overlays: Dialog and ConfirmDialog */
 .dialog-backdrop {
   position: fixed;
@@ -915,6 +1500,18 @@
   justify-content: flex-end;
   gap: var(--spacing-sm);
   margin-top: var(--spacing-md);
+}
+
+/* An error banner shown INSIDE a ConfirmDialog, so a refused action stays
+   open with its reasons visible and the retry button still offered. */
+.confirm-dialog__error {
+  margin: var(--spacing-sm) 0 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-destructive);
+  border-radius: var(--radius-md);
+  background: var(--color-destructive-tint);
+  color: var(--color-on-destructive-tint);
+  font-size: 0.875rem;
 }
 
 /* Toast */
@@ -1013,30 +1610,12 @@
   max-width: 100%;
 }
 
-.overview-page__header-controls {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: var(--spacing-sm);
-}
-
 .overview-period-select {
   inline-size: var(--activity-filter-width);
 }
 
 .overview-period-select .form-control,
-.overview-activity-filter .form-control {
-  margin: 0;
-}
-
-.overview-sample-marker {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--spacing-xs);
-  padding-block: var(--spacing-xs);
-  color: var(--color-muted-foreground);
-  font-size: 0.75rem;
+.overview-activity-filter .form-control {  margin: 0;
 }
 
 .overview-page__body {
@@ -1244,8 +1823,7 @@
     flex-direction: column;
   }
 
-  .page-header__actions,
-  .overview-page__header-controls {
+  .page-header__actions {
     width: 100%;
     align-items: flex-start;
     flex-direction: column;
@@ -1285,5 +1863,525 @@
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+.empty-state { display: grid; justify-items: center; text-align: center; gap: var(--spacing-md); padding: var(--spacing-2xl) var(--spacing-lg); }
+.empty-state__illustration { inline-size: clamp(3rem, 8vw, 4rem); color: var(--color-muted-foreground); opacity: .85; }
+.empty-state__title { margin: 0; font-size: 1.125rem; font-weight: 600; }
+.empty-state__description { max-width: 36rem; }
+.empty-state__title { color: var(--color-foreground); }
+.empty-state h3 { margin: 0; }
+
+[data-density='compact'] .data-table th, [data-density='compact'] .data-table td { padding-block: var(--spacing-xs); }
+[data-density='compact'] .table-container .data-table { font-size: .8125rem; }
+
+.route-enter { animation: route-enter var(--motion-duration-standard) var(--motion-easing-standard); }
+@keyframes route-enter { from { opacity: 0; transform: translateY(var(--spacing-sm)); } to { opacity: 1; transform: translateY(0); } }
+
+.top-bar__command { display: inline-flex; align-items: center; gap: var(--spacing-xs); min-height: 2.75rem; border: 1px solid var(--color-border); border-radius: var(--radius-pill); background: var(--color-card); color: var(--color-muted-foreground); padding-inline: var(--spacing-sm); cursor: pointer; }
+.top-bar__command:hover { color: var(--color-foreground); border-color: var(--color-primary); }
+.top-bar__command kbd, .command-palette__footer kbd { border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-muted); color: var(--color-muted-foreground); font-family: var(--font-mono); font-size: .7rem; padding-inline: var(--spacing-xs); }
+
+.command-palette { position: fixed; inset: 0; z-index: 70; }
+.command-palette__backdrop { position: absolute; inset: 0; border: 0; background-color: var(--color-overlay); cursor: pointer; }
+.command-palette__panel { position: relative; z-index: 1; width: min(42rem, calc(100vw - var(--spacing-xl))); max-height: min(34rem, calc(100dvh - var(--spacing-2xl))); margin: var(--shell-topbar-height) auto var(--spacing-xl); display: grid; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-card); box-shadow: var(--shadow-xl); }
+.command-palette__panel .form-control { margin: 0; padding: var(--spacing-md); border-bottom: 1px solid var(--color-border); }
+.command-palette__results { overflow: auto; padding: var(--spacing-sm); display: grid; gap: var(--spacing-xs); }
+.command-palette__item { display: grid; grid-template-columns: var(--spacing-lg) 1fr auto; align-items: center; gap: var(--spacing-sm); width: 100%; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-foreground); padding: var(--spacing-sm); text-align: start; cursor: pointer; }
+.command-palette__item:hover, .command-palette__item--selected { background: var(--color-muted); }
+.command-palette__item--selected { outline: 2px solid var(--color-ring); outline-offset: calc(var(--spacing-xs) * -0.5); }
+.command-palette__label { font-weight: 600; }
+.command-palette__hint { font-size: .75rem; color: var(--color-muted-foreground); }
+.command-palette__empty { padding: var(--spacing-lg); text-align: center; color: var(--color-muted-foreground); }
+.command-palette__footer { display: flex; flex-wrap: wrap; gap: var(--spacing-md); margin: 0; padding: var(--spacing-sm) var(--spacing-md); border-top: 1px solid var(--color-border); font-size: .75rem; color: var(--color-muted-foreground); }
+.command-palette__footer span { display: inline-flex; align-items: center; gap: var(--spacing-xs); }
+
+/* Saved, reusable invoice/payment views. */
+.overview-page__intelligence { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--spacing-md); margin-block: var(--spacing-lg); }
+.action-center .card__header, .week-review .card__header { padding-block: var(--spacing-sm); }
+.action-center__loading { color: var(--color-muted-foreground); margin: 0; }
+.action-center__caught-up { margin: 0; color: var(--color-muted-foreground); }
+.action-center__caught-up strong { color: var(--color-success); }
+.action-center__list { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--spacing-sm); }
+.action-center__item { display: grid; gap: var(--spacing-xs); border: 1px solid var(--color-border); border-inline-start: var(--spacing-sm) solid var(--color-warning); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md); background: var(--color-card); color: inherit; text-decoration: none; transition: transform var(--motion-duration-fast) var(--motion-easing-standard), border-color var(--motion-duration-fast) var(--motion-easing-standard); }
+.action-center__item:hover { border-color: var(--color-primary); transform: translateY(calc(var(--spacing-xs) * -1)); }
+.action-center__item[data-severity='high'] { border-inline-start-color: var(--color-destructive); }
+.action-center__item[data-severity='low'] { border-inline-start-color: var(--color-info); }
+.action-center__item-title { font-weight: 650; }
+.action-center__item-detail { font-size: .8125rem; color: var(--color-muted-foreground); }
+.action-center__footer { margin-top: var(--spacing-md); }
+.action-center__link { text-decoration: none; }
+.action-center__item:focus-visible, .action-center__link:focus-visible { outline: 2px solid var(--color-ring); outline-offset: var(--spacing-xs); }
+.week-review__metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--spacing-md); }
+.week-review__metric { display: grid; align-content: start; gap: var(--spacing-xs); padding: var(--spacing-md); background: var(--color-muted); border-radius: var(--radius-md); min-width: 0; }
+.week-review__metric-label, .week-review__link { font-size: .75rem; color: var(--color-muted-foreground); }
+.week-review__metric-value { font-family: var(--font-mono); font-size: 1.125rem; font-variant-numeric: tabular-nums; }
+.week-review__link { text-decoration: none; }
+@media (max-width: 1023px) { .overview-page__intelligence { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 767px) { .week-review__metrics { grid-template-columns: minmax(0, 1fr); } }
+
+.saved-views { display: grid; gap: var(--spacing-sm); align-items: end; }
+.saved-views__actions { display: flex; flex-wrap: wrap; align-items: end; gap: var(--spacing-xs); }
+.saved-views__actions .form-control { min-width: 12rem; margin: 0; }
+.saved-views__list { list-style: none; display: flex; flex-wrap: wrap; gap: var(--spacing-xs); padding: 0; margin: 0; }
+.saved-views__list li { display: inline-flex; align-items: center; }
+.saved-views__chip, .saved-views__remove { border: 1px solid var(--color-border); background: var(--color-card); color: var(--color-foreground); cursor: pointer; }
+.saved-views__chip { border-radius: var(--radius-pill) 0 0 var(--radius-pill); padding: var(--spacing-xs) var(--spacing-sm); border-right: 0; }
+.saved-views__remove { border-radius: 0 var(--radius-pill) var(--radius-pill) 0; padding-inline: var(--spacing-xs); color: var(--color-muted-foreground); }
+.saved-views__chip:hover, .saved-views__remove:hover { background: var(--color-muted); }
+
+.app-shell__content > * { min-width: 0; }
+
+.sparkline { display: block; inline-size: 100%; min-inline-size: 5rem; block-size: 2.25rem; }
+.sparkline polyline { vector-effect: non-scaling-stroke; }
+
+.toast__action { flex: none; border: 0; border-radius: var(--radius-sm); background: var(--color-primary); color: var(--color-on-primary); font: inherit; font-size: .8125rem; font-weight: 700; padding-inline: var(--spacing-sm); min-height: 2rem; cursor: pointer; }
+
+.print-only { display: none; }
+/* Printing re-asserts the light "ink" palette from tokens.css so a dark-mode
+   session never prints a page of solid ink; the values live only in the token file. */
+@media print {
+  .top-bar__command, .page-header__actions, .invoice-header-actions, .breadcrumb, .command-palette, .button, .toast, .app-shell__sidebar, .app-shell__topbar { display: none !important; }
+  .print-only { display: block; }
+  .invoice-print-header { margin-bottom: var(--spacing-lg); border-bottom: 1px solid var(--color-border); padding-bottom: var(--spacing-md); }
+}
+
+[dir='rtl'] .sidebar-nav__link { border-left: 0; border-right: 3px solid transparent; }
+[dir='rtl'] .sidebar-nav__link[aria-current='page'] { border-right-color: var(--color-primary); }
+[dir='rtl'] .invoice-overdue { margin-left: 0; margin-right: var(--spacing-xs); }
+[dir='rtl'] .table-container { direction: rtl; }
+
+@media (max-width: 767px) {
+  .top-bar__command-label { display: none; }
+  .top-bar__command kbd { display: none; }
+  .command-palette__panel { width: calc(100vw - var(--spacing-md)); margin-top: var(--spacing-md); }
+  .command-palette__item { grid-template-columns: var(--spacing-lg) 1fr; }
+  .command-palette__hint { display: none; }
+  .empty-state { padding-inline: var(--spacing-md); }
+  .invoice-metrics { gap: var(--spacing-md); }
+}
+
+/* Responsive ERP surfaces --------------------------------------------------- */
+.form-control,
+.card,
+.dialog,
+.page-header__leading-block {
+  min-width: 0;
+}
+
+.table-container {
+  width: 100%;
+  max-width: 100%;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table__pager > div {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.dialog {
+  max-height: calc(100dvh - var(--spacing-xl));
+  min-height: 0;
+}
+
+.dialog__body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.invoicable-orders button,
+.profile-details,
+.invoice-details-grid,
+.order-detail-page__details,
+.audit-detail-summary {
+  min-width: 0;
+}
+
+.invoicable-orders button > *,
+.order-detail-page__details dd,
+.invoice-details-grid dd,
+.profile-details dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1023px) and (min-width: 768px) {
+  .app-shell__content {
+    padding: var(--spacing-lg);
+  }
+
+  .overview-page__charts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .line-items-editor__line,
+  .line-items-editor__line--with-note {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .line-items-editor__line--head {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-shell {
+    grid-template-areas: 'topbar' 'content';
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--shell-topbar-height) minmax(0, 1fr);
+  }
+
+  .app-shell__topbar {
+    gap: var(--spacing-sm);
+    padding-inline: var(--spacing-sm);
+  }
+
+  .mobile-navigation__trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    inline-size: 2.75rem;
+    block-size: 2.75rem;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-card);
+    color: var(--color-foreground);
+    cursor: pointer;
+  }
+
+  .top-bar__brand {
+    min-width: 0;
+    font-size: 1rem;
+  }
+
+  .top-bar__right {
+    gap: var(--spacing-xs);
+  }
+
+  .top-bar__account {
+    min-width: 0;
+    gap: var(--spacing-xs);
+  }
+
+  .top-bar__organization-menu .menu__trigger,
+  .top-bar__user-menu .menu__trigger {
+    min-height: 2.75rem;
+    padding-inline: var(--spacing-xs);
+  }
+
+  .top-bar__organization-name {
+    display: block;
+    max-width: clamp(4rem, 24vw, 9rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .top-bar__user-copy {
+    display: none;
+  }
+
+  .app-shell__sidebar {
+    grid-area: auto;
+    position: fixed;
+    inset-block: var(--shell-topbar-height) 0;
+    inset-inline-start: 0;
+    z-index: 51;
+    inline-size: min(20rem, calc(100vw - var(--spacing-2xl)));
+    block-size: auto;
+    max-block-size: calc(100dvh - var(--shell-topbar-height));
+    padding: var(--spacing-md) var(--spacing-sm);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform var(--motion-duration-standard) var(--motion-easing-standard),
+      visibility var(--motion-duration-standard) var(--motion-easing-standard);
+    box-shadow: var(--shadow-xl);
+    overscroll-behavior: contain;
+  }
+
+  .app-shell__sidebar--open {
+    transform: translateX(0);
+    visibility: visible;
+  }
+
+  .app-shell__sidebar .sidebar-nav__link {
+    justify-content: flex-start;
+    min-height: 2.75rem;
+    padding-inline: var(--spacing-md);
+  }
+
+  .app-shell__sidebar .sidebar-nav__group-label,
+  .app-shell__sidebar .sidebar-nav__label,
+  .app-shell__sidebar .sidebar-nav__soon {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: revert;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    border-width: 0;
+  }
+
+  .app-shell__sidebar .sidebar-nav__group-label {
+    padding: var(--spacing-sm) var(--spacing-md) var(--spacing-xs);
+  }
+
+  .app-shell__sidebar .sidebar-nav__soon {
+    margin-inline-start: auto;
+    padding-inline: var(--spacing-xs);
+    white-space: nowrap;
+  }
+
+  .mobile-navigation__overlay {
+    display: block;
+    position: fixed;
+    inset: var(--shell-topbar-height) 0 0;
+    z-index: 40;
+    padding: 0;
+    border: 0;
+    background: var(--color-overlay);
+    cursor: pointer;
+  }
+
+  .app-shell__content {
+    padding: var(--spacing-md);
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+  }
+
+  .page-header {
+    gap: var(--spacing-sm);
+  }
+
+  .page-header__title {
+    overflow-wrap: anywhere;
+    font-size: clamp(1.125rem, 5vw, 1.25rem);
+  }
+
+  .page-header__actions,
+  .page-header__actions > * {
+    max-width: 100%;
+  }
+
+  .contacts-page__toolbar,
+  .products-page__toolbar,
+  .stock-balances__toolbar,
+  .movements__toolbar,
+  .warehouses__toolbar,
+  .purchase-orders__toolbar,
+  .goods-receipts__toolbar,
+  .invoice-toolbar,
+  .admin-toolbar,
+  .settings-fields {
+    align-items: stretch;
+  }
+
+  .contacts-page__toolbar .form-control,
+  .products-page__toolbar .form-control,
+  .stock-balances__toolbar .form-control,
+  .movements__toolbar .form-control,
+  .warehouses__toolbar .form-control,
+  .purchase-orders__toolbar .form-control,
+  .goods-receipts__toolbar .form-control,
+  .invoice-toolbar .form-control,
+  .admin-toolbar .form-control,
+  .settings-fields .form-control {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .tab-strip {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .tab-strip__tab {
+    min-height: 2.75rem;
+    flex: none;
+  }
+
+  .data-table__pager {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .data-table__pager > div {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .data-table__pager .button,
+  .data-table th button {
+    min-height: 2.75rem;
+  }
+
+  .button,
+  .input,
+  .select {
+    min-height: 2.75rem;
+  }
+
+  .kebab-trigger {
+    inline-size: 2.75rem;
+    block-size: 2.75rem;
+  }
+
+  .invoice-actions a,
+  .invoice-actions button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding-inline: var(--spacing-xs);
+  }
+
+  .line-items-editor__line,
+  .line-items-editor__line--with-note {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--spacing-xs);
+    padding: var(--spacing-md) 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .line-items-editor__line--head {
+    display: none;
+  }
+
+  .line-items-editor__line-total .qty,
+  .line-items-editor__note {
+    padding: 0;
+  }
+
+  .order-form__actions,
+  .dialog__actions,
+  .payment-submit {
+    flex-wrap: wrap;
+  }
+
+  .dialog-backdrop {
+    align-items: flex-end;
+    padding: var(--spacing-sm);
+  }
+
+  .dialog {
+    max-height: calc(100dvh - var(--spacing-lg));
+    padding: var(--spacing-md);
+  }
+
+  .dialog__actions > .button {
+    flex: 1 1 auto;
+  }
+
+  .report-kpis,
+  .permission-groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .invoice-details-grid,
+  .profile-details,
+  .audit-detail-summary,
+  .order-detail-page__details {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--spacing-xs);
+  }
+
+  .invoice-details-grid dd,
+  .profile-details dd,
+  .audit-detail-summary dd,
+  .order-detail-page__details dd {
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .invoicable-orders button {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .toast-container {
+    inset-inline: var(--spacing-sm);
+    inset-block-end: var(--spacing-sm);
+  }
+
+  .toast {
+    width: 100%;
+  }
+}
+
+@media (max-width: 639px) {
+  .app-shell__content {
+    padding: var(--spacing-sm);
+  }
+
+  .top-bar__brand > span:last-child {
+    display: none;
+  }
+
+  .top-bar__organization-name {
+    max-width: 5rem;
+  }
+
+  .top-bar__user-menu .menu__trigger {
+    gap: var(--spacing-xs);
+  }
+
+  .overview-page__kpis,
+  .report-kpis,
+  .permission-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .overview-page__charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .overview-page__kpis .card,
+  .card {
+    padding: var(--spacing-md);
+  }
+
+  .overview-chart-frame {
+    block-size: clamp(10rem, 56vw, var(--chart-height));
+  }
+
+  .invoice-metrics > div {
+    min-width: min(100%, 10rem);
+  }
+
+  .invoice-overdue {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 374px) {
+  .app-shell__topbar {
+    gap: var(--spacing-xs);
+    padding-inline: var(--spacing-xs);
+  }
+
+  .top-bar__account {
+    gap: 0;
+  }
+
+  .top-bar__organization-name {
+    max-width: 3.75rem;
+  }
+
+  .app-shell__content {
+    padding: var(--spacing-xs);
+  }
+
+  .dialog__actions {
+    flex-direction: column-reverse;
   }
 }

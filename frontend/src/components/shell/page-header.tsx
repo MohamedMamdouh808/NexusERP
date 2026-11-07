@@ -11,16 +11,21 @@ import type { ReactNode } from 'react';
  *    that does nothing.
  *  - Secondary actions sit to the left of the primary one, so the reading order
  *    matches the visual order.
+ *  - An optional `leading` control (a period filter) sits UNDER the title, so a
+ *    page's reading filter reads after the heading, not beside it.
  *  - The title is the page's `h1`. Every destination in the shell therefore has
  *    exactly one first-level heading, which is what the router tests assert.
  *
  * The class names are the ones the design system publishes (`.page-header`,
- * `.page-header__title`, `.page-header__description`, `.page-header__actions`).
+ * `.page-header__title`, `.page-header__leading`, `.page-header__description`,
+ * `.page-header__actions`).
  */
 
 export interface PageHeaderProps {
   readonly title: string;
   readonly description?: string;
+  /** A control rendered on the left, under the title (for example a period filter). */
+  readonly leading?: ReactNode;
   readonly secondaryActions?: readonly ReactNode[];
   readonly primaryAction?: ReactNode;
 }
@@ -28,13 +33,16 @@ export interface PageHeaderProps {
 export function PageHeader({
   title,
   description,
+  leading,
   secondaryActions,
   primaryAction,
 }: PageHeaderProps) {
+  const showLeading = leading !== undefined && leading !== null;
   return (
     <div className="page-header">
-      <div>
+      <div className="page-header__leading-block">
         <h1 className="page-header__title">{title}</h1>
+        {showLeading ? <div className="page-header__leading">{leading}</div> : null}
         {description === undefined ? null : (
           <p className="page-header__description">{description}</p>
         )}

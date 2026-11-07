@@ -457,7 +457,7 @@ gallery in their default state, and are not rows in this matrix.
 | Checkbox | required | unit test + gallery |
 | Checkbox | invalid, with inline error | unit test + gallery |
 | Checkbox | disabled | unit test + gallery |
-| Badge | one state per status name in the design system's status mapping — DRAFT, CONFIRMED, ISSUED, PARTIALLY_RECEIVED, PARTIALLY_SHIPPED, PARTIALLY_PAID, RECEIVED, SHIPPED, PAID, CANCELLED, VOID, ACTIVE, CONSUMED, RELEASED | unit test + gallery |
+| Badge | one state per status name in the design system's status mapping — DRAFT, CONFIRMED, ISSUED, PARTIALLY_RECEIVED, PARTIALLY_SHIPPED, PARTIALLY_PAID, RECEIVED, SHIPPED, PAID, CANCELLED, VOID, ACTIVE, CONSUMED, RELEASED, RECORDED, REVERSED, USER_ACTIVE, USER_DEACTIVATED | unit test + gallery |
 | Badge | status conveyed by more than colour | unit test + gallery |
 | Card | title only | unit test + gallery |
 | Card | with description | unit test + gallery |

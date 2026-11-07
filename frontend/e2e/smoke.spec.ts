@@ -31,11 +31,13 @@ test.describe('the authenticated application shell', () => {
     await expect(page.getByLabel(/password/i)).toHaveCount(0);
   });
 
-  test('labels the organization and the user as unavailable rather than showing dead controls', async ({ page }) => {
+  test('labels the organization and the user as sample rather than showing dead controls', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByTestId('organization-placeholder')).toContainText(/none available yet/i);
-    await expect(page.getByTestId('user-placeholder')).toContainText(/no user available yet/i);
+    // The top bar carries real controls, not inert placeholders, and each one names its
+    // value as sample (FR-013). The accessible name leads with that label.
+    await expect(page.getByRole('button', { name: /Sample organization:/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Preview user:/ })).toBeVisible();
   });
 });
 
@@ -50,7 +52,10 @@ test.describe('the health panel', () => {
   test('reads the service report or reports the failure, but never renders nothing', async ({ page }) => {
     await page.goto('/health');
 
-    const report = page.getByText('Application');
+    // Scoped to the checks list on purpose: a loose `getByText('Application')` also matches
+    // the word "application" inside the failure alert's message, which would send the
+    // assertion down the healthy branch even when the service is unreachable.
+    const report = page.locator('.health-panel__checks');
     const failure = page.getByRole('alert');
 
     await expect(report.or(failure).first()).toBeVisible({ timeout: 20_000 });

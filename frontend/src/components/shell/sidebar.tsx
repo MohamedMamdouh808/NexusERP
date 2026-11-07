@@ -1,8 +1,10 @@
 import { NavLink } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 
 import { Icon } from '../ui/icon';
 import type { NavGroupName } from './navigation';
 import { NAVIGATION } from './navigation';
+import { sampleCatalogService } from '../../services/sample-catalog-service';
 
 /**
  * The persistent left sidebar (T025, FR-006 to FR-009).
@@ -24,9 +26,10 @@ function groupLabelId(name: NavGroupName): string {
   return `nav-group-${name.toLowerCase().replace(/\s+/g, '-')}`;
 }
 
-export function Sidebar() {
+export function Sidebar({ className }: { readonly className?: string } = {}) {
+  const modules = useQuery({ queryKey: ['modules'], queryFn: () => sampleCatalogService.listModules() });
   return (
-    <nav className="app-shell__sidebar" aria-label="Main">
+    <nav id="main-navigation" className={['app-shell__sidebar', className].filter(Boolean).join(' ')} aria-label="Main">
       <ul className="sidebar-nav">
         {NAVIGATION.map((group) => (
           <li key={group.name} className="sidebar-nav__group">
@@ -35,8 +38,10 @@ export function Sidebar() {
             </h2>
 
             <ul className="sidebar-nav__group-list" aria-labelledby={groupLabelId(group.name)}>
-              {group.entries.map((entry) =>
-                entry.state === 'available' ? (
+              {group.entries.map((entry) => {
+                const moduleKey = entry.label === 'Inventory' ? 'inventory' : entry.label === 'Purchasing' ? 'purchasing' : entry.label === 'Sales Orders' ? 'sales' : entry.label === 'Invoicing' ? 'invoicing' : null;
+                const disabledBySettings = moduleKey !== null && modules.data?.find((module) => module.key === moduleKey)?.enabled === false;
+                return entry.state === 'available' && !disabledBySettings ? (
                   <li key={entry.label}>
                     <NavLink to={entry.path} end className="sidebar-nav__link" title={entry.label}>
                       <Icon name={entry.icon} />
@@ -47,18 +52,18 @@ export function Sidebar() {
                   <li key={entry.label}>
                     <span
                       className="sidebar-nav__link"
-                      data-state="Soon"
+                      data-state={disabledBySettings ? 'Unavailable' : 'Soon'}
                       aria-disabled="true"
-                      title={entry.reason}
+                      title={disabledBySettings ? 'Turned off in Settings' : entry.reason ?? undefined}
                     >
                       <Icon name={entry.icon} />
                       <span className="sidebar-nav__label">{entry.label}</span>
-                      <span className="sidebar-nav__soon">Soon</span>
-                      <span className="sr-only"> - {entry.reason}</span>
+                      <span className="sidebar-nav__soon">{disabledBySettings ? 'Unavailable' : 'Soon'}</span>
+                      <span className="sr-only"> - {disabledBySettings ? 'Turned off in Settings' : entry.reason}</span>
                     </span>
                   </li>
-                ),
-              )}
+                );
+              })}
             </ul>
           </li>
         ))}

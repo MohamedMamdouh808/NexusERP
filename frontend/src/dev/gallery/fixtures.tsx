@@ -151,6 +151,10 @@ export const FIXTURES: Record<FixtureSlot, () => ReactNode> = {
   'Badge.ACTIVE': () => <Badge status="ACTIVE" />,
   'Badge.CONSUMED': () => <Badge status="CONSUMED" />,
   'Badge.RELEASED': () => <Badge status="RELEASED" />,
+  'Badge.RECORDED': () => <Badge status="RECORDED" />,
+  'Badge.REVERSED': () => <Badge status="REVERSED" />,
+  'Badge.USER_ACTIVE': () => <Badge status="USER_ACTIVE" />,
+  'Badge.USER_DEACTIVATED': () => <Badge status="USER_DEACTIVATED" />,
   'Badge.conveys-more-than-colour': () => <Badge status="CONFIRMED" />,
 
   // Card

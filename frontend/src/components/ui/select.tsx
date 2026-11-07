@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import type { SelectHTMLAttributes } from 'react';
 
 export interface SelectOption {
@@ -14,17 +15,25 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   readonly error?: string;
 }
 
-export function Select({
-  id,
-  label,
-  options,
-  placeholder,
-  helpText,
-  error,
-  required,
-  className,
-  ...props
-}: SelectProps) {
+/**
+ * Accepts a ref for the same reason as Input: form libraries register the
+ * select through it, and dropping the ref breaks reading, writing and
+ * validating the field.
+ */
+export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
+  {
+    id,
+    label,
+    options,
+    placeholder,
+    helpText,
+    error,
+    required,
+    className,
+    ...props
+  },
+  ref,
+) {
   const helpId = helpText ? `${id}-help` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [helpId, errorId].filter(Boolean).join(' ') || undefined;
@@ -42,6 +51,7 @@ export function Select({
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={describedBy}
         {...props}
+        ref={ref}
       >
         {placeholder && (
           <option value="" disabled selected={props.defaultValue === undefined && props.value === undefined}>
@@ -66,4 +76,4 @@ export function Select({
       )}
     </div>
   );
-}
+});

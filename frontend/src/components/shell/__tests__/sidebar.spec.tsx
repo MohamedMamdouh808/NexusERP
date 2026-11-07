@@ -70,13 +70,18 @@ describe('Sidebar structure (T020, FR-006)', () => {
 });
 
 describe('Sidebar reachability (T020, FR-007, FR-009, SC-016)', () => {
-  it('offers exactly two links, and they are the two available destinations', () => {
+  it('offers one link per available destination, in navigation-list order', () => {
     renderSidebar();
 
     const links = within(mainNav()).getAllByRole('link');
+    const availableLabels = ALL_ENTRIES
+      .filter((entry) => entry.state === 'available')
+      .map((entry) => entry.label);
 
-    expect(links.map((link) => link.textContent)).toEqual(['Overview', 'System Health']);
-    expect(ALL_ENTRIES.filter((entry) => entry.state === 'available')).toHaveLength(2);
+    expect(links.map((link) => link.textContent)).toEqual(availableLabels);
+    expect(ALL_ENTRIES.filter((entry) => entry.state === 'available').length).toBe(
+      availableLabels.length,
+    );
   });
 
   it('marks the entry for the current destination as the page, and nothing else', () => {
@@ -105,37 +110,15 @@ describe('Sidebar reachability (T020, FR-007, FR-009, SC-016)', () => {
 describe('Sidebar honesty (T020, FR-007, FR-008)', () => {
   const unavailable = ALL_ENTRIES.filter((entry) => entry.state === 'Soon');
 
-  it('renders every unbuilt module as unavailable, in place, with its reason', () => {
+  it('links Reports now that its page is available', () => {
     renderSidebar();
-
-    expect(unavailable.length).toBeGreaterThan(0);
-
-    for (const entry of unavailable) {
-      const rendered = screen.getByTitle(entry.reason);
-
-      expect(rendered).toHaveAttribute('data-state', 'Soon');
-      expect(rendered).toHaveAttribute('aria-disabled', 'true');
-      expect(rendered.textContent).toContain(entry.label);
-      expect(rendered.textContent).toContain('Soon');
-      expect(rendered.textContent, 'the reason must reach assistive technology').toContain(
-        entry.reason,
-      );
-    }
+    expect(unavailable).toHaveLength(0);
+    expect(screen.getByRole('link', { name: /Reports/i })).toHaveAttribute('href', '/reports');
   });
 
-  it('gives an unavailable entry no activation path at all', () => {
+  it('does not render a Soon destination while every navigation page is implemented', () => {
     renderSidebar();
-
-    const entry = unavailable[0];
-    const rendered = screen.getByTitle(entry.reason);
-
-    // Not a link and not a button: there is nothing to activate, and no handler
-    // that would silently do nothing.
-    expect(within(rendered).queryByRole('link')).toBeNull();
-    expect(within(mainNav()).queryByRole('link', { name: new RegExp(entry.label) })).toBeNull();
-    expect(within(mainNav()).queryByRole('button', { name: new RegExp(entry.label) })).toBeNull();
-    expect(rendered.closest('a')).toBeNull();
-    expect(rendered.closest('button')).toBeNull();
+    expect(within(mainNav()).queryByText('Soon')).toBeNull();
   });
 
   it('never puts the keyboard on an unavailable entry', async () => {
@@ -153,17 +136,11 @@ describe('Sidebar honesty (T020, FR-007, FR-008)', () => {
     }
   });
 
-  it('changes nothing when an unavailable entry is clicked', async () => {
+  it('keeps Reports as an in-app route', async () => {
     const user = userEvent.setup();
     renderSidebar();
-
-    const before = document.body.innerHTML;
-    await user.click(screen.getByTitle(unavailable[0].reason));
-
-    expect(document.body.innerHTML).toBe(before);
-    expect(within(mainNav()).getAllByRole('link', { current: 'page' })[0].textContent).toBe(
-      'Overview',
-    );
+    await user.click(screen.getByRole('link', { name: /Reports/i }));
+    expect(within(mainNav()).getByRole('link', { name: /Reports/i })).toHaveAttribute('href', '/reports');
   });
 });
 
