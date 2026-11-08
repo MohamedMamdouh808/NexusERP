@@ -16,7 +16,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const repoRoot = resolve(__dirname, '..', '..');
 const envPath = join(repoRoot, '.env');
 
 function parseEnvFile(contents: string): Record<string, string> {
@@ -71,7 +71,7 @@ if (!databaseUrl) {
 let host: string | null = null;
 const match = databaseUrl.match(/^postgres(?:ql)?:\/\/[^@]+@([^:/:]+)(?::\d+)?\//);
 if (match) {
-  host = match[1];
+  host = match[1] ?? null;
 }
 
 const allowedHosts = ['localhost', '127.0.0.1'];

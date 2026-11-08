@@ -142,24 +142,30 @@ export async function seed(target: PrismaClient = prisma): Promise<SeedSummary> 
   // organizations that already exist.
   const organizations = await target.organization.findMany();
   for (const organization of organizations) {
-    await target.warehouse.upsert({
-      where: { organizationId_isDefault: { organizationId: organization.id, isDefault: true } },
-      update: {},
-      create: {
-        organizationId: organization.id,
-        name: 'Default Warehouse',
-        isDefault: true,
-      },
+    const existingWarehouse = await target.warehouse.findFirst({
+      where: { organizationId: organization.id, isDefault: true },
     });
-    await target.documentSequence.upsert({
-      where: { organizationId_name: { organizationId: organization.id, name: 'invoice' } },
-      update: {},
-      create: {
-        organizationId: organization.id,
-        name: 'invoice',
-        currentValue: 0,
-      },
+    if (!existingWarehouse) {
+      await target.warehouse.create({
+        data: {
+          organizationId: organization.id,
+          name: 'Default Warehouse',
+          isDefault: true,
+        },
+      });
+    }
+    const existingSequence = await target.documentSequence.findFirst({
+      where: { organizationId: organization.id, name: 'invoice' },
     });
+    if (!existingSequence) {
+      await target.documentSequence.create({
+        data: {
+          organizationId: organization.id,
+          name: 'invoice',
+          currentValue: 0,
+        },
+      });
+    }
   }
 
   const [permissionCount, roleCount, grantCount, warehouseCount, sequenceCount] =

@@ -19,7 +19,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const repoRoot = resolve(__dirname, '..', '..');
 const migrationsDir = join(repoRoot, 'database', 'prisma', 'migrations');
 
 /** Migration folder names (directories only), sorted. */
@@ -37,7 +37,7 @@ function createdTables(sql: string): string[] {
   const pattern = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?\s*\(/gi;
   let match;
   while ((match = pattern.exec(sql)) !== null) {
-    tables.push(match[1]);
+    tables.push(match[1]!);
   }
   return tables;
 }
@@ -49,7 +49,7 @@ function rlsEnabledTables(sql: string): string[] {
   let match;
   while ((match = pattern.exec(sql)) !== null) {
     // Group 2 is the table name when schema-qualified, group 1 otherwise.
-    tables.push(match[2] ?? match[1]);
+    tables.push(match[2] ?? match[1] ?? '');
   }
   return tables;
 }
