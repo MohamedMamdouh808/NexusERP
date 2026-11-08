@@ -296,11 +296,13 @@ describe('runMigrationHistoryCheck names every mismatch it finds (FR-014)', () =
       expect(output).toContain('a_applied_but_absent');
       expect(output).toContain('b_applied_but_absent');
       expect(output).toContain('missing-folder');
-      // Three, not two: the two applied-but-absent migrations, PLUS the repository's own
-      // folder, which this synthetic history also claims was never applied. A mismatch in
-      // one direction implies a mismatch in the other, and reporting only one side would
-      // understate the divergence.
-      expect(output).toMatch(/3 problem\(s\)/);
+      // Beyond the two applied-but-absent migrations, every folder in the repository
+      // shows up as never applied (read from disk rather than hardcoded: the chain
+      // grows as features land, and a hardcoded count would fail this test for the
+      // wrong reason). A mismatch in one direction implies a mismatch in the other,
+      // and reporting only one side would understate the divergence.
+      const repositoryFolders = listMigrationFolders(resolveMigrationsDir(join(__dirname, '..'))).length;
+      expect(output).toMatch(new RegExp(`${repositoryFolders + 2} problem\\(s\\)`));
       expect(output).toContain('missing-file');
     } finally {
       errorSpy.mockRestore();
@@ -333,13 +335,21 @@ describe('runMigrationHistoryCheck names every mismatch it finds (FR-014)', () =
     });
 
     try {
-      const code = await runMigrationHistoryCheck(() => Promise.resolve([
-        {
-          migration_name: '20261018100057_init_reference_tables',
-          finished_at: new Date(),
-          rolled_back_at: null,
-        },
-      ]));
+      // The injected history is derived from the repository's own folder list rather
+      // than hardcoding migration names: the chain grows as features land, and a
+      // hardcoded single-folder history would report the five newer folders as
+      // never applied and fail this "exact match" test for the wrong reason.
+      const migrationsDir = resolveMigrationsDir(join(__dirname, '..'));
+      const folders = listMigrationFolders(migrationsDir);
+      const code = await runMigrationHistoryCheck(() =>
+        Promise.resolve(
+          folders.map((migration_name) => ({
+            migration_name,
+            finished_at: new Date(),
+            rolled_back_at: null,
+          })),
+        ),
+      );
 
       expect(code).toBe(0);
       expect(lines.join('\n')).toMatch(/consistent/i);

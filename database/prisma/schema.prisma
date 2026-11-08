@@ -147,6 +147,7 @@ model Organization {
   memberships Membership[]
   warehouses  Warehouse[]
   sequences   DocumentSequence[]
+  roles       Role[]
 
   @@map("organizations")
 }
@@ -166,6 +167,7 @@ model Membership {
   sessions Session[]
 
   @@unique([userId, organizationId])
+  @@index([organizationId])
   @@map("memberships")
 }
 
@@ -179,10 +181,12 @@ model Role {
   description   String   @db.VarChar(255)
   isSystem      Boolean  @default(true)
   organizationId String? @db.Uuid
+  organization  Organization? @relation(fields: [organizationId], references: [id])
 
   permissions   RolePermission[]
   createdAt     DateTime @default(now()) @db.Timestamptz(6)
 
+  @@index([organizationId])
   @@map("roles")
 }
 
@@ -227,6 +231,7 @@ model LoginAttempt {
   succeeded    Boolean  @default(false)
   createdAt    DateTime @default(now()) @db.Timestamptz(6)
 
+  @@index([email])
   @@map("login_attempts")
 }
 
@@ -241,6 +246,7 @@ model Warehouse {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
   @@map("warehouses")
 }
 
@@ -255,5 +261,6 @@ model DocumentSequence {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
   @@map("document_sequences")
 }

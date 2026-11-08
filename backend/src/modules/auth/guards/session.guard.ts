@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../../../platform/prisma/prisma.service';
 
 export interface SessionRequest extends Request {
@@ -23,16 +24,17 @@ export class SessionGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<SessionRequest>();
-    const sessionId = request.cookies?.['session_id'];
+    // cookie-parser is registered globally in main.ts; its untyped declaration is
+    // narrowed here so the session cookie is read as a string, never as `any`.
+    const sessionId = (request.cookies as Record<string, string | undefined> | undefined)?.[
+      'session_id'
+    ];
 
     if (!sessionId) {
       throw new UnauthorizedException('No session cookie.');
     }
 
-    const tokenHash = require('node:crypto')
-      .createHash('sha256')
-      .update(sessionId)
-      .digest('hex');
+    const tokenHash = createHash('sha256').update(sessionId).digest('hex');
 
     const session = await this.prisma.session.findUnique({
       where: { tokenHash },

@@ -16,6 +16,10 @@ import { ERROR_CODES } from '@nexuserp/shared';
 import { AppException } from '../../common/errors/all-exceptions.filter';
 import { AuthService } from './auth.service';
 import { SessionGuard, SessionRequest } from './guards/session.guard';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
+import { registerSchema, type RegisterDto } from './dto/register.dto';
+import { loginSchema, type LoginDto } from './dto/login.dto';
+import { switchOrganizationSchema, type SwitchOrganizationDto } from './dto/switch-organization.dto';
 import { CONFIGURATION } from '../../config/configuration.module';
 import { Configuration } from '../../config/configuration';
 
@@ -38,7 +42,7 @@ export class AuthController {
    */
   @Public()
   @Post('register')
-  async register(@Body() body: { email: string; password: string }) {
+  async register(@Body(new ZodValidationPipe(registerSchema)) body: RegisterDto) {
     return this.authService.register(body.email, body.password);
   }
 
@@ -50,7 +54,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
-    @Body() body: { email: string; password: string },
+    @Body(new ZodValidationPipe(loginSchema)) body: LoginDto,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authService.login(body.email, body.password);
@@ -87,7 +91,9 @@ export class AuthController {
     @Req() request: SessionRequest,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const sessionId = request.cookies?.['session_id'];
+    const sessionId = (request.cookies as Record<string, string | undefined> | undefined)?.[
+      'session_id'
+    ];
     if (sessionId) {
       await this.authService.logout(sessionId);
     }
@@ -135,7 +141,7 @@ export class AuthController {
   @Post('switch-organization')
   @UseGuards(SessionGuard)
   async switchOrganization(
-    @Body() body: { organizationId: string },
+    @Body(new ZodValidationPipe(switchOrganizationSchema)) body: SwitchOrganizationDto,
     @Req() request: SessionRequest,
   ) {
     if (!request.userId || !request.membershipId) {

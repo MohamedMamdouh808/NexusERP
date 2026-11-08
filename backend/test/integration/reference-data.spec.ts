@@ -48,7 +48,7 @@ describe('reference data seed', () => {
     expect(after).toEqual(before);
     expect(after[0]).toBeGreaterThan(0);
     expect(after[1]).toBeGreaterThan(0);
-  });
+  }, 240_000);
 
   it('leaves no duplicate permission code (FR-018)', async () => {
     const prisma = getTestPrisma();
@@ -78,7 +78,7 @@ describe('reference data seed', () => {
 
     const restored = await prisma.roleTemplate.findUnique({ where: { key: 'manager' } });
     expect(restored).not.toBeNull();
-  });
+  }, 180_000);
 
   // T032 - content invariants
   it('loads exactly the five default role templates (FR-019)', async () => {

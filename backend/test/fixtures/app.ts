@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import cookieParser from 'cookie-parser';
 import { getTestPrisma } from './database';
 import { AppModule } from '../../src/app.module';
 
@@ -31,6 +32,7 @@ export async function createTestApp(): Promise<TestApp> {
   // Mirrors main.ts exactly. A divergence here would mean the tests exercise a different
   // application from the one that ships, which defeats the purpose of the suite.
   app.setGlobalPrefix('api/v1');
+  app.use(cookieParser());
   app.useGlobalFilters();
   app.enableShutdownHooks();
 

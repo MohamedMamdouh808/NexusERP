@@ -3,8 +3,12 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../../platform/prisma/prisma.service';
-import { TransactionService } from '../../platform/transaction/transaction.service';
+import {
+  TransactionService,
+  type TransactionClient,
+} from '../../platform/transaction/transaction.service';
 import { extendRequestContext } from '../../common/logging/request-context';
 
 /**
@@ -128,7 +132,7 @@ export class AuthService {
     const csrfToken = this.generateCsrfToken();
 
     extendRequestContext({
-      organizationId: (membership as any).organization.id,
+      organizationId: membership.organization.id,
     });
 
     return {
@@ -137,8 +141,8 @@ export class AuthService {
         id: membership.id,
         roleKey: membership.roleKey,
         organization: {
-          id: (membership as any).organization.id,
-          name: (membership as any).organization.name,
+          id: membership.organization.id,
+          name: membership.organization.name,
         },
       },
       session: { id: sessionId },
@@ -273,10 +277,10 @@ export class AuthService {
    * so a database leak does not expose session tokens.
    */
   private async createSession(
-    tx: { session: { create: (data: any) => Promise<{ id: string }> } },
+    tx: TransactionClient,
     userId: string,
     membershipId: string,
-  ) {
+  ): Promise<{ sessionId: string; rawToken: string }> {
     const rawToken = this.generateSessionToken();
     const session = await tx.session.create({
       data: {
@@ -300,18 +304,15 @@ export class AuthService {
   }
 
   private generateSessionToken(): string {
-    const crypto = require('node:crypto');
-    return crypto.randomBytes(32).toString('hex');
+    return randomBytes(32).toString('hex');
   }
 
   private hashToken(token: string): string {
-    const crypto = require('node:crypto');
-    return crypto.createHash('sha256').update(token).digest('hex');
+    return createHash('sha256').update(token).digest('hex');
   }
 
   private generateCsrfToken(): string {
-    const crypto = require('node:crypto');
-    return crypto.randomBytes(16).toString('hex');
+    return randomBytes(16).toString('hex');
   }
 }
 

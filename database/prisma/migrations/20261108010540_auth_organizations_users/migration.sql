@@ -45,12 +45,18 @@ CREATE TABLE "roles" (
 );
 
 -- CreateTable
+-- NOTE: at apply time this table was created with a column named "permission"; the
+-- current Prisma schema field is "permissionId". The following migration
+-- (20261108012225_fix_role_permission_column) renames this column to "permissionId".
+-- This file keeps the apply-time shape: a fresh database fails at the foreign key
+-- below if the column is renamed here prematurely (...and it is also what the dev
+-- database actually applied, so editing it here is what keeps a fresh deploy possible).
 CREATE TABLE "role_permissions" (
     "roleId" UUID NOT NULL,
-    "permissionId" UUID NOT NULL,
+    "permission" UUID NOT NULL,
     "createdAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "role_permissions_pkey" PRIMARY KEY ("roleId","permissionId")
+    CONSTRAINT "role_permissions_pkey" PRIMARY KEY ("roleId","permission")
 );
 
 -- CreateTable
@@ -79,6 +85,9 @@ CREATE TABLE "document_sequences" (
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "memberships_userId_organizationId_key" ON "memberships"("userId","organizationId");
+
+-- CreateIndex
 CREATE INDEX "memberships_organizationId_idx" ON "memberships"("organizationId");
 
 -- CreateIndex
@@ -102,7 +111,7 @@ ALTER TABLE "roles" ADD CONSTRAINT "roles_organizationId_fkey" FOREIGN KEY ("org
 
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_permission_fkey" FOREIGN KEY ("permission") REFERENCES "permissions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_permissionId_fkey" FOREIGN KEY ("permission") REFERENCES "permissions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "warehouses" ADD CONSTRAINT "warehouses_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
