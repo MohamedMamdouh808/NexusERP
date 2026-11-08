@@ -81,7 +81,7 @@ A user who is a member of multiple organizations can switch their active organiz
 
 ### Key Entities *(include if feature involves data)*
 
-- **User**: A person who can sign in to the system. Identified by email. Holds a hashed password and belongs to one or more organizations through memberships.
+- **User**: A person who can sign in to the system. Identified by email, which is unique system-wide (one account per email across all organizations). Holds a hashed password and belongs to one or more organizations through memberships.
 - **Organization**: A tenant workspace. Contains users through memberships, and owns data such as warehouse, contacts, products, and documents.
 - **Membership**: Links a user to an organization with a role. Determines the user's active tenant context and permissions within that organization. Can be active or deactivated.
 - **Role**: A named set of permissions within an organization. Default roles are Administrator, Manager, Sales, Inventory, and Purchasing.
@@ -125,3 +125,10 @@ A user who is a member of multiple organizations can switch their active organiz
 - Document sequences are organization-scoped counters used for generating document numbers (e.g., invoice numbers).
 - The default warehouse is a single storage location created per organization during registration; no warehouse management UI is part of this feature.
 - Login rate limiting uses the proxy-trust setting to determine the client address, consistent with the platform foundation.
+
+## Clarifications *(mandatory)*
+
+### Session 2026-11-08
+
+- Q: Should email be unique system-wide or per-organization? → A: System-wide unique (one account per email across all organizations).
+

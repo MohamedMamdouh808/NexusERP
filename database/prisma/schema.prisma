@@ -72,6 +72,7 @@ model Permission {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
 
   grants RoleTemplatePermission[]
+  rolePermissions RolePermission[]
 
   @@map("permissions")
 }
@@ -118,4 +119,141 @@ model RoleTemplatePermission {
   @@id([roleTemplateId, permissionId])
   @@index([permissionId])
   @@map("role_template_permissions")
+}
+
+/// A user who can sign in to the system. Identified by email, which is unique
+/// system-wide (one account per email across all organizations).
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String   @unique @db.VarChar(255)
+  passwordHash  String   @db.VarChar(255)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+
+  memberships   Membership[]
+  sessions      Session[]
+
+  @@map("users")
+}
+
+/// A tenant workspace. Contains users through memberships, and owns data such as
+/// warehouse, contacts, products, and documents.
+model Organization {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(128)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  memberships Membership[]
+  warehouses  Warehouse[]
+  sequences   DocumentSequence[]
+
+  @@map("organizations")
+}
+
+/// Links a user to an organization with a role. Determines the user's active tenant
+/// context and permissions within that organization. Can be active or deactivated.
+model Membership {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @db.Uuid
+  organizationId  String   @db.Uuid
+  roleKey         String   @db.VarChar(64)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessions Session[]
+
+  @@unique([userId, organizationId])
+  @@map("memberships")
+}
+
+/// A named set of permissions within an organization. Default roles are Administrator,
+/// Manager, Sales, Inventory, and Purchasing. organizationId is null for system/default
+/// roles that apply globally.
+model Role {
+  id            String   @id @default(uuid()) @db.Uuid
+  key           String   @unique @db.VarChar(64)
+  name          String   @db.VarChar(128)
+  description   String   @db.VarChar(255)
+  isSystem      Boolean  @default(true)
+  organizationId String? @db.Uuid
+
+  permissions   RolePermission[]
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("roles")
+}
+
+/// The join between a role and the permissions it grants within an organization.
+/// The composite primary key IS the duplicate-grant guard.
+model RolePermission {
+  roleId        String @db.Uuid
+  permissionId  String @db.Uuid
+
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  role          Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+/// A server-side session tying an opaque session identifier to a user and membership,
+/// with idle and absolute expiry timestamps.
+model Session {
+  id           String   @id @default(uuid()) @db.Uuid
+  tokenHash    String   @unique @db.VarChar(255)
+  userId       String   @db.Uuid
+  membershipId String   @db.Uuid
+  expiresAt    DateTime @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  lastUsedAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+/// A record of a failed login attempt keyed by email and client address, used for
+/// rate limiting.
+model LoginAttempt {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @db.VarChar(255)
+  clientAddress String  @db.VarChar(64)
+  succeeded    Boolean  @default(false)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("login_attempts")
+}
+
+/// A storage location belonging to an organization. The default warehouse is created
+/// during registration.
+model Warehouse {
+  id            String   @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  name          String   @db.VarChar(128)
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("warehouses")
+}
+
+/// A numbering sequence for documents within an organization. Default sequences are
+/// created during registration.
+model DocumentSequence {
+  id            String   @id @default(uuid()) @db.Uuid
+  organizationId String  @db.Uuid
+  name          String   @db.VarChar(64)
+  currentValue  Int      @default(0)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("document_sequences")
 }

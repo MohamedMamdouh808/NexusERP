@@ -136,19 +136,50 @@ export async function seed(target: PrismaClient = prisma): Promise<SeedSummary> 
     await upsertRoleTemplate(target, role, permissionIdByCode);
   }
 
-  const [permissionCount, roleCount, grantCount] = await Promise.all([
-    target.permission.count(),
-    target.roleTemplate.count(),
-    target.roleTemplatePermission.count(),
-  ]);
+  // Ensure every existing organization has a default warehouse and document
+  // sequence. Organizations are created during registration (not here), so this
+  // is idempotent and safe to re-run: it only adds missing defaults for
+  // organizations that already exist.
+  const organizations = await target.organization.findMany();
+  for (const organization of organizations) {
+    await target.warehouse.upsert({
+      where: { organizationId_isDefault: { organizationId: organization.id, isDefault: true } },
+      update: {},
+      create: {
+        organizationId: organization.id,
+        name: 'Default Warehouse',
+        isDefault: true,
+      },
+    });
+    await target.documentSequence.upsert({
+      where: { organizationId_name: { organizationId: organization.id, name: 'invoice' } },
+      update: {},
+      create: {
+        organizationId: organization.id,
+        name: 'invoice',
+        currentValue: 0,
+      },
+    });
+  }
 
-  return { permissionCount, roleCount, grantCount };
+  const [permissionCount, roleCount, grantCount, warehouseCount, sequenceCount] =
+    await Promise.all([
+      target.permission.count(),
+      target.roleTemplate.count(),
+      target.roleTemplatePermission.count(),
+      target.warehouse.count(),
+      target.documentSequence.count(),
+    ]);
+
+  return { permissionCount, roleCount, grantCount, warehouseCount, sequenceCount };
 }
 
 export interface SeedSummary {
   permissionCount: number;
   roleCount: number;
   grantCount: number;
+  warehouseCount: number;
+  sequenceCount: number;
 }
 
 async function main(): Promise<void> {
@@ -158,7 +189,8 @@ async function main(): Promise<void> {
   );
   console.log(
     `Reference data now contains ${summary.permissionCount} permissions, ` +
-      `${summary.roleCount} role templates, and ${summary.grantCount} grants.`,
+      `${summary.roleCount} role templates, ${summary.grantCount} grants, ` +
+      `${summary.warehouseCount} warehouses, and ${summary.sequenceCount} document sequences.`,
   );
 }
 

@@ -6,6 +6,7 @@ import { AppModule } from './app.module';
 import { buildOpenApiDocument } from './openapi/openapi-document';
 import { assertPortIsAvailable, loadConfiguration, ConfigurationError } from './config/configuration';
 import { NestPinoLogger, createLogger } from './common/logging/logger';
+import cookieParser from 'cookie-parser';
 
 /**
  * Bootstrap.
@@ -49,6 +50,9 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: nestLogger,
   });
+
+  // Parse Cookie headers so session guards can read session_id and csrf_token.
+  app.use(cookieParser());
 
   // Trust nothing unless the environment says how many proxy hops are in front of the
   // service. Behind a proxy the socket address is the proxy's, so an explicit hop count is

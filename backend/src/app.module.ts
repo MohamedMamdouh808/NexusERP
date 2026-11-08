@@ -5,6 +5,10 @@ import { PermissionGuard } from './common/guards/permission.guard';
 import { RequestIdMiddleware } from './common/logging/request-id.middleware';
 import { ConfigurationModule } from './config/configuration.module';
 import { PlatformModule } from './platform/platform.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
+import { UsersModule } from './modules/users/users.module';
+import { AccessControlModule } from './modules/access-control/access-control.module';
 
 /**
  * The application root.
@@ -19,11 +23,10 @@ import { PlatformModule } from './platform/platform.module';
  *   3. AllExceptionsFilter  - registered globally so a new endpoint cannot return a
  *      differently shaped error by forgetting a filter (FR-021).
  *
- * Domain modules are added here one at a time by their own features. This feature adds
- * none (Constitution Principle IX).
+ * Domain modules are added here one at a time by their own features.
  */
 @Module({
-  imports: [ConfigurationModule, PlatformModule],
+  imports: [ConfigurationModule, PlatformModule, AuthModule, OrganizationsModule, UsersModule, AccessControlModule],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_GUARD, useClass: PermissionGuard },
