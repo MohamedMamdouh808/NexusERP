@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { PageHeader } from '../../components/shell/page-header';
+import { SampleDataBanner } from '../../components/ui/sample-data-banner';
 import { Button, Card, TabStrip } from '../../components/ui';
 import type { TabDefinition } from '../../components/ui';
 import { StockBalancesTab } from './balances-tab';
@@ -42,6 +43,7 @@ export function InventoryPage() {
           </Button>
         }
       />
+      <SampleDataBanner moduleKey="inventory" />
       <Card className="inventory-card">
         <TabStrip tabs={TABS} activeKey={activeTab} onSelect={selectTab} />
         {activeTab === 'balances' && <StockBalancesTab />}

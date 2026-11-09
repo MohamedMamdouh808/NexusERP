@@ -1,10 +1,15 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import type { RouteObject } from 'react-router-dom';
+import type { ReactNode } from 'react';
 
 import { AppShell } from '../components/shell/app-shell';
 import { Breadcrumb } from '../components/shell/breadcrumb';
 import { PageHeader } from '../components/shell/page-header';
+import { SessionGate } from '../features/auth/session-gate';
+import { LoginPage } from '../features/auth/login-page';
+import { RegisterPage } from '../features/auth/register-page';
+import { ProfilePage } from '../features/profile/profile-page';
 import { HealthPanel } from '../features/health/health-panel';
 import { OverviewPage } from '../features/overview/overview-page';
 import { ProductsPage } from '../features/products/products-page';
@@ -33,36 +38,37 @@ import { UsersPage } from '../features/administration/users-page';
 import { RoleDetailPage } from '../features/administration/role-detail-page';
 import { AuditLogPage } from '../features/administration/audit-log-page';
 import { ReportsPage } from '../features/reports/reports-page';
-import { PreviewProfilePage } from '../features/profile/preview-profile-page';
 
 const DevGallery = import.meta.env.DEV
   ? lazy(() => import('../dev/gallery/gallery-route').then((m) => ({ default: m.GalleryRoute })))
   : null;
 
 /**
+ * A shell route: the authenticated shell behind the session gate, with the
+ * breadcrumb in place. The gate lives at the ROUTER level, not inside AppShell,
+ * so the shell stays a pure layout component and only reachable-when-signed-in
+ * screens ever sit behind it (FR-045).
+ */
+function shell(children: ReactNode): ReactNode {
+  return (
+    <SessionGate>
+      <AppShell>
+        <Breadcrumb />
+        {children}
+      </AppShell>
+    </SessionGate>
+  );
+}
+
+/**
  * The route table, exported so a test can assert that every navigation
  * destination actually resolves rather than merely existing in a list (T078).
  */
 export const routes: RouteObject[] = [
-  {
-    path: '/',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <OverviewPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/health',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <PageHeader title="System health" />
-        <HealthPanel />
-      </AppShell>
-    ),
-  },
+  { path: '/login', element: <LoginPage /> },
+  { path: '/register', element: <RegisterPage /> },
+  { path: '/', element: shell(<OverviewPage />) },
+  { path: '/health', element: shell(<><PageHeader title="System health" /><HealthPanel /></>) },
   ...(DevGallery
     ? [
         {
@@ -75,215 +81,48 @@ export const routes: RouteObject[] = [
         },
       ]
     : []),
-  {
-    path: '/products',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <ProductsPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/products/new',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <ProductNewPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/products/:id',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <ProductDetailPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/products/:id/edit',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <ProductEditPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/contacts',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <ContactsPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/contacts/new',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <ContactNewPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/contacts/:id',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <ContactDetailPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/contacts/:id/edit',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <ContactEditPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/inventory',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <InventoryPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/inventory/movements',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <InventoryPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/inventory/warehouses',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <InventoryPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/purchasing',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <PurchasingPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/purchasing/receipts',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <PurchasingPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/purchasing/new',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <PurchaseOrderNewPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/purchasing/:id',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <PurchaseOrderDetailPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/purchasing/:id/edit',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <PurchaseOrderEditPage />
-      </AppShell>
-    ),
-  },
+  { path: '/products', element: shell(<ProductsPage />) },
+  { path: '/products/new', element: shell(<ProductNewPage />) },
+  { path: '/products/:id', element: shell(<ProductDetailPage />) },
+  { path: '/products/:id/edit', element: shell(<ProductEditPage />) },
+  { path: '/contacts', element: shell(<ContactsPage />) },
+  { path: '/contacts/new', element: shell(<ContactNewPage />) },
+  { path: '/contacts/:id', element: shell(<ContactDetailPage />) },
+  { path: '/contacts/:id/edit', element: shell(<ContactEditPage />) },
+  { path: '/inventory', element: shell(<InventoryPage />) },
+  { path: '/inventory/movements', element: shell(<InventoryPage />) },
+  { path: '/inventory/warehouses', element: shell(<InventoryPage />) },
+  { path: '/purchasing', element: shell(<PurchasingPage />) },
+  { path: '/purchasing/receipts', element: shell(<PurchasingPage />) },
+  { path: '/purchasing/new', element: shell(<PurchaseOrderNewPage />) },
+  { path: '/purchasing/:id', element: shell(<PurchaseOrderDetailPage />) },
+  { path: '/purchasing/:id/edit', element: shell(<PurchaseOrderEditPage />) },
   // Sales routes. The static paths are declared BEFORE the /sales/:id route,
   // so /sales/new and /sales/shipments match exactly rather than as an id.
-  {
-    path: '/sales',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <SalesPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/sales/shipments',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <SalesPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/sales/new',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <SalesOrderNewPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/sales/:id',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <SalesOrderDetailPage />
-      </AppShell>
-    ),
-  },
-  {
-    path: '/sales/:id/edit',
-    element: (
-      <AppShell>
-        <Breadcrumb />
-        <SalesOrderEditPage />
-      </AppShell>
-    ),
-  },
-  { path: '/invoicing', element: <AppShell><Breadcrumb /><InvoicingPage /></AppShell> },
-  { path: '/invoicing/payments', element: <AppShell><Breadcrumb /><InvoicingPage /></AppShell> },
-  { path: '/invoicing/payments/new', element: <AppShell><Breadcrumb /><PaymentFormPage /></AppShell> },
-  { path: '/invoicing/payments/:id', element: <AppShell><Breadcrumb /><PaymentDetailPage /></AppShell> },
-  { path: '/invoicing/:id', element: <AppShell><Breadcrumb /><InvoiceDetailPage /></AppShell> },
-  { path: '/settings/organization', element: <AppShell><Breadcrumb /><OrganizationPage /></AppShell> },
-  { path: '/users', element: <AppShell><Breadcrumb /><UsersPage /></AppShell> },
-  { path: '/users/roles', element: <AppShell><Breadcrumb /><UsersPage /></AppShell> },
-  { path: '/users/roles/:id', element: <AppShell><Breadcrumb /><RoleDetailPage /></AppShell> },
-  { path: '/audit-log', element: <AppShell><Breadcrumb /><AuditLogPage /></AppShell> },
-  { path: '/reports', element: <AppShell><Breadcrumb /><ReportsPage /></AppShell> },
-  { path: '/profile', element: <AppShell><Breadcrumb /><PreviewProfilePage /></AppShell> },
+  { path: '/sales', element: shell(<SalesPage />) },
+  { path: '/sales/shipments', element: shell(<SalesPage />) },
+  { path: '/sales/new', element: shell(<SalesOrderNewPage />) },
+  { path: '/sales/:id', element: shell(<SalesOrderDetailPage />) },
+  { path: '/sales/:id/edit', element: shell(<SalesOrderEditPage />) },
+  { path: '/invoicing', element: shell(<InvoicingPage />) },
+  { path: '/invoicing/payments', element: shell(<InvoicingPage />) },
+  { path: '/invoicing/payments/new', element: shell(<PaymentFormPage />) },
+  { path: '/invoicing/payments/:id', element: shell(<PaymentDetailPage />) },
+  { path: '/invoicing/:id', element: shell(<InvoiceDetailPage />) },
+  { path: '/settings/organization', element: shell(<OrganizationPage />) },
+  { path: '/users', element: shell(<UsersPage />) },
+  { path: '/users/roles', element: shell(<UsersPage />) },
+  { path: '/users/roles/:id', element: shell(<RoleDetailPage />) },
+  { path: '/audit-log', element: shell(<AuditLogPage />) },
+  { path: '/reports', element: shell(<ReportsPage />) },
+  { path: '/profile', element: shell(<ProfilePage />) },
   { path: '*', element: <Navigate to="/" replace /> },
 ];
 
 /**
- * Routes (T088). Six destinations: overview, health panel, the products
- * catalogue, inventory, purchasing, and sales. There is no sign-in route, because this feature
- * has no authentication and a stub sign-in screen would imply one (research.md R-015).
+ * Routes (T088). Signed-out visitors reach only the sign-in and registration
+ * screens; every other destination lives behind the SessionGate, which probes
+ * /auth/me on first load and returns the visitor to the route they asked for
+ * after sign-in (FR-045).
  */
 export const router = createBrowserRouter(routes);

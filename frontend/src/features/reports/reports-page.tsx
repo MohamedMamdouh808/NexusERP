@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { SampleDataBanner } from '../../components/ui/sample-data-banner';
 import { PageHeader } from '../../components/shell/page-header';
 import { Badge, Card, DataTable, ErrorState, Skeleton } from '../../components/ui';
 import type { Column } from '../../components/ui';
@@ -20,7 +21,7 @@ export function ReportsPage() {
   const invoiceColumns: Column<Invoice>[] = [{ key: 'number', header: 'Invoice' }, { key: 'customerName', header: 'Customer' }, { key: 'dueDate', header: 'Due date' }, { key: 'balance', header: 'Balance', numeric: true, render: (invoice) => formatMoneyGrouped(invoice.balance) }];
   const loading = dashboard.isPending || invoices.isPending || stock.isPending;
   const failed = dashboard.isError || invoices.isError || stock.isError;
-  return <section className="reports-page"><PageHeader title="Reports" description="Sales, inventory, and accounts receivable summaries."/><div className="sample-banner">Sample data</div>
+  return <section className="reports-page"><PageHeader title="Reports" description="Sales, inventory, and accounts receivable summaries."/><SampleDataBanner moduleKey="reports" />
     {failed ? <ErrorState message="Reports could not be loaded." onRetry={() => { void dashboard.refetch(); void invoices.refetch(); void stock.refetch(); }}/> : loading ? <Card title="Reports"><Skeleton label="Loading reports"/></Card> : <>
       <div className="report-kpis"><Card title="Sales this month"><strong>{formatMoneyGrouped(dashboard.data!.sales.value)}</strong></Card><Card title="Active sales orders"><strong>{dashboard.data!.activeOrders.value}</strong><span>Confirmed orders not yet shipped</span></Card><Card title="Low stock items"><strong>{lowStock.length}</strong><span>At or below reorder level</span></Card><Card title="Outstanding invoices"><strong>{formatMoneyGrouped(dashboard.data!.outstandingInvoices.value)}</strong><span>{formatMoneyGrouped(overdueBalance)} overdue</span></Card></div>
       <Card title="Sales order status"><div className="report-status-list">{dashboard.data!.ordersByStatus.map((entry) => <div key={entry.status}><Badge status={entry.status}>{entry.status}</Badge><strong>{entry.count}</strong></div>)}</div></Card>

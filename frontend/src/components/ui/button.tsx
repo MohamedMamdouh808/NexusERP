@@ -15,6 +15,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     variant = 'default',
     loading = false,
     disabled = false,
+    // Defaults to the same 'button' the component has always used; callers may
+    // pass type="submit" for a form. Nothing about existing behaviour changes.
+    type = 'button',
     children,
     reason,
     className,
@@ -34,7 +37,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   return (
     <button
       ref={ref}
-      type="button"
+      type={type}
       className={classes}
       disabled={isActuallyDisabled}
       aria-busy={loading ? 'true' : undefined}

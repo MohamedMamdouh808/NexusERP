@@ -1,73 +1,59 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * End-to-end smoke test (T093): the shell renders, and the health panel reads the service.
+ * End-to-end smoke test for the auth feature.
  *
- * These two are the whole of what this feature can honestly show a browser. The shell is
- * the authenticated application shell - sidebar, top bar, content - and the health panel
- * is the one destination wired to a live endpoint.
- *
- * The health assertions accept either outcome on purpose. The service may be up (the
- * panel reports the checks) or the request may fail (the panel reports the failure and the
- * request identifier). What must never happen is the panel rendering nothing: an empty
- * card is indistinguishable from a still-loading one, and a smoke test that cannot tell
- * the difference proves nothing.
+ * The sign-in and registration screens do not depend on the service for their
+ * rendering or their inline validation, so those assertions are firm. Anything
+ * that needs the service answers an UNAUTHENTICATED probe or a refused login
+ * gracefully; the config starts the API and the built web bundle, so a healthy
+ * run sees the real redirect chain (signed-out visit -> /login).
  */
 
-test.describe('the authenticated application shell', () => {
-  test('renders the sidebar, the top bar and the content area', async ({ page }) => {
+test.describe('the sign-in screen', () => {
+  test('is where the application lands for a signed-out visitor', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
-    await expect(page.getByRole('banner')).toBeVisible();
-    await expect(page.getByRole('main')).toBeVisible();
+    expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible();
   });
 
-  test('offers no sign-in screen', async ({ page }) => {
-    await page.goto('/');
+  test('renders the fields and links to registration', async ({ page }) => {
+    await page.goto('/login');
 
-    await expect(page.getByRole('link', { name: /sign in/i })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: /sign up/i })).toHaveCount(0);
-    await expect(page.getByLabel(/password/i)).toHaveCount(0);
+    await expect(page.getByLabel('Email')).toBeVisible();
+    await expect(page.getByLabel('Password')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Create an account' })).toBeVisible();
   });
 
-  test('labels the organization and the user as sample rather than showing dead controls', async ({ page }) => {
-    await page.goto('/');
+  test('validates inline before contacting the service', async ({ page }) => {
+    await page.goto('/login');
 
-    // The top bar carries real controls, not inert placeholders, and each one names its
-    // value as sample (FR-013). The accessible name leads with that label.
-    await expect(page.getByRole('button', { name: /Sample organization:/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Preview user:/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Sign in' }).click();
+
+    await expect(page.getByText('Email is required.')).toBeVisible();
+    await expect(page.getByText('Password is required.')).toBeVisible();
   });
 });
 
-test.describe('the health panel', () => {
-  test('renders the shell and the health panel together', async ({ page }) => {
-    await page.goto('/health');
+test.describe('the registration screen', () => {
+  test('renders the fields without an organization field (the service names the org)', async ({ page }) => {
+    await page.goto('/register');
 
-    await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
-    await expect(page.getByRole('heading', { level: 1, name: 'System health' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Create your account' })).toBeVisible();
+    await expect(page.getByLabel('Email')).toBeVisible();
+    await expect(page.getByLabel('Password')).toBeVisible();
+    await expect(page.getByLabel(/organization/i)).toHaveCount(0);
   });
 
-  test('reads the service report or reports the failure, but never renders nothing', async ({ page }) => {
-    await page.goto('/health');
+  test('enforces the password rules inline', async ({ page }) => {
+    await page.goto('/register');
 
-    // Scoped to the checks list on purpose: a loose `getByText('Application')` also matches
-    // the word "application" inside the failure alert's message, which would send the
-    // assertion down the healthy branch even when the service is unreachable.
-    const report = page.locator('.health-panel__checks');
-    const failure = page.getByRole('alert');
+    await page.getByLabel('Email').fill('missing@example.test');
+    await page.getByLabel('Password').fill('Short1');
+    await page.getByRole('button', { name: 'Create account' }).click();
 
-    await expect(report.or(failure).first()).toBeVisible({ timeout: 20_000 });
-
-    // If the service answered, the checks are attributed rather than merged.
-    const answered = await report.isVisible().catch(() => false);
-    if (answered) {
-      await expect(page.getByText('Database')).toBeVisible();
-    } else {
-      // The failure state must hand over the request identifier so the failure can be
-      // quoted, and must not invent a cause the service did not give.
-      await expect(failure).toBeVisible();
-    }
+    await expect(page.getByText('Password must be at least 12 characters.')).toBeVisible();
   });
 });

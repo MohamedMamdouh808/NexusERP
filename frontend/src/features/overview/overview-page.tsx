@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 
 import { PageHeader } from '../../components/shell/page-header';
+import { SampleDataBanner } from '../../components/ui/sample-data-banner';
 import {
   Badge,
   Button,
@@ -378,7 +379,7 @@ function DashboardContent({ summary }: { summary: DashboardSummary }) {
     return (
       <EmptyState
         title="Your overview is ready when your first activity arrives"
-        description="This sample organization has no dashboard activity yet. Sales, orders, stock and invoice figures will appear here when records are available."
+        description="This is sample data, not your organization's records; the dashboard is not connected yet. Sales, orders, stock and invoice figures will appear here when records are available."
       />
     );
   }
@@ -488,6 +489,7 @@ export function OverviewPage() {
           </Button>
         }
       />
+      <SampleDataBanner moduleKey="overview" />
       {isPending ? (
         <LoadingOverview />
       ) : isError || data === undefined ? (

@@ -2,6 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 
+import { resetSession } from './session';
+
 /**
  * Request shim (jsdom × Node 24 undici).
  *
@@ -44,6 +46,10 @@ if (NativeRequest !== undefined) {
 
 // Unmount between cases so a query cannot match a node left behind by the
 // previous one - a passing test that reads yesterday's DOM proves nothing.
+// The session store is reset the same way: it is a module singleton, so a
+// seeded or cleared session from one case must not answer the next one's
+// renders, and the in-memory CSRF token is dropped with it.
 afterEach(() => {
   cleanup();
+  resetSession();
 });

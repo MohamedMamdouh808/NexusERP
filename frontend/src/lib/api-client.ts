@@ -10,6 +10,16 @@
  * Rate limiting is handled here rather than in a component, because `Retry-After`
  * is a transport concern: it is the service telling the client WHEN to come back,
  * and ignoring it means retrying into a limit that is still in force.
+ *
+ * Two transport-wide behaviours are registered here by the session store rather
+ * than repeated per caller (`auth-session.ts` wires them at module scope):
+ *
+ *  - **The CSRF header is attached centrally.** Every state-changing request
+ *    carries `X-CSRF-Token` when the provider has a token (FR-011). The token
+ *    lives only in the provider's memory; this client never persists it.
+ *  - **A 401 anywhere signs the user out.** One handler, so no component needs
+ *    to know what an expired session looks like: the store clears itself and
+ *    the session gate redirects to the sign-in screen.
  */
 
 import { ERROR_CODES, type ErrorEnvelopeSchema } from '@nexuserp/shared';
@@ -33,6 +43,32 @@ export interface ApiFailure {
 export type ApiResult<T> =
   | { readonly ok: true; readonly data: T }
   | { readonly ok: false; readonly failure: ApiFailure };
+
+/**
+ * Supplies the CSRF token to attach to state-changing requests, or null when
+ * the application holds none (signed out). Registered by the session store.
+ */
+type CsrfProvider = () => string | null;
+
+let csrfProvider: CsrfProvider = () => null;
+
+/** Registers where the CSRF token comes from (the session store, at startup). */
+export function setCsrfProvider(provider: CsrfProvider): void {
+  csrfProvider = provider;
+}
+
+/** Called whenever the service answers 401, so the app can drop its session. */
+type UnauthorizedHandler = () => void;
+
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+/** Registers the 401 reaction (the session store, at startup). */
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler;
+}
+
+/** Methods that change state and therefore carry the CSRF header. */
+const CSRF_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
  * True when a failure is a rate limit rather than a generic problem (T014).
@@ -115,9 +151,21 @@ export async function requestJson<T>(
 ): Promise<ApiResult<T>> {
   let response: Response;
   try {
+    // All callers pass headers as a plain object, so a spread is a copy rather
+    // than an alias; the outbound header set below starts from the caller's.
+    const callerHeaders = (init.headers ?? {}) as Record<string, string>;
+    const headers: Record<string, string> = { accept: 'application/json', ...callerHeaders };
+    const method = (init.method ?? 'GET').toUpperCase();
+    // FR-011: the CSRF token rides along on state-changing requests. The token
+    // is read from the provider at call time so an expired token is never
+    // replayed after the store has dropped it.
+    if (CSRF_METHODS.has(method)) {
+      const token = csrfProvider();
+      if (token !== null) headers['X-CSRF-Token'] = token;
+    }
     response = await fetchImpl(path, {
       ...init,
-      headers: { accept: 'application/json', ...(init.headers ?? {}) },
+      headers,
       credentials: 'same-origin',
     });
   } catch {
@@ -135,6 +183,13 @@ export async function requestJson<T>(
   }
 
   const headerRequestId = response.headers.get('x-request-id');
+
+  // A 401 means the session is gone (expired, replaced or never valid), no
+  // matter which body shape accompanies it. The store's handler clears the
+  // signed-in state; the session gate then redirects to the sign-in screen.
+  // Signed-out callers (the /auth/me probe answers 401 as "not signed in")
+  // are unaffected: the handler no-ops when nobody is signed in.
+  if (response.status === 401) unauthorizedHandler?.();
 
   if (response.ok) {
     // A success status does not promise a readable body: a proxy or a captive

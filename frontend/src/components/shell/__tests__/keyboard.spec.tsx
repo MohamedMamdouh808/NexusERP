@@ -5,10 +5,16 @@ import { AppShell } from '../app-shell';
 import { Breadcrumb } from '../breadcrumb';
 import { PageHeader } from '../page-header';
 import { renderWithProviders } from '../../../test/render';
+import { seedSignedInSession, TEST_ORGANIZATION, TEST_ORGANIZATION_TWO } from '../../../test/session';
 
 describe('Shell keyboard navigation (T066, FR-044, FR-045)', () => {
   it('allows complete visual order tab navigation with visible focus', async () => {
     const user = userEvent.setup();
+    // Two memberships, so the organization control in the top bar is the real
+    // switcher menu (a single membership renders as text, not a control).
+    seedSignedInSession({
+      organizations: [TEST_ORGANIZATION, TEST_ORGANIZATION_TWO],
+    });
     renderWithProviders(
       <AppShell>
         <Breadcrumb />
@@ -30,11 +36,11 @@ describe('Shell keyboard navigation (T066, FR-044, FR-045)', () => {
     await user.tab(); // Command-palette trigger (Ctrl + K also opens it)
     expect(screen.getByRole('button', { name: /Open command palette/i })).toHaveFocus();
 
-    await user.tab(); // Org switcher in topbar
-    expect(screen.getByRole('button', { name: /Sample organization/i })).toHaveFocus();
+    await user.tab(); // Org switcher in topbar (two seeded memberships)
+    expect(screen.getByRole('button', { name: /Organization:/i })).toHaveFocus();
 
     await user.tab(); // User menu in topbar
-    expect(screen.getByRole('button', { name: /Preview user/i })).toHaveFocus();
+    expect(screen.getByRole('button', { name: /User:/i })).toHaveFocus();
 
     await user.tab(); // First available nav link (Overview)
     expect(screen.getByRole('link', { name: /Overview/i })).toHaveFocus();

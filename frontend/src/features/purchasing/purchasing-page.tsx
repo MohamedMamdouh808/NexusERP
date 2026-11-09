@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { PageHeader } from '../../components/shell/page-header';
+import { SampleDataBanner } from '../../components/ui/sample-data-banner';
 import { Button, Card, TabStrip } from '../../components/ui';
 import type { TabDefinition } from '../../components/ui';
 import { OrdersTab } from './orders-tab';
@@ -40,6 +41,7 @@ export function PurchasingPage() {
           </Button>
         }
       />
+      <SampleDataBanner moduleKey="purchasing" />
       <Card className="purchasing-card">
         <TabStrip tabs={TABS} activeKey={activeTab} onSelect={selectTab} />
         {activeTab === 'orders' && <OrdersTab />}

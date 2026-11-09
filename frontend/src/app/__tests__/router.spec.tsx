@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { NAVIGATION } from '../../components/shell/navigation';
 import { healthyReport, jsonResponse, createTestQueryClient } from '../../test/render';
+import { seedSignedInSession } from '../../test/session';
 import { createQueryClient } from '../query-client';
 import { routes } from '../router';
 
@@ -18,6 +19,9 @@ afterEach(() => {
 });
 
 function renderRoute(path: string) {
+  // Signed in: the destinations live behind the session gate, so the gate
+  // renders its children as soon as the store already holds a session.
+  seedSignedInSession();
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   render(
     <QueryClientProvider client={createTestQueryClient()}>

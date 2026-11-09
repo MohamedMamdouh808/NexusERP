@@ -20,9 +20,10 @@
  *     (FR-022, FR-044).
  *
  * Nothing here is real: no organization, person or document is represented
- * (FR-041). The honesty the surfaces owe the user comes from the shell itself —
- * the top bar labels the organization "Sample organization" on every page — and
- * page descriptions describe the page instead of repeating a disclaimer.
+ * (FR-041). The honesty the surfaces owe the user comes from the session (the
+ * top bar shows the real signed-in organization and user) and from the shared
+ * sample-data banner on every sample surface - page descriptions describe the
+ * page instead of repeating a disclaimer.
  */
 
 import type {
@@ -46,7 +47,6 @@ import type {
   ModuleSetting,
   AuditEntry,
 } from '../services/catalog-service';
-import type { PreviewUser, SampleOrganization } from '../services/shell-service';
 
 /**
  * Dates for the invoicing sample are relative to the day the app loads, so the
@@ -89,21 +89,16 @@ function isoTimestampInMonth(monthsBack: number, day: number, hour: number): str
   return `${isoDateInMonth(monthsBack, day)}T${String(hour).padStart(2, '0')}:30:00Z`;
 }
 
-export const SAMPLE_ORGANIZATIONS: readonly SampleOrganization[] = [
-  { id: 'sample-org-alpha', name: 'Sample Organization (Alpha)' },
-  { id: 'sample-org-beta', name: 'Sample Organization (Beta)' },
-];
+/**
+ * The organization and user shown in the shell are no longer mock data: they
+ * come from the signed-in session via /auth/me and /auth/organizations
+ * (services/auth-session.ts). The only sample organization left here is the
+ * settings page's sample row and the audit entries' sample record reference,
+ * both identified by the fixed sample id below.
+ */
+const SAMPLE_ORGANIZATION_ID = 'sample-org-alpha';
 
-/** The organization the shell starts on. Only ever one of `SAMPLE_ORGANIZATIONS`. */
-export const SAMPLE_DEFAULT_ORGANIZATION_ID = SAMPLE_ORGANIZATIONS[0].id;
-
-export const SAMPLE_PREVIEW_USER: PreviewUser = {
-  id: 'sample-user-preview',
-  name: 'Preview user',
-  role: 'Not signed in',
-};
-
-export const SAMPLE_SETTINGS_ORGANIZATION: Organization = { id: SAMPLE_DEFAULT_ORGANIZATION_ID, name: 'Sample Organization (Alpha)', currency: 'USD', defaultPaymentTermDays: 30, currencyLocked: false };
+export const SAMPLE_SETTINGS_ORGANIZATION: Organization = { id: SAMPLE_ORGANIZATION_ID, name: 'Sample Organization (Alpha)', currency: 'USD', defaultPaymentTermDays: 30, currencyLocked: false };
 export const SAMPLE_MODULES: readonly ModuleSetting[] = [
   { key: 'contacts', label: 'Contacts', enabled: true, locked: true, description: 'Customers and suppliers' },
   { key: 'products', label: 'Products', enabled: true, locked: true, description: 'Product catalogue' },
@@ -132,7 +127,7 @@ const SAMPLE_AUDIT_ITEMS: readonly Omit<AuditEntry, 'id' | 'time'>[] = [
   { userId: 'user-0003', userName: 'Mariam Adel', action: 'SHIPMENT_POSTED', actionLabel: 'Shipment posted', recordType: 'Shipment', recordId: 'so-0001', recordNumber: 'SH-000001', summary: 'Sales order SO-000001 was shipped.', changes: [{ field: 'Status', before: 'CONFIRMED', after: 'SHIPPED' }] },
   { userId: 'user-0001', userName: 'Amina Hassan', action: 'INVOICE_ISSUED', actionLabel: 'Invoice issued', recordType: 'Invoice', recordId: 'inv-0001', recordNumber: 'INV-000001', summary: 'Invoice INV-000001 was issued.', changes: [{ field: 'Status', before: 'DRAFT', after: 'ISSUED' }] },
   { userId: 'user-0003', userName: 'Mariam Adel', action: 'PAYMENT_RECORDED', actionLabel: 'Payment recorded', recordType: 'Payment', recordId: 'pay-0001', recordNumber: 'PAY-000001', summary: 'Payment PAY-000001 was recorded.', changes: [{ field: 'Status', before: '—', after: 'RECORDED' }] },
-  { userId: 'user-0002', userName: 'Omar Nabil', action: 'ORGANIZATION_SETTINGS_CHANGED', actionLabel: 'Organization settings changed', recordType: 'Organization', recordId: SAMPLE_DEFAULT_ORGANIZATION_ID, recordNumber: 'Sample Organization', summary: 'Payment terms were updated.', changes: [{ field: 'Payment terms', before: '30', after: '30' }] },
+  { userId: 'user-0002', userName: 'Omar Nabil', action: 'ORGANIZATION_SETTINGS_CHANGED', actionLabel: 'Organization settings changed', recordType: 'Organization', recordId: 'sample-org-alpha', recordNumber: 'Sample Organization', summary: 'Payment terms were updated.', changes: [{ field: 'Payment terms', before: '30', after: '30' }] },
   { userId: 'user-0001', userName: 'Amina Hassan', action: 'ROLE_PERMISSIONS_CHANGED', actionLabel: 'Role permissions changed', recordType: 'Role', recordId: 'role-sales', recordNumber: 'Sales', summary: 'Permissions for the Sales role were reviewed.', changes: [{ field: 'Permission count', before: '7', after: '7' }] },
   { userId: 'user-0004', userName: 'Youssef Samir', action: 'SALES_ORDER_CANCELLED', actionLabel: 'Sales order cancelled', recordType: 'Sales order', recordId: 'so-0005', recordNumber: 'SO-000005', summary: 'Sales order was cancelled.', changes: [{ field: 'Status', before: 'CONFIRMED', after: 'CANCELLED' }] },
   { userId: 'user-0002', userName: 'Omar Nabil', action: 'PURCHASE_ORDER_CANCELLED', actionLabel: 'Purchase order cancelled', recordType: 'Purchase order', recordId: 'po-0003', recordNumber: 'PO-000003', summary: 'Purchase order was cancelled.', changes: [{ field: 'Status', before: 'DRAFT', after: 'CANCELLED' }] },
@@ -146,7 +141,7 @@ const SAMPLE_AUDIT_ITEMS: readonly Omit<AuditEntry, 'id' | 'time'>[] = [
   { userId: 'user-0001', userName: 'Amina Hassan', action: 'INVOICE_ISSUED', actionLabel: 'Invoice issued', recordType: 'Invoice', recordId: 'inv-0003', recordNumber: 'INV-000003', summary: 'Invoice INV-000003 was issued.', changes: [{ field: 'Status', before: 'DRAFT', after: 'ISSUED' }] },
   { userId: 'user-0003', userName: 'Mariam Adel', action: 'PAYMENT_RECORDED', actionLabel: 'Payment recorded', recordType: 'Payment', recordId: 'pay-0003', recordNumber: 'PAY-000003', summary: 'Payment PAY-000003 was recorded.', changes: [{ field: 'Status', before: '—', after: 'RECORDED' }] },
   { userId: 'user-0001', userName: 'Amina Hassan', action: 'ROLE_CREATED', actionLabel: 'Role created', recordType: 'Role', recordId: 'role-custom-1', recordNumber: 'Warehouse Lead', summary: 'A custom role was created.', changes: [{ field: 'Type', before: '—', after: 'Custom' }] },
-  { userId: 'user-0002', userName: 'Omar Nabil', action: 'ORGANIZATION_SETTINGS_CHANGED', actionLabel: 'Organization settings changed', recordType: 'Organization', recordId: SAMPLE_DEFAULT_ORGANIZATION_ID, recordNumber: 'Sample Organization', summary: 'Organization settings were saved.', changes: [{ field: 'Currency', before: 'USD', after: 'USD' }] },
+  { userId: 'user-0002', userName: 'Omar Nabil', action: 'ORGANIZATION_SETTINGS_CHANGED', actionLabel: 'Organization settings changed', recordType: 'Organization', recordId: 'sample-org-alpha', recordNumber: 'Sample Organization', summary: 'Organization settings were saved.', changes: [{ field: 'Currency', before: 'USD', after: 'USD' }] },
   { userId: 'user-0004', userName: 'Youssef Samir', action: 'STOCK_ADJUSTED', actionLabel: 'Stock adjusted', recordType: 'Adjustment', recordId: null, recordNumber: 'ADJ-000002', summary: 'A stock count correction was recorded.', changes: [{ field: 'Reason', before: '—', after: 'Count correction' }] },
   { userId: 'user-0001', userName: 'Amina Hassan', action: 'USER_REACTIVATED', actionLabel: 'User reactivated', recordType: 'User', recordId: 'user-0005', recordNumber: 'layla.farooq@example.test', summary: 'A user was reactivated, then later deactivated.', changes: [{ field: 'Status', before: 'USER_DEACTIVATED', after: 'USER_ACTIVE' }] },
 ];

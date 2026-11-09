@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { PageHeader } from '../../components/shell/page-header';
+import { SampleDataBanner } from '../../components/ui/sample-data-banner';
 import {
   Badge,
   Button,
@@ -144,6 +145,7 @@ export function ProductsPage() {
           </Button>
         }
       />
+      <SampleDataBanner moduleKey="products" />
       {isPending ? (
         <Card>
           <Skeleton label="Loading products" />

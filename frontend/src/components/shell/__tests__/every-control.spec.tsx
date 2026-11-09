@@ -1,11 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { routes } from '../../../app/router';
 import { sampleCatalogService } from '../../../services/sample-catalog-service';
 import { createTestQueryClient } from '../../../test/render';
+import { seedSignedInSession } from '../../../test/session';
+import { jsonResponse } from '../../../test/render';
 import { QueryClientProvider } from '@tanstack/react-query';
 
 /**
@@ -18,6 +20,20 @@ import { QueryClientProvider } from '@tanstack/react-query';
  */
 
 function renderShellRouter(initialPath = '/') {
+  // Signed in: the shell's session controls exist (org switcher, user menu),
+  // which is the state the guard audits. The service is stubbed so the sign
+  // out the walker may click cannot hit a real network - it answers the way
+  // the current backend does (403 for everyone; the store clears regardless).
+  seedSignedInSession();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      jsonResponse(
+        { code: 'FORBIDDEN', message: "You don't have permission.", details: [], requestId: 'test-403' },
+        { status: 403 },
+      ),
+    ),
+  );
   const router = createMemoryRouter(routes, { initialEntries: [initialPath] });
   const queryClient = createTestQueryClient();
   const view = render(
@@ -33,12 +49,16 @@ describe('Every enabled control guard for the shell (T023, FR-071, SC-019)', () 
     sampleCatalogService.reset();
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('activates every enabled control in the shell and observes a change', async () => {
     const user = userEvent.setup();
     const { router, container } = renderShellRouter('/');
 
-    // Wait for initial paint
-    await screen.findByRole('button', { name: /^Sample organization:/ });
+    // Wait for the first paint: the top bar's user menu is present.
+    await screen.findByRole('button', { name: /User:/i });
 
     // Collect all interactive controls in the shell
     const controls = container.querySelectorAll<HTMLElement>('button, a[href]');

@@ -21,6 +21,7 @@ export * from './line-items-editor';
 export * from './skeleton';
 export * from './empty-state';
 export * from './error-state';
+export * from './sample-data-banner';
 export * from './icon';
 
 // Backwards compatibility aliases for health-panel

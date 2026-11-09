@@ -962,6 +962,115 @@
   color: var(--color-muted-foreground);
 }
 
+/* The single-membership organization: part of the account, not a data cell,
+   and not a control (nothing to choose among). */
+.top-bar__organization {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* A refused organization switch surfaces here, in place, with the identifier
+   the user can quote. It clears on the next attempt. */
+.top-bar__switch-failure {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  max-width: 24rem;
+}
+
+/* The sign-in and registration screens. A full-height centred card on the
+   canvas background; the card itself reuses the shared .card surface, so the
+   screens ship no bespoke palette (tokens.css is the only colour source). */
+.auth-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--spacing-lg);
+  background: var(--color-background);
+}
+
+.auth-screen__inner {
+  width: 100%;
+  max-width: 26rem;
+  display: grid;
+  gap: var(--spacing-md);
+}
+
+.auth-screen__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.auth-screen__brand .top-bar__logomark {
+  width: var(--spacing-xl);
+  height: var(--spacing-xl);
+}
+
+.auth-screen__card {
+  display: grid;
+  gap: var(--spacing-md);
+}
+
+.auth-screen__title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--color-foreground);
+}
+
+.auth-screen__lede {
+  margin: 0;
+  color: var(--color-muted-foreground);
+  font-size: 0.9375rem;
+}
+
+.auth-screen__fields {
+  display: grid;
+  gap: var(--spacing-md);
+}
+
+.auth-screen__error {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-muted);
+}
+
+.auth-screen__error p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.auth-screen__error-request-id {
+  color: var(--color-muted-foreground);
+  font-size: 0.75rem;
+}
+
+.auth-screen__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.auth-screen__alt {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+}
+
+.auth-screen__alt a {
+  color: var(--color-primary);
+}
+
+.auth-screen__status {
+  margin: 0;
+  color: var(--color-muted-foreground);
+  font-size: 0.9375rem;
+}
+
+
 /* The centred-search grid only holds while the right-side group fits its
    track. Below that the account copy steps down: the organization label and
    the user name/role shrink or hide, leaving avatar-sized controls, so nothing

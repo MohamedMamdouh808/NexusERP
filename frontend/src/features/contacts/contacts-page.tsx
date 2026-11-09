@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { PageHeader } from '../../components/shell/page-header';
+import { SampleDataBanner } from '../../components/ui/sample-data-banner';
 import {
   Badge,
   Button,
@@ -141,6 +142,7 @@ export function ContactsPage() {
           </Button>
         }
       />
+      <SampleDataBanner moduleKey="contacts" />
       {isPending ? (
         <Card title="Contacts">
           <Skeleton label="Loading contacts" />

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { routes } from '../../../app/router';
 import { healthyReport, jsonResponse, createTestQueryClient, renderWithProviders } from '../../../test/render';
+import { seedSignedInSession } from '../../../test/session';
 import { HealthPanel } from '../health-panel';
 
 /**
@@ -67,6 +68,8 @@ describe('HealthPanel healthy state (T081)', () => {
 
 describe('No sign-in screen anywhere (T081)', () => {
   it('renders the health route through the real route table without a sign-in screen', async () => {
+    // Signed in, so the session gate renders the shell the route serves.
+    seedSignedInSession();
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(healthyReport)));
 
     const router = createMemoryRouter(routes, { initialEntries: ['/health'] });
