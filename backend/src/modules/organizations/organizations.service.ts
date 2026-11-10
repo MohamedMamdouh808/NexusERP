@@ -18,16 +18,27 @@ export class OrganizationsService {
   async createMembership(
     userId: string,
     organizationId: string,
-    roleKey: string,
+    roleId?: string,
   ) {
-    return this.prisma.membership.create({
+    const membership = await this.prisma.membership.create({
       data: {
         userId,
         organizationId,
-        roleKey,
         isActive: true,
       },
     });
+
+    if (roleId) {
+      await this.prisma.membershipRole.create({
+        data: {
+          membershipId: membership.id,
+          roleId,
+          organizationId,
+        },
+      });
+    }
+
+    return membership;
   }
 
   async createDefaultWarehouse(organizationId: string) {

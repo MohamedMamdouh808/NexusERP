@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { PrismaService } from '../../platform/prisma/prisma.service';
 import {
   IS_PUBLIC_KEY,
   REQUIRED_PERMISSION_KEY,
@@ -20,7 +21,7 @@ import {
  *
  * Why default deny rather than default allow: the primary users are non-technical staff
  * on shared machines, and a single bypassed check exposes another organization's
- * commercial data. Default deny means an unforgotten guard fails CLOSED. A developer who
+ * commercial data. Default deny means an unforgotten check fails CLOSED. A developer who
  * forgets the decorator gets a 403 on their own endpoint - a five-second fix - rather than
  * an unprotected route that ships.
  *
@@ -39,9 +40,12 @@ import {
 export class PermissionGuard implements CanActivate {
   private readonly logger = new Logger(PermissionGuard.name);
 
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -65,10 +69,10 @@ export class PermissionGuard implements CanActivate {
       );
     }
 
-    // Permission resolution arrives with authentication. Until then the effective set is
-    // empty, so a declared route is denied - still failing closed, and now for the
-    // correct reason: no session means no permissions.
-    const effective = this.effectivePermissions(context);
+    // Permission resolution arrives with authentication. The session guard resolves
+    // membershipId per request; no caching, so role/permission changes apply from the
+    // member's next request onward (FR-004).
+    const effective = await this.effectivePermissions(context);
     if (!effective.includes(required)) {
       throw new ForbiddenException('You do not have permission to perform this action.');
     }
@@ -77,14 +81,36 @@ export class PermissionGuard implements CanActivate {
   }
 
   /**
-   * The caller's effective permissions.
+   * The caller's effective permissions: the union of all permissions granted through
+   * the membership's roles, resolved from the database on every request.
    *
-   * Empty until authentication ships. It reads the union of the member's role grants
-   * from the session context once that exists; today it exists as a single seam so the
-   * guard's control flow is final and only its data source is pending.
+   * Returns an empty set when no session/membership is bound to the request
+   * (unauthenticated callers hit default deny).
    */
-  private effectivePermissions(context: ExecutionContext): readonly string[] {
-    void context;
-    return [];
+  private async effectivePermissions(context: ExecutionContext): Promise<readonly string[]> {
+    const request = context.switchToHttp().getRequest<{
+      membershipId?: string;
+    }>();
+    const membershipId = request.membershipId;
+    if (!membershipId) return [];
+
+    // Resolve the union: membership → membership_roles → role_permissions → permissions.code,
+    // all within the membership's organization (composite FKs prevent cross-org links).
+    const permissions = await this.prisma.permission.findMany({
+      where: {
+        rolePermissions: {
+          some: {
+            role: {
+              memberships: {
+                some: { membershipId },
+              },
+            },
+          },
+        },
+      },
+      select: { code: true },
+    });
+
+    return permissions.map((p) => p.code);
   }
 }

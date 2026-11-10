@@ -19,6 +19,7 @@ import { SessionGuard, SessionRequest } from './guards/session.guard';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 import { registerSchema, type RegisterDto } from './dto/register.dto';
 import { loginSchema, type LoginDto } from './dto/login.dto';
+import { changePasswordSchema, type ChangePasswordDto } from './dto/change-password.dto';
 import { switchOrganizationSchema, type SwitchOrganizationDto } from './dto/switch-organization.dto';
 import { CONFIGURATION } from '../../config/configuration.module';
 import { Configuration } from '../../config/configuration';
@@ -117,6 +118,51 @@ export class AuthController {
     }
 
     return this.authService.me(request.userId, request.membershipId);
+  }
+
+  /**
+   * Change the authenticated user's own password. Rotates the current session,
+     * invalidates all other sessions in every organization, and clears the
+     * forced-change flag. CSRF-protected.
+   */
+  @Post('change-password')
+  @UseGuards(SessionGuard)
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Req() request: SessionRequest,
+    @Res({ passthrough: true }) response: Response,
+    @Body(new ZodValidationPipe(changePasswordSchema)) body: ChangePasswordDto,
+  ) {
+    if (!request.userId || !request.membershipId) {
+      throw new AppException(ERROR_CODES.UNAUTHENTICATED, [], 'Not authenticated.');
+    }
+
+    const { rawToken } = await this.authService.changeOwnPassword({
+      userId: request.userId,
+      currentPassword: body.currentPassword,
+      newPassword: body.newPassword,
+      sessionId: (request.cookies as Record<string, string | undefined> | undefined)?.[
+        'session_id'
+      ] ?? '',
+    });
+
+    // Issue fresh session cookie
+    response.cookie('session_id', rawToken, {
+      httpOnly: true,
+      secure: this.configuration.isProduction,
+      sameSite: 'lax',
+      path: '/',
+    });
+
+    // Issue fresh CSRF token cookie
+    response.cookie('csrf_token', rawToken, {
+      httpOnly: false,
+      secure: this.configuration.isProduction,
+      sameSite: 'lax',
+      path: '/',
+    });
+
+    return { message: 'Password changed.' };
   }
 
   /**

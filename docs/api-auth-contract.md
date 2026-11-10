@@ -157,6 +157,41 @@ organization's real name must be fetched instead). 403 if the user lacks an
 active membership in the target organization — ⚠ currently pre-empted by the
 same default-deny gap as logout (403 for every caller).
 
+### POST /api/v1/auth/change-password — requires session + CSRF
+
+Changes the authenticated user's own password (FR-025, FR-026, FR-027, FR-029).
+CSRF-protected: send `X-CSRF-Token` matching the `csrf_token` cookie.
+
+Request:
+
+```json
+{ "currentPassword": "...", "newPassword": "..." }
+```
+
+Validation order (400 `VALIDATION_ERROR` unless noted otherwise):
+
+1. Current password verified with Argon2id. Wrong → **400** `INVALID_CURRENT_PASSWORD`
+   (NEVER 401 — the session is valid; this is body validation). Counts toward the
+   failed-verification limiter keyed by user id; more than 5 failures per 15 minutes
+   → **429** `TOO_MANY_REQUESTS` with `Retry-After`.
+2. New password: ≥12 chars, upper/lower/digit; must differ from current; must not
+   equal the user's email (case-insensitive). Violations name `newPassword` in
+   `details[].field`.
+
+Success (one transaction): hash updated with Argon2id, `mustChangePassword` cleared,
+all other sessions of the user in every organization invalidated, current session
+rotated (fresh token → new `session_id` cookie; fresh CSRF token → new
+`csrf_token` cookie). Audit `auth.password_changed` contains no password/hash/token
+values.
+
+| Status | Body | Notes |
+|--------|------|-------|
+| 200    | `{ "message": "Password changed." }` | Fresh `session_id`/`csrf_token` cookies set. |
+| 400    | envelope `VALIDATION_ERROR` / `INVALID_CURRENT_PASSWORD` | `details[].field` names the failing field. |
+| 401    | envelope `UNAUTHENTICATED` | No valid session. |
+| 403    | envelope `PASSWORD_CHANGE_REQUIRED` | User's flag is already set — this endpoint is still allowed. |
+| 429    | envelope `TOO_MANY_REQUESTS` | `Retry-After` header; rate-limit window exceeded. |
+
 ## Client rules (frontend)
 
 1. Probe sign-in state with `GET /api/v1/auth/me`; 401 ⇒ signed-out UI, 200 ⇒

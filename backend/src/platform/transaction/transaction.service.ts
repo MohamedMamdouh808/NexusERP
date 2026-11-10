@@ -53,9 +53,11 @@ export class TransactionService {
 
     return this.prisma.$transaction(async (tx: TransactionClient) => this.storage.run(tx, () => work(tx)), {
       // A transaction that runs longer than this is a bug, not a slow request; failing
-      // is better than holding locks against concurrent stock mutations.
-      timeout: 10_000,
-      maxWait: 5_000,
+      // is better than holding locks against concurrent stock mutations. Role-template
+      // provisioning (68 permission links) against a remote database can take a few
+      // seconds, so the budget is generous.
+      timeout: 30_000,
+      maxWait: 10_000,
     });
   }
 

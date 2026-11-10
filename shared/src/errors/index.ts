@@ -23,6 +23,7 @@ export const ERROR_CODES = {
   VALIDATION_ERROR: 'VALIDATION_ERROR',
   MALFORMED_REQUEST: 'MALFORMED_REQUEST',
   IDEMPOTENCY_KEY_REQUIRED: 'IDEMPOTENCY_KEY_REQUIRED',
+  INVALID_CURRENT_PASSWORD: 'INVALID_CURRENT_PASSWORD',
   OVER_RECEIPT: 'OVER_RECEIPT',
   OVER_ALLOCATION: 'OVER_ALLOCATION',
 
@@ -32,6 +33,8 @@ export const ERROR_CODES = {
   // 403 Forbidden
   FORBIDDEN: 'FORBIDDEN',
   MODULE_DISABLED: 'MODULE_DISABLED',
+  NOT_ENOUGH_PERMISSIONS: 'NOT_ENOUGH_PERMISSIONS',
+  PASSWORD_CHANGE_REQUIRED: 'PASSWORD_CHANGE_REQUIRED',
 
   // 404 Not Found
   NOT_FOUND: 'NOT_FOUND',
@@ -83,6 +86,7 @@ export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
 export const EMITTABLE_ERROR_CODES: readonly ErrorCode[] = [
   ERROR_CODES.VALIDATION_ERROR,
   ERROR_CODES.MALFORMED_REQUEST,
+  ERROR_CODES.INVALID_CURRENT_PASSWORD,
   ERROR_CODES.UNAUTHENTICATED,
   ERROR_CODES.FORBIDDEN,
   ERROR_CODES.MODULE_DISABLED,
@@ -98,6 +102,8 @@ export const EMITTABLE_ERROR_CODES: readonly ErrorCode[] = [
   ERROR_CODES.INTERNAL_ERROR,
   ERROR_CODES.NOT_IMPLEMENTED,
   ERROR_CODES.SERVICE_UNAVAILABLE,
+  ERROR_CODES.NOT_ENOUGH_PERMISSIONS,
+  ERROR_CODES.PASSWORD_CHANGE_REQUIRED,
 ];
 
 /**
@@ -110,11 +116,14 @@ export const ERROR_CODE_STATUS: Readonly<Record<ErrorCode, number>> = {
   [ERROR_CODES.VALIDATION_ERROR]: 400,
   [ERROR_CODES.MALFORMED_REQUEST]: 400,
   [ERROR_CODES.IDEMPOTENCY_KEY_REQUIRED]: 400,
+  [ERROR_CODES.INVALID_CURRENT_PASSWORD]: 400,
   [ERROR_CODES.OVER_RECEIPT]: 400,
   [ERROR_CODES.OVER_ALLOCATION]: 400,
   [ERROR_CODES.UNAUTHENTICATED]: 401,
   [ERROR_CODES.FORBIDDEN]: 403,
   [ERROR_CODES.MODULE_DISABLED]: 403,
+  [ERROR_CODES.NOT_ENOUGH_PERMISSIONS]: 403,
+  [ERROR_CODES.PASSWORD_CHANGE_REQUIRED]: 403,
   [ERROR_CODES.NOT_FOUND]: 404,
   [ERROR_CODES.METHOD_NOT_ALLOWED]: 405,
   [ERROR_CODES.CONFLICT]: 409,
@@ -145,6 +154,7 @@ export const ERROR_CODE_STATUS: Readonly<Record<ErrorCode, number>> = {
 export const DEFAULT_ERROR_MESSAGES: Readonly<Record<ErrorCode, string>> = {
   [ERROR_CODES.VALIDATION_ERROR]: 'Some fields need attention.',
   [ERROR_CODES.MALFORMED_REQUEST]: 'The request could not be read.',
+  [ERROR_CODES.INVALID_CURRENT_PASSWORD]: 'The current password is incorrect.',
   [ERROR_CODES.IDEMPOTENCY_KEY_REQUIRED]:
     'This action requires an Idempotency-Key header. Refresh and try again.',
   [ERROR_CODES.OVER_RECEIPT]: 'The received quantity exceeds the outstanding quantity.',
@@ -152,6 +162,8 @@ export const DEFAULT_ERROR_MESSAGES: Readonly<Record<ErrorCode, string>> = {
   [ERROR_CODES.UNAUTHENTICATED]: 'Your session has expired. Please sign in again.',
   [ERROR_CODES.FORBIDDEN]: 'You do not have permission to perform this action.',
   [ERROR_CODES.MODULE_DISABLED]: 'This module is not enabled for your organization.',
+  [ERROR_CODES.NOT_ENOUGH_PERMISSIONS]: 'This action requires a permission you do not hold: {permission}.',
+  [ERROR_CODES.PASSWORD_CHANGE_REQUIRED]: 'You must change your password before continuing.',
   [ERROR_CODES.NOT_FOUND]: 'Record not found.',
   [ERROR_CODES.METHOD_NOT_ALLOWED]: 'That action is not available on this address.',
   [ERROR_CODES.CONFLICT]: 'This record changed since you opened it. Reload to continue.',

@@ -127,11 +127,13 @@ model User {
   id            String   @id @default(uuid()) @db.Uuid
   email         String   @unique @db.VarChar(255)
   passwordHash  String   @db.VarChar(255)
+  mustChangePassword Boolean @default(false)
   createdAt     DateTime @default(now()) @db.Timestamptz(6)
   updatedAt     DateTime @updatedAt @db.Timestamptz(6)
 
   memberships   Membership[]
   sessions      Session[]
+  auditLogs     AuditLog[]
 
   @@map("users")
 }
@@ -148,46 +150,72 @@ model Organization {
   warehouses  Warehouse[]
   sequences   DocumentSequence[]
   roles       Role[]
+  auditLogs   AuditLog[]
 
   @@map("organizations")
 }
 
-/// Links a user to an organization with a role. Determines the user's active tenant
+/// Links a user to an organization with one or more roles. Determines the user's active tenant
 /// context and permissions within that organization. Can be active or deactivated.
 model Membership {
   id              String   @id @default(uuid()) @db.Uuid
   userId          String   @db.Uuid
   organizationId  String   @db.Uuid
-  roleKey         String   @db.VarChar(64)
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now()) @db.Timestamptz(6)
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   sessions Session[]
+  roles    MembershipRole[]
 
   @@unique([userId, organizationId])
+  @@unique([id, organizationId])
   @@index([organizationId])
   @@map("memberships")
 }
 
 /// A named set of permissions within an organization. Default roles are Administrator,
-/// Manager, Sales, Inventory, and Purchasing. organizationId is null for system/default
-/// roles that apply globally.
+/// Manager, Sales, Inventory, and Purchasing. Every role belongs to exactly one
+/// organization (organizationId NOT NULL); role keys are unique per organization.
 model Role {
   id            String   @id @default(uuid()) @db.Uuid
-  key           String   @unique @db.VarChar(64)
+  key           String   @db.VarChar(64)
   name          String   @db.VarChar(128)
   description   String   @db.VarChar(255)
   isSystem      Boolean  @default(true)
-  organizationId String? @db.Uuid
-  organization  Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String   @db.Uuid
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   permissions   RolePermission[]
+  memberships   MembershipRole[]
   createdAt     DateTime @default(now()) @db.Timestamptz(6)
 
+  @@unique([organizationId, key])
+  @@unique([id, organizationId])
   @@index([organizationId])
   @@map("roles")
+}
+
+/// Links a membership to one of its organization's roles. Composite key over
+/// (membershipId, roleId) is the duplicate-grant guard; composite foreign keys keep
+/// every link inside a single organization (a role of org A can never link to a
+/// membership of org B).
+model MembershipRole {
+  membershipId  String   @db.Uuid
+  roleId        String   @db.Uuid
+  organizationId String   @db.Uuid
+
+  membership Membership @relation(fields: [membershipId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  role         Role     @relation(fields: [roleId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([membershipId, roleId])
+  @@unique([organizationId, membershipId, roleId])
+  @@index([organizationId, roleId])
+  @@index([organizationId, membershipId])
+  @@map("membership_roles")
 }
 
 /// The join between a role and the permissions it grants within an organization.
@@ -203,6 +231,34 @@ model RolePermission {
 
   @@id([roleId, permissionId])
   @@map("role_permissions")
+}
+
+/// Append-only audit log of every audited action. organizationId and userId are
+/// nullable: anonymous auth events (unknown-email sign-in failures) carry neither.
+/// Updates, deletions and truncations are rejected for the application database role
+/// (FR-017). RLS enabled with no policies (FR-023).
+model AuditLog {
+  id                   String      @id @default(uuid()) @db.Uuid
+  organizationId       String?     @db.Uuid
+  userId               String?     @db.Uuid
+  action               String      @db.VarChar(64)
+  recordType           String      @db.VarChar(64)
+  recordId             String?     @db.Uuid
+  before               Json?
+  after                Json?
+  clientAddress        String?     @db.VarChar(64)
+  reasonCode           String?     @db.VarChar(32)
+  unknownAccountHash   String?     @db.VarChar(64)
+  unknownAccountMarker String?     @db.VarChar(128)
+  createdAt            DateTime    @default(now()) @db.Timestamptz(6)
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, userId])
+  @@index([userId])
+  @@map("audit_logs")
 }
 
 /// A server-side session tying an opaque session identifier to a user and membership,

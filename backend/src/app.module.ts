@@ -2,12 +2,14 @@ import { MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { PermissionGuard } from './common/guards/permission.guard';
+import { PasswordChangeGuard } from './common/guards/password-change.guard';
 import { RequestIdMiddleware } from './common/logging/request-id.middleware';
 import { ConfigurationModule } from './config/configuration.module';
 import { PlatformModule } from './platform/platform.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { UsersModule } from './modules/users/users.module';
+import { AuditModule } from './modules/audit/audit.module';
 import { AccessControlModule } from './modules/access-control/access-control.module';
 
 /**
@@ -26,10 +28,11 @@ import { AccessControlModule } from './modules/access-control/access-control.mod
  * Domain modules are added here one at a time by their own features.
  */
 @Module({
-  imports: [ConfigurationModule, PlatformModule, AuthModule, OrganizationsModule, UsersModule, AccessControlModule],
+  imports: [ConfigurationModule, PlatformModule, AuthModule, OrganizationsModule, UsersModule, AccessControlModule, AuditModule],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_GUARD, useClass: PermissionGuard },
+    { provide: APP_GUARD, useClass: PasswordChangeGuard },
   ],
 })
 export class AppModule implements NestModule {
