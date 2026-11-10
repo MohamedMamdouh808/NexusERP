@@ -1,28 +1,23 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
+import type { ExecutionContext } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../../../platform/prisma/prisma.service';
 import { PasswordChangeGuard } from '../../../common/guards/password-change.guard';
 import { AppException } from '../../../common/errors/all-exceptions.filter';
-import { ERROR_CODES } from '@nexuserp/shared';
 
 describe('PasswordChangeGuard', () => {
   let guard: PasswordChangeGuard;
   let prisma: jest.Mocked<PrismaService>;
-  let reflector: Reflector;
 
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         PasswordChangeGuard,
         { provide: PrismaService, useValue: { user: { findUnique: jest.fn() } } },
-        { provide: Reflector, useValue: { getAllAndOverride: jest.fn() } },
       ],
     }).compile();
 
     guard = moduleRef.get(PasswordChangeGuard);
     prisma = moduleRef.get(PrismaService);
-    reflector = moduleRef.get(Reflector);
   });
 
   const mockContext = (userId?: string, url = '', method = 'GET') =>

@@ -89,6 +89,17 @@ export class AuthService {
         after: { roles: Array.from(roleByTemplateKey.keys()) },
       });
 
+      // Audit: registration (FR-015)
+      await this.audit.record({
+        organizationId: organization.id,
+        userId: user.id,
+        action: AUDIT_ACTIONS.authRegister,
+        recordType: 'user',
+        recordId: user.id,
+        before: null,
+        after: { email, organizationId: organization.id },
+      });
+
       // 5. Create default warehouse (FR-001)
       await tx.warehouse.create({
         data: {
@@ -533,6 +544,17 @@ export class AuthService {
     });
 
     if (failureCount >= AuthService.MAX_FAILURES) {
+      // Audit: lockout event (FR-015, FR-030)
+      const lockedUser = await this.prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+      await this.audit.loginFailure({
+        userId: lockedUser?.id,
+        reasonCode: 'lockout',
+        isLockout: true,
+      });
+
       // Find the earliest failure in the window to compute Retry-After.
       const oldest = await this.prisma.loginAttempt.findFirst({
         where: {

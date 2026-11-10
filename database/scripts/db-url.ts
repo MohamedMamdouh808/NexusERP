@@ -54,18 +54,38 @@ export interface DatabaseTarget {
   username: string | null;
   host: string | null;
   database: string | null;
+  schema: string | null;
   /** Full URL with the password replaced by [redacted]. Safe to print. */
   maskedUrl: string | null;
 }
 
 export function parseDatabaseUrl(url: string): DatabaseTarget {
-  const match = url.match(/^postgres(?:ql)?:\/\/([^:@/]+)(?::[^@]*)?@([^:/\s]+)(?::\d+)?\/([^?\s]+)/);
+  const match = url.match(/^postgres(?:ql)?:\/\/([^:@/]+)(?::[^@]*)?@([^:/\s]+)(?::\d+)?\/([^?\s]+)(\?[^\s]*)?/);
+  const searchParams = match?.[5] ? new URLSearchParams(match[5]) : new URLSearchParams();
   return {
     username: match?.[1] ?? null,
     host: match?.[2] ?? null,
     database: match?.[3] ?? null,
+    schema: searchParams.get('schema') ?? null,
     maskedUrl: url.replace(/(postgres(?:ql)?:\/\/[^:]+:)[^@]*@/, '$1[redacted]@'),
   };
+}
+
+/** Returns a copy of the URL with the schema query parameter replaced or added. */
+export function replaceSchema(url: string, schema: string): string {
+  const hasQuery = url.includes('?');
+  const existingSchema = url.match(/[?&]schema=[^&]*/);
+  if (existingSchema) {
+    return url.replace(existingSchema[0], `schema=${schema}`);
+  }
+  const separator = hasQuery ? '&' : '?';
+  return `${url}${separator}schema=${schema}`;
+}
+
+/** Returns true when the URL targets the public schema (no schema param means public). */
+export function isPublicSchema(url: string): boolean {
+  const schemaMatch = url.match(/[?&]schema=([^&]*)/);
+  return schemaMatch === null || schemaMatch[1] === 'public';
 }
 
 /** Local development hostnames that are always allowed. */

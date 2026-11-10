@@ -17,7 +17,9 @@
 import {
   databaseRefMismatch,
   isLocalHost,
+  isPublicSchema,
   loadDatabaseTarget,
+  replaceSchema,
 } from './db-url';
 
 const loaded = loadDatabaseTarget();
@@ -29,7 +31,7 @@ if (!loaded) {
   process.exit(1);
 }
 
-const { target } = loaded;
+const { target, url } = loaded;
 const databaseNameAllowed = target.database !== null && target.database.endsWith('_test');
 
 if (!isLocalHost(target.host) && !databaseNameAllowed) {
@@ -41,13 +43,22 @@ if (!isLocalHost(target.host) && !databaseNameAllowed) {
   process.exit(1);
 }
 
+if (isPublicSchema(url)) {
+  console.error(
+    `test:integration: refused — DATABASE_URL targets schema "public". Integration tests must ` +
+      `use an isolated schema (e.g. schema=nexuserp_test) so the public schema is never ` +
+      `modified by tests. Target (password masked): ${target.maskedUrl}`,
+  );
+  process.exit(1);
+}
+
 const refMismatch = databaseRefMismatch(target);
 if (refMismatch !== null) {
   console.error(`test:integration: refused — ${refMismatch}`);
   process.exit(1);
 }
 
-console.log(`test:integration: allowed — host "${target.host}", database "${target.database}".`);
+console.log(`test:integration: allowed — host "${target.host}", database "${target.database}", schema "${target.schema ?? 'public'}"`);
 if (databaseNameAllowed && !isLocalHost(target.host)) {
   console.log('test:integration: database name ends with "_test"; hosted test database permitted.');
 }
