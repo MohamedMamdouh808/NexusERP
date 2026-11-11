@@ -15,7 +15,7 @@ import { AuditService } from '../audit/audit.service';
 import { hash as argon2Hash, verify as argon2Verify } from 'argon2';
 import { AppException } from '../../common/errors/all-exceptions.filter';
 import { ERROR_CODES } from '@nexuserp/shared';
-import { AUDIT_ACTIONS } from '@nexuserp/shared';
+import { AUDIT_ACTIONS, DEFAULT_UNITS_OF_MEASURE } from '@nexuserp/shared';
 
 /**
  * Authentication service. Orchestrates registration, login, logout, current-user
@@ -56,6 +56,18 @@ export class AuthService {
       const roleByTemplateKey = await this.accessControl.grantDefaultRolesAndPermissions(
         organization.id,
       );
+
+      // 3b. The default units of measure, in the same transaction as the
+      //     organization. A product cannot be created without a unit of measure,
+      //     so an organization that starts empty must still be able to create
+      //     its first product.
+      await tx.unitOfMeasure.createMany({
+        data: DEFAULT_UNITS_OF_MEASURE.map((unit) => ({
+          organizationId: organization.id,
+          name: unit.name,
+          abbreviation: unit.abbreviation,
+        })),
+      });
 
       // 4. Create Administrator membership and link it to the Administrator role
       const membership = await tx.membership.create({
@@ -280,6 +292,9 @@ export class AuthService {
       organization: {
         id: membership.organization.id,
         name: membership.organization.name,
+        // The currency the organization's prices are in. Read-only here: changing
+        // it belongs to the organization settings feature.
+        currencyCode: membership.organization.currencyCode,
       },
       permissions,
     };
@@ -368,6 +383,9 @@ export class AuthService {
         return {
           id: membership.organization.id,
           name: membership.organization.name,
+          // The currency this organization's prices are in, so the interface can
+          // show it beside them.
+          currencyCode: membership.organization.currencyCode,
           roles: roles.map((r) => r.role),
         };
       }),

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { PRODUCT_PERMISSIONS } from '@nexuserp/shared';
 
 import { PageHeader } from '../../components/shell/page-header';
 import {
@@ -11,48 +12,33 @@ import {
   Skeleton,
   Toast,
 } from '../../components/ui';
-import { formatMoney } from '../../lib/format';
-import { useProduct, useArchiveProduct, useUpdateProduct } from './use-products';
+import { hasPermission, useSession } from '../../services/auth-session';
+import { useArchiveProduct, useProduct, useRestoreProduct } from './use-products';
 
+/**
+ * One product.
+ *
+ * The prices are shown exactly as they were recorded, with the organization's
+ * currency beside them - no conversion, and no arithmetic in the browser.
+ *
+ * There is no stock figure here: the inventory feature owns the balances, and
+ * this feature stores no stock at all. Saying so is better than showing a
+ * number that means nothing yet.
+ */
 export function ProductDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const productId = id ?? '';
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const session = useSession();
+  const canWrite = hasPermission(session, PRODUCT_PERMISSIONS.write);
+  const currencyCode = session.status === 'signed-in' ? session.organization.currencyCode : null;
 
   const { data, isPending, isError, error } = useProduct(productId);
-  const archiveMutation = useArchiveProduct();
-  const updateMutation = useUpdateProduct();
-  const [toasts, setToasts] = useState<{ id: string; message: string; tone?: 'success' | 'failure' }[]>([]);
-
-  const product = data;
-  const archived = product?.status === 'ARCHIVED';
-
-  const apiFailure =
-    error && typeof error === 'object' && 'requestId' in error
-      ? (error as Error & { requestId: string })
-      : undefined;
-
-  const handleArchive = () => {
-    archiveMutation.mutate(productId, {
-      onSuccess: () => {
-        setDialogOpen(false);
-        setToasts((items) => [...items, { id: `archive-product-${Date.now()}`, message: `${product?.name ?? 'Product'} archived` }]);
-      },
-      onError: (caught) => {
-        setDialogOpen(false);
-        setToasts((items) => [...items, { id: `archive-product-error-${Date.now()}`, message: caught instanceof Error ? caught.message : 'The product could not be archived.', tone: 'failure' }]);
-      },
-    });
-  };
-
-  const restore = () => {
-    if (!product) return;
-    updateMutation.mutate({ ...product, status: 'ACTIVE' }, {
-      onSuccess: () => setToasts((items) => [...items, { id: `restore-product-${Date.now()}`, message: `${product.name} restored` }]),
-      onError: (caught) => setToasts((items) => [...items, { id: `restore-product-error-${Date.now()}`, message: caught instanceof Error ? caught.message : 'The product could not be restored.', tone: 'failure' as const }]),
-    });
-  };
+  const archiveProduct = useArchiveProduct();
+  const restoreProduct = useRestoreProduct();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogError, setDialogError] = useState('');
+  const [toast, setToast] = useState<string | null>(null);
 
   if (isPending) {
     return (
@@ -65,45 +51,71 @@ export function ProductDetailPage() {
     );
   }
 
-  if (isError || product === undefined) {
+  if (isError || data === undefined) {
     return (
       <section className="product-detail-page" aria-label="Product detail">
         <PageHeader title="Product" />
         <Card title="Product">
           <ErrorState
             message={error instanceof Error ? error.message : 'The product could not be loaded.'}
-            requestId={apiFailure?.requestId}
-            onRetry={() => {
-              // no-op: query will refetch on remount
-            }}
           />
         </Card>
       </section>
     );
   }
 
+  const archived = data.isArchived;
+
+  function handleArchive() {
+    setDialogError('');
+    archiveProduct.mutate(productId, {
+      onSuccess: () => {
+        setDialogOpen(false);
+        setToast(`${data!.name} archived`);
+      },
+      onError: (caught) => {
+        setDialogError(
+          caught instanceof Error ? caught.message : 'The product could not be archived.',
+        );
+      },
+    });
+  }
+
+  function handleRestore() {
+    setDialogError('');
+    restoreProduct.mutate(productId, {
+      onSuccess: () => {
+        setDialogOpen(false);
+        setToast(`${data!.name} restored`);
+      },
+      onError: (caught) => {
+        setDialogError(
+          caught instanceof Error ? caught.message : 'The product could not be restored.',
+        );
+      },
+    });
+  }
+
   return (
     <section className="product-detail-page" aria-label="Product detail">
       <PageHeader
-        title={product.name}
+        title={data.name}
         secondaryActions={[
           <div className="product-detail-page__header-actions" key="product-actions">
-            <Button variant="primary" onClick={() => navigate(`/products/${product.id}/edit`)}>
-              Edit
-            </Button>
-            {archived ? (
-              <Button variant="default" onClick={restore} loading={updateMutation.isPending}>
-                Restore
-              </Button>
-            ) : (
-              <Button
-                variant="danger"
-                onClick={() => setDialogOpen(true)}
-                reason="Archived products can be restored later"
-              >
-                Archive
-              </Button>
-            )}
+            {canWrite ? (
+              <>
+                <Button variant="primary" onClick={() => navigate(`/products/${data.id}/edit`)}>
+                  Edit
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={() => setDialogOpen(true)}
+                  disabled={archiveProduct.isPending || restoreProduct.isPending}
+                >
+                  {archived ? 'Restore' : 'Archive'}
+                </Button>
+              </>
+            ) : null}
             <Button variant="default" onClick={() => navigate('/products')}>
               Back to list
             </Button>
@@ -111,58 +123,57 @@ export function ProductDetailPage() {
         ]}
       />
       <Card title="Product details">
-        <dl className="product-detail-page__details">
+        <dl className="contact-detail-page__details">
           <dt>SKU</dt>
-          <dd>{product.sku}</dd>
-          <dt>Category</dt>
-          <dd>{product.category}</dd>
-          <dt>Unit of measure</dt>
-          <dd>{product.unitOfMeasure}</dd>
-          <dt>Purchase price</dt>
-          <dd>{formatMoney(product.purchasePrice)}</dd>
-          <dt>Selling price</dt>
-          <dd>{formatMoney(product.sellingPrice)}</dd>
-          {product.lowStockThreshold !== null && (
-            <>
-              <dt>Low stock threshold</dt>
-              <dd>{product.lowStockThreshold}</dd>
-            </>
-          )}
+          <dd>{data.sku}</dd>
           <dt>Status</dt>
           <dd>
-            <Badge tone={statusTone(product.status)}>{product.status}</Badge>
+            <Badge tone={archived ? 'destructive' : 'success'}>
+              {archived ? 'Archived' : 'Active'}
+            </Badge>
           </dd>
+          <dt>Purchase price</dt>
+          <dd>{currencyCode === null ? data.purchasePrice : `${data.purchasePrice} ${currencyCode}`}</dd>
+          <dt>Selling price</dt>
+          <dd>{currencyCode === null ? data.sellingPrice : `${data.sellingPrice} ${currencyCode}`}</dd>
+          <dt>Reorder level</dt>
+          <dd>{data.lowStockThreshold ?? '—'}</dd>
+          <dt>Version</dt>
+          <dd>{data.version}</dd>
+          <dt>Stock</dt>
+          <dd className="form-help-text">Stock arrives with the Inventory feature.</dd>
         </dl>
       </Card>
 
-      {toasts.map((toast) => (
+      {toast !== null && (
         <Toast
-          key={toast.id}
-          id={toast.id}
-          tone={toast.tone ?? 'success'}
-          message={toast.message}
-          actionLabel={toast.id.startsWith('archive-product-') ? 'Undo' : undefined}
-          onAction={toast.id.startsWith('archive-product-') ? restore : undefined}
-          onDismiss={(id) => setToasts((items) => items.filter((item) => item.id !== id))}
+          id={`product-toast-${productId}`}
+          tone="success"
+          message={toast}
+          onDismiss={() => setToast(null)}
         />
-      ))}
+      )}
+
       <ConfirmDialog
         open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        onConfirm={handleArchive}
-        title="Archive product"
-        description={`Are you sure you want to archive “${product.name}”? Archived products are hidden from the catalogue but can be restored later.`}
-        actionLabel="Archive"
-        destructive
-        loading={archiveMutation.isPending}
+        onClose={() => {
+          if (!archiveProduct.isPending && !restoreProduct.isPending) {
+            setDialogOpen(false);
+            setDialogError('');
+          }
+        }}
+        onConfirm={archived ? handleRestore : handleArchive}
+        title={archived ? 'Restore product' : 'Archive product'}
+        description={
+          archived
+            ? `Are you sure you want to restore “${data.name}”? It becomes selectable again.`
+            : `Are you sure you want to archive “${data.name}”? It leaves the catalogue but can be restored, and its SKU stays reserved.`
+        }
+        actionLabel={archived ? 'Restore' : 'Archive'}
+        destructive={!archived}
+        loading={archiveProduct.isPending || restoreProduct.isPending}
+        error={dialogError}
       />
     </section>
   );
-}
-
-function statusTone(status: string): 'success' | 'warning' | 'info' | 'neutral' | 'destructive' {
-  if (status === 'ARCHIVED' || status === 'CANCELLED') return 'destructive';
-  if (status === 'ACTIVE') return 'success';
-  if (status === 'DRAFT') return 'neutral';
-  return 'warning';
 }

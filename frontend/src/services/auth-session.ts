@@ -54,6 +54,8 @@ export interface SessionMembership {
 export interface SessionOrganization {
   readonly id: string;
   readonly name: string;
+  /** The ISO 4217 code the organization's prices are in. Read-only. */
+  readonly currencyCode: string;
 }
 
 /** A signed-in user as the service describes them (no password material). */

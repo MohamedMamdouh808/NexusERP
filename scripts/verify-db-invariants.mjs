@@ -129,22 +129,30 @@ async function main() {
       pass(`Every table in schema "${targetSchema}" has RLS enabled`);
     }
 
-    // The contacts table is named explicitly. It is the newest tenant-scoped
-    // table, and "every table has RLS" is a claim nobody can check by eye at
-    // 3am when exactly one table is unprotected.
-    const contactsRls = await prisma.$queryRawUnsafe(
-      `SELECT relrowsecurity FROM pg_class
+    // The contacts and catalogue tables are named explicitly. They are the
+    // newest tenant-scoped tables, and "every table has RLS" is a claim nobody
+    // can check by eye at 3am when exactly one table is unprotected.
+    const catalogueRls = await prisma.$queryRawUnsafe(
+      `SELECT relname, relrowsecurity FROM pg_class
        WHERE relkind = 'r'
          AND relnamespace = $1::regnamespace
-         AND relname = 'contacts'`,
+         AND relname = ANY($2::text[])`,
       targetSchema,
+      ['contacts', 'products', 'product_categories', 'units_of_measure'],
     );
-    if (contactsRls.length === 0) {
-      fail('the contacts table does not exist in this schema');
-    } else if (!contactsRls[0].relrowsecurity) {
-      fail('the contacts table lacks RLS');
+    if (catalogueRls.length === 0) {
+      fail('the contacts and catalogue tables do not exist in this schema');
     } else {
-      pass('The contacts table has RLS enabled');
+      let unprotected = 0;
+      for (const table of catalogueRls) {
+        if (!table.relrowsecurity) {
+          unprotected += 1;
+          fail(`the ${table.relname} table lacks RLS`);
+        }
+      }
+      if (unprotected === 0) {
+        pass('The contacts and catalogue tables have RLS enabled');
+      }
     }
 
     // ------------------------------------------------------------------

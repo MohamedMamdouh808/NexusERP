@@ -332,6 +332,80 @@
         ],
         "type": "object"
       },
+      "ProductResponseDto": {
+        "properties": {
+          "categoryId": {
+            "description": "Category id",
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "Creation timestamp",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Product id",
+            "type": "string"
+          },
+          "isArchived": {
+            "description": "Whether the product is archived",
+            "type": "boolean"
+          },
+          "lowStockThreshold": {
+            "description": "Reorder level (low-stock threshold) as a decimal string with three places",
+            "nullable": true,
+            "type": "object"
+          },
+          "name": {
+            "description": "Product name",
+            "type": "string"
+          },
+          "organizationId": {
+            "description": "Owning organization id",
+            "type": "string"
+          },
+          "purchasePrice": {
+            "description": "Purchase price as a decimal string with four places",
+            "type": "string"
+          },
+          "sellingPrice": {
+            "description": "Selling price as a decimal string with four places",
+            "type": "string"
+          },
+          "sku": {
+            "description": "Stock keeping unit, unique within the organization",
+            "type": "string"
+          },
+          "unitId": {
+            "description": "Unit of measure id",
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "Last change timestamp",
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "description": "Version, increased on every accepted change",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "sku",
+          "name",
+          "categoryId",
+          "unitId",
+          "purchasePrice",
+          "sellingPrice",
+          "isArchived",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
       "UpdateContactDto": {
         "properties": {
           "addressLine1": {
@@ -889,7 +963,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -912,7 +986,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -935,12 +1009,232 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
         "tags": [
           "Memberships"
+        ]
+      }
+    },
+    "/api/v1/product-categories": {
+      "get": {
+        "operationId": "ProductCategoriesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List the organization's product categories",
+        "tags": [
+          "Product categories"
+        ]
+      },
+      "post": {
+        "operationId": "ProductCategoriesController_create",
+        "parameters": [],
+        "responses": {
+          "409": {
+            "description": "The name already exists in this organization"
+          }
+        },
+        "summary": "Create a product category",
+        "tags": [
+          "Product categories"
+        ]
+      }
+    },
+    "/api/v1/products": {
+      "get": {
+        "operationId": "ProductsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The matching products, with the total count"
+          },
+          "403": {
+            "description": "Forbidden (requires products.read)"
+          }
+        },
+        "summary": "List products with search, filters, sorting and paging",
+        "tags": [
+          "Products"
+        ]
+      },
+      "post": {
+        "operationId": "ProductsController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponseDto"
+                }
+              }
+            },
+            "description": "The created product"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Forbidden (requires products.write)"
+          },
+          "409": {
+            "description": "The SKU already exists in this organization"
+          }
+        },
+        "summary": "Create a product",
+        "tags": [
+          "Products"
+        ]
+      }
+    },
+    "/api/v1/products/{id}": {
+      "get": {
+        "operationId": "ProductsController_findById",
+        "parameters": [
+          {
+            "description": "Product UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponseDto"
+                }
+              }
+            },
+            "description": "The product"
+          },
+          "403": {
+            "description": "Forbidden (requires products.read)"
+          },
+          "404": {
+            "description": "Product not found or cross-tenant"
+          }
+        },
+        "summary": "Get a product by id",
+        "tags": [
+          "Products"
+        ]
+      },
+      "put": {
+        "operationId": "ProductsController_update",
+        "parameters": [
+          {
+            "description": "Product UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponseDto"
+                }
+              }
+            },
+            "description": "The updated product"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Forbidden (requires products.write)"
+          },
+          "404": {
+            "description": "Product not found or cross-tenant"
+          },
+          "409": {
+            "description": "Stale version, or the SKU is taken"
+          }
+        },
+        "summary": "Update a product",
+        "tags": [
+          "Products"
+        ]
+      }
+    },
+    "/api/v1/products/{id}/archive": {
+      "post": {
+        "operationId": "ProductsController_archive",
+        "parameters": [
+          {
+            "description": "Product UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The archived product"
+          },
+          "403": {
+            "description": "Forbidden (requires products.write)"
+          },
+          "404": {
+            "description": "Product not found or cross-tenant"
+          },
+          "409": {
+            "description": "The product is in use"
+          }
+        },
+        "summary": "Archive a product (never deleted)",
+        "tags": [
+          "Products"
+        ]
+      }
+    },
+    "/api/v1/products/{id}/restore": {
+      "post": {
+        "operationId": "ProductsController_restore",
+        "parameters": [
+          {
+            "description": "Product UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The restored product"
+          },
+          "403": {
+            "description": "Forbidden (requires products.write)"
+          },
+          "404": {
+            "description": "Product not found or cross-tenant"
+          }
+        },
+        "summary": "Restore an archived product",
+        "tags": [
+          "Products"
         ]
       }
     },
@@ -1025,6 +1319,34 @@
         },
         "tags": [
           "Roles"
+        ]
+      }
+    },
+    "/api/v1/units-of-measure": {
+      "get": {
+        "operationId": "UnitsOfMeasureController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List the organization's units of measure",
+        "tags": [
+          "Units of measure"
+        ]
+      },
+      "post": {
+        "operationId": "UnitsOfMeasureController_create",
+        "parameters": [],
+        "responses": {
+          "409": {
+            "description": "The name already exists in this organization"
+          }
+        },
+        "summary": "Create a unit of measure",
+        "tags": [
+          "Units of measure"
         ]
       }
     }

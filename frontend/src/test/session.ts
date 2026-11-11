@@ -51,12 +51,14 @@ const TEST_ROLE_ADMINISTRATOR: readonly MembershipRole[] = [
 export const TEST_ORGANIZATION: Organization = {
   id: 'test-org-1',
   name: 'Test Organization (One)',
+  currencyCode: 'USD',
   roles: TEST_ROLE_ADMINISTRATOR,
 };
 /** A second membership, so a test can make the switcher real (>1 membership). */
 export const TEST_ORGANIZATION_TWO: Organization = {
   id: 'test-org-2',
   name: 'Test Organization (Two)',
+  currencyCode: 'USD',
   roles: TEST_ROLE_ADMINISTRATOR,
 };
 

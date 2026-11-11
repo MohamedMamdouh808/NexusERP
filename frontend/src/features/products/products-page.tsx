@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { PRODUCT_PERMISSIONS, PRODUCT_LIST_DEFAULTS } from '@nexuserp/shared';
+import type { ProductSortField, ProductSortOrder, ProductStatusFilter } from '@nexuserp/shared';
 
 import { PageHeader } from '../../components/shell/page-header';
-import { SampleDataBanner } from '../../components/ui/sample-data-banner';
 import {
   Badge,
   Button,
@@ -16,81 +17,125 @@ import {
   Skeleton,
 } from '../../components/ui';
 import type { Column } from '../../components/ui';
-import { formatMoney } from '../../lib/format';
-import { useProducts } from './use-products';
+import { hasPermission, useSession } from '../../services/auth-session';
+import { useCategories, useProducts, useUnits } from './use-products';
+import type { Product } from '../../services/products-client';
 
-const CATEGORIES = ['Packaging', 'Storage', 'Equipment', 'PPE', 'Services', 'General'] as const;
-
-const STATUSES = ['DRAFT', 'ACTIVE', 'ARCHIVED'] as const;
-
-function statusTone(status: string): 'success' | 'warning' | 'info' | 'neutral' | 'destructive' {
-  if (status === 'ARCHIVED' || status === 'CANCELLED') return 'destructive';
-  if (status === 'ACTIVE') return 'success';
-  if (status === 'DRAFT') return 'neutral';
-  return 'warning';
+/**
+ * Shows a recorded amount with the organization's currency.
+ *
+ * The amount is shown exactly as it was stored: no conversion, and no
+ * arithmetic on money. The currency code is the organization's own.
+ */
+function withCurrency(amount: string, currencyCode: string | null): string {
+  return currencyCode === null ? amount : `${amount} ${currencyCode}`;
 }
 
+/**
+ * The product catalogue.
+ *
+ * The list is the organization's own: the search, the filters, the sorting and
+ * the paging all happen on the server, because a browser cannot hold ten
+ * thousand products. The status in force is visible, so the default is a rule
+ * the reader can see rather than one they have to guess about.
+ */
 export function ProductsPage() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState<string>('');
-  const [status, setStatus] = useState<string>('');
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [searchParams] = useSearchParams();
+  const session = useSession();
+  const canWrite = hasPermission(session, PRODUCT_PERMISSIONS.write);
 
-  const { data, isPending, isError, error } = useProducts({
-    search,
-    category: category || undefined,
-    status: (status as 'DRAFT' | 'ACTIVE' | 'ARCHIVED') || undefined,
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
+  const [categoryId, setCategoryId] = useState('');
+  const [status, setStatus] = useState<ProductStatusFilter>(PRODUCT_LIST_DEFAULTS.status);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(PRODUCT_LIST_DEFAULTS.pageSize);
+  const [sortBy, setSortBy] = useState<ProductSortField>(PRODUCT_LIST_DEFAULTS.sortBy);
+  const [sortOrder, setSortOrder] = useState<ProductSortOrder>(PRODUCT_LIST_DEFAULTS.sortOrder);
+
+  const { data, isPending, isError, error, refetch } = useProducts({
+    search: search.trim() || undefined,
+    categoryId: categoryId || undefined,
+    status,
     page,
     pageSize,
-    sort: 'sku',
-    direction: 'asc',
+    sortBy,
+    sortOrder,
   });
+  const categories = useCategories();
+  const units = useUnits();
+  const currencyCode = session.status === 'signed-in' ? session.organization.currencyCode : null;
 
   const products = data?.items ?? [];
   const total = data?.total ?? 0;
 
-  const columns: Column<{ id: string; sku: string; name: string; category: string; unitOfMeasure: string; purchasePrice: string; sellingPrice: string; status: string }>[] = useMemo(
+  function applySort(column: string, direction: 'asc' | 'desc') {
+    if (column !== 'name' && column !== 'sku' && column !== 'createdAt') return;
+    setSortBy(column as ProductSortField);
+    setSortOrder(direction);
+    setPage(1);
+  }
+
+  // The names are resolved before the columns are built, so the column list
+  // does not depend on a function that changes on every render.
+  const categoryNames = useMemo(
+    () => new Map((categories.data ?? []).map((category) => [category.id, category.name])),
+    [categories.data],
+  );
+  const unitNames = useMemo(
+    () => new Map((units.data ?? []).map((unit) => [unit.id, unit.name])),
+    [units.data],
+  );
+
+  const columns: Column<Product>[] = useMemo(
     () => [
-      { key: 'sku', header: 'SKU' },
-      { key: 'name', header: 'Name' },
-      { key: 'category', header: 'Category' },
-      { key: 'unitOfMeasure', header: 'Unit' },
+      { key: 'sku', header: 'SKU', sortable: true },
       {
-        key: 'purchasePrice',
-        header: 'Purchase price',
-        numeric: true,
-        render: (row) => formatMoney(row.purchasePrice),
+        key: 'name',
+        header: 'Name',
+        sortable: true,
+        render: (row) => <Link to={`/products/${row.id}`}>{row.name}</Link>,
       },
+      { key: 'categoryId', header: 'Category', render: (row) => categoryNames.get(row.categoryId) ?? '—' },
+      { key: 'unitId', header: 'Unit', render: (row) => unitNames.get(row.unitId) ?? '—' },
+      { key: 'purchasePrice', header: 'Purchase price', numeric: true, render: (row) => withCurrency(row.purchasePrice, currencyCode) },
+      { key: 'sellingPrice', header: 'Selling price', numeric: true, render: (row) => withCurrency(row.sellingPrice, currencyCode) },
       {
-        key: 'sellingPrice',
-        header: 'Selling price',
-        numeric: true,
-        render: (row) => formatMoney(row.sellingPrice),
-      },
-      {
-        key: 'status',
+        key: 'isArchived',
         header: 'Status',
-        render: (row) => <Badge tone={statusTone(row.status)}>{row.status}</Badge>,
+        render: (row) => (
+          <Badge tone={row.isArchived ? 'destructive' : 'success'}>
+            {row.isArchived ? 'Archived' : 'Active'}
+          </Badge>
+        ),
       },
       {
         key: 'actions',
         header: 'Actions',
         render: (row) => {
-          const archived = row.status === 'ARCHIVED';
           const entries = [
-            { kind: 'item' as const, id: 'view', label: 'View', onSelect: () => navigate(`/products/${row.id}`) },
-            { kind: 'item' as const, id: 'edit', label: 'Edit', onSelect: () => navigate(`/products/${row.id}/edit`) },
-            archived
-              ? { kind: 'unavailable' as const, id: 'restore', label: 'Restore', reason: 'Use Restore on the product detail page.' }
-              : { kind: 'unavailable' as const, id: 'archive', label: 'Archive', reason: 'Open the product to archive it.' },
+            {
+              kind: 'item' as const,
+              id: 'view',
+              label: 'View',
+              onSelect: () => navigate(`/products/${row.id}`),
+            },
+            ...(canWrite
+              ? [
+                  {
+                    kind: 'item' as const,
+                    id: 'edit',
+                    label: 'Edit',
+                    onSelect: () => navigate(`/products/${row.id}/edit`),
+                  },
+                ]
+              : []),
           ];
           return <KebabMenu label={`Actions for ${row.name}`} entries={entries} />;
         },
       },
     ],
-    [navigate],
+    [canWrite, navigate, categoryNames, unitNames, currencyCode],
   );
 
   const apiFailure =
@@ -102,88 +147,106 @@ export function ProductsPage() {
     <section className="products-page" aria-label="Products catalogue">
       <PageHeader
         title="Products"
-        description="Product catalogue with unit prices and stock levels."
-        secondaryActions={[
-          <div className="products-page__toolbar" key="products-toolbar">
-            <Input
-              id="product-search"
-              label="Search"
-              placeholder="SKU, name or category"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-            />
-            <Select
-              id="product-category"
-              label="Category"
-              options={CATEGORIES.map((value) => ({ value, label: value }))}
-              value={category}
-              onChange={(event) => {
-                setCategory(event.target.value);
-                setPage(1);
-              }}
-              placeholder="All categories"
-            />
-            <Select
-              id="product-status"
-              label="Status"
-              options={STATUSES.map((value) => ({ value, label: value }))}
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value);
-                setPage(1);
-              }}
-              placeholder="All statuses"
-            />
-          </div>,
-        ]}
+        description="The organization's catalogue of customers' and suppliers' items."
         primaryAction={
-          <Button variant="primary" onClick={() => navigate('/products/new')}>
-            New Product
-          </Button>
+          canWrite ? (
+            <Button variant="primary" onClick={() => navigate('/products/new')}>
+              New Product
+            </Button>
+          ) : undefined
         }
       />
-      <SampleDataBanner moduleKey="products" />
+      {/* The filters get their own row: inside the header they compete with the
+          title and the action, and the action must stay readable. */}
+      <div className="products-page__toolbar">
+        <Input
+          id="product-search"
+          label="Search"
+          placeholder="SKU or name"
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setPage(1);
+          }}
+        />
+        <Select
+          id="product-category"
+          label="Category"
+          options={(categories.data ?? []).map((category) => ({
+            value: category.id,
+            label: category.name,
+          }))}
+          value={categoryId}
+          onChange={(event) => {
+            setCategoryId(event.target.value);
+            setPage(1);
+          }}
+          placeholder="All categories"
+        />
+        <Select
+          id="product-status"
+          label="Status"
+          options={[
+            { value: 'active', label: 'Active' },
+            { value: 'archived', label: 'Archived' },
+            { value: 'all', label: 'All statuses' },
+          ]}
+          value={status}
+          onChange={(event) => {
+            setStatus(event.target.value as ProductStatusFilter);
+            setPage(1);
+          }}
+          placeholder="All statuses"
+        />
+      </div>
       {isPending ? (
-        <Card>
+        <Card title="Products">
           <Skeleton label="Loading products" />
         </Card>
       ) : isError || data === undefined ? (
-        <Card>
+        <Card title="Products">
           <ErrorState
             message={error instanceof Error ? error.message : 'The products could not be loaded.'}
             requestId={apiFailure?.requestId}
             onRetry={() => {
-              setPage(1);
+              void refetch();
             }}
           />
         </Card>
       ) : products.length === 0 ? (
         <EmptyState
           title="No products match your filters"
-          description="Try adjusting the search, category or status filter to see products."
-          actionLabel="Clear filters"
+          description={
+            status === 'active'
+              ? 'Try another search, another category, or show the archived products.'
+              : 'Try adjusting the search or the category filter.'
+          }
+          actionLabel={status === 'active' ? 'Show archived' : 'Clear filters'}
           onAction={() => {
-            setSearch('');
-            setCategory('');
-            setStatus('');
+            if (status === 'active') {
+              setStatus('archived');
+            } else {
+              setSearch('');
+              setCategoryId('');
+              setStatus('active');
+            }
             setPage(1);
           }}
         />
       ) : (
-        <Card>
+        <Card title="Products">
           <DataTable
             columns={columns}
             data={products}
             total={total}
             page={page}
             pageSize={pageSize}
-            sortColumn="sku"
-            sortDirection="asc"
+            sortColumn={sortBy}
+            sortDirection={sortOrder}
+            onSortChange={applySort}
             onPageChange={setPage}
             emptyMessage="No products found."
+            ariaLabel="Products catalogue"
           />
         </Card>
       )}

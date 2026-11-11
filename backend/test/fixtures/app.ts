@@ -16,18 +16,28 @@ import { AppModule } from '../../src/app.module';
  * The database is real (Constitution Principle V, FR-047). SQLite and in-memory
  * substitutes are not acceptable: the defects this product must not have - races, partial
  * writes, duplicate postings - do not appear against a faked database.
+ *
+ * `providerOverrides` replaces a provider inside the imported modules. The usage
+ * checks are seams on purpose: a test that must prove the refusal of an
+ * archive because the product is in use swaps in a check that says so.
  */
 export interface TestApp {
   app: INestApplication;
   close: () => Promise<void>;
 }
 
-export async function createTestApp(): Promise<TestApp> {
+export async function createTestApp(
+  providerOverrides: readonly { token: string; useValue: unknown }[] = [],
+): Promise<TestApp> {
   // Touch the client first so a missing DATABASE_URL fails here with a clear message
   // rather than surfacing as a confusing connection error inside the first request.
   void getTestPrisma();
 
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+  const builder = Test.createTestingModule({ imports: [AppModule] });
+  for (const override of providerOverrides) {
+    builder.overrideProvider(override.token).useValue(override.useValue);
+  }
+  const moduleRef = await builder.compile();
 
   const app = moduleRef.createNestApplication();
 

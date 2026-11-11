@@ -31,6 +31,14 @@ export const AUDIT_ACTIONS = {
   contactsUpdated: 'contacts.updated',
   contactsArchived: 'contacts.archived',
   contactsRestored: 'contacts.restored',
+
+  // Products
+  productsCreated: 'products.created',
+  productsUpdated: 'products.updated',
+  productsArchived: 'products.archived',
+  productsRestored: 'products.restored',
+  productCategoriesCreated: 'product_categories.created',
+  unitsOfMeasureCreated: 'units_of_measure.created',
 } as const;
 
 /** The type of a single audit action code value. */

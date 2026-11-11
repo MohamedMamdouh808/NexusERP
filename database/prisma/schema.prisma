@@ -143,15 +143,23 @@ model User {
 model Organization {
   id          String   @id @default(uuid()) @db.Uuid
   name        String   @db.VarChar(128)
+  /// The ISO 4217 code the organization's prices are in (three uppercase letters).
+  /// Read-only in the products feature: changing it belongs to the Organization
+  /// settings feature, which also owns the rule that it locks once an order or
+  /// an invoice exists.
+  currencyCode String  @default("USD") @map("currency_code") @db.VarChar(3)
   createdAt   DateTime @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @db.Timestamptz(6)
 
-  memberships Membership[]
-  warehouses  Warehouse[]
-  sequences   DocumentSequence[]
-  roles       Role[]
-  auditLogs   AuditLog[]
-  contacts    Contact[]
+  memberships  Membership[]
+  warehouses   Warehouse[]
+  sequences    DocumentSequence[]
+  roles        Role[]
+  auditLogs    AuditLog[]
+  contacts     Contact[]
+  products     Product[]
+  productCategories ProductCategory[]
+  unitsOfMeasure   UnitOfMeasure[]
 
   @@map("organizations")
 }
@@ -367,5 +375,71 @@ model Contact {
   @@index([organizationId, isCustomer], map: "contacts_org_customer_idx")
   @@index([organizationId, isSupplier], map: "contacts_org_supplier_idx")
   @@map("contacts")
+}
+
+/// A classification of products, unique within the organization without regard
+/// to capitalisation.
+model ProductCategory {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   @db.VarChar(128)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  products     Product[]
+
+  @@unique([organizationId, id], map: "product_categories_organization_id_id_key")
+  @@index([organizationId, name], map: "product_categories_org_name_idx")
+  @@map("product_categories")
+}
+
+/// A way of counting a product. Unique within the organization without regard to
+/// capitalisation. Every organization starts with a default set.
+model UnitOfMeasure {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   @db.VarChar(64)
+  abbreviation   String   @db.VarChar(16)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  products     Product[]
+
+  @@unique([organizationId, id], map: "units_of_measure_organization_id_id_key")
+  @@index([organizationId, name], map: "units_of_measure_org_name_idx")
+  @@map("units_of_measure")
+}
+
+/// An item the organization sells or buys, scoped to one organization.
+///
+/// The SKU is unique within the organization without regard to capitalisation
+/// and stays reserved when the product is archived. The prices are exact
+/// decimals carried as strings over the interface; the reorder level is absent
+/// rather than zero when no threshold applies, and no computed "low stock" flag
+/// is stored - stock changes without the product changing.
+model Product {
+  id                String   @id @default(uuid()) @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  sku               String   @db.VarChar(64)
+  name              String   @db.VarChar(255)
+  categoryId        String   @map("category_id") @db.Uuid
+  unitId            String   @map("unit_id") @db.Uuid
+  purchasePrice     Decimal  @map("purchase_price") @db.Decimal(14, 4)
+  sellingPrice      Decimal  @map("selling_price") @db.Decimal(14, 4)
+  lowStockThreshold Decimal? @map("low_stock_threshold") @db.Decimal(14, 3)
+  isArchived        Boolean  @default(false) @map("is_archived")
+  version           Int      @default(1)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  category     ProductCategory @relation(fields: [organizationId, categoryId], references: [organizationId, id], onDelete: Restrict)
+  unit         UnitOfMeasure   @relation(fields: [organizationId, unitId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, id], map: "products_organization_id_id_key")
+  @@index([organizationId, isArchived], map: "products_org_archived_idx")
+  @@index([organizationId, categoryId], map: "products_org_category_idx")
+  @@index([organizationId, name], map: "products_org_name_idx")
+  @@map("products")
 }
 

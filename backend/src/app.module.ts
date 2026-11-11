@@ -13,6 +13,7 @@ import { UsersModule } from './modules/users/users.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AccessControlModule } from './modules/access-control/access-control.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
+import { ProductsModule } from './modules/products/products.module';
 
 /**
  * The application root.
@@ -39,6 +40,7 @@ import { ContactsModule } from './modules/contacts/contacts.module';
     AccessControlModule,
     AuditModule,
     ContactsModule,
+    ProductsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

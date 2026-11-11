@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { sampleCatalogService } from '../../services/sample-catalog-service';
+import { listProducts } from '../../services/products-client';
 import { listContacts, type Contact } from '../../services/contacts-client';
 import { NAVIGATION } from '../shell/navigation';
 import { Input } from './index';
@@ -36,7 +37,19 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const normalized = query.trim().toLowerCase();
   const searching = normalized.length >= 2;
 
-  const products = useQuery({ queryKey: ['command-palette', 'products', normalized], queryFn: () => sampleCatalogService.listProducts({ search: normalized, page: 1, pageSize: 5 }), enabled: searching });
+  // The palette searches the real domains for the real records (contacts,
+  // products) and the demonstration modules for their own demonstration
+  // records. A product result is a real product, so it opens the real
+  // catalogue.
+  const products = useQuery({
+    queryKey: ['command-palette', 'products', normalized],
+    queryFn: async () => {
+      const result = await listProducts({ search: normalized, page: 1, pageSize: 5 });
+      if (!result.ok) return [];
+      return result.data.items;
+    },
+    enabled: searching,
+  });
   // Contacts are a REAL domain now, so the palette searches the real service.
   // A palette result that pointed at a mock contact would send the user to a
   // record that does not exist.
@@ -103,7 +116,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     if (!searching) return [...commands, ...nav];
 
     const records: CommandItem[] = [
-      ...(products.data?.items ?? []).map((item) => ({ id: `product-${item.id}`, label: item.name, hint: `Product · ${item.sku}`, keywords: [item.sku, item.name, item.category], run: () => navigate(`/products/${item.id}`) })),
+      ...(products.data ?? []).map((item) => ({ id: `product-${item.id}`, label: item.name, hint: `Product · ${item.sku}`, keywords: [item.sku, item.name], run: () => navigate(`/products/${item.id}`) })),
       ...(contacts.data?.items ?? []).map((item) => ({ id: `contact-${item.id}`, label: item.name, hint: `${contactRoleLabel(item)} · ${item.code}`, keywords: [item.code, item.name, item.email ?? '', item.phone ?? ''], run: () => navigate(`/contacts/${item.id}`) })),
       ...(orders.data?.items ?? []).map((item) => ({ id: `po-${item.id}`, label: item.number ?? 'Purchase order', hint: `Purchase order · ${item.supplierName}`, keywords: [item.number, item.supplierName, item.status], run: () => navigate(`/purchasing/${item.id}`) })),
       ...(salesOrders.data?.items ?? []).map((item) => ({ id: `so-${item.id}`, label: item.number ?? 'Sales order', hint: `Sales order · ${item.customerName}`, keywords: [item.number, item.customerName, item.status], run: () => navigate(`/sales/${item.id}`) })),
@@ -114,7 +127,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       const text = [item.label, item.hint, ...item.keywords].join(' ').toLowerCase();
       return normalized.split(/\s+/).filter(Boolean).every((word) => text.includes(word));
     });
-  }, [contacts.data?.items, invoices.data?.items, navigate, normalized, orders.data?.items, payments.data?.items, products.data?.items, salesOrders.data?.items, searching]);
+  }, [contacts.data?.items, invoices.data?.items, navigate, normalized, orders.data?.items, payments.data?.items, products.data, salesOrders.data?.items, searching]);
 
   const visible = items.slice(0, 12);
   const selectedIndex = visible.length === 0 ? 0 : Math.min(selected, visible.length - 1);

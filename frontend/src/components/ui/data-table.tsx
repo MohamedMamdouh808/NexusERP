@@ -22,6 +22,8 @@ export interface DataTableProps<T> {
   readonly onPageChange?: (page: number) => void;
   readonly emptyMessage?: string;
   readonly className?: string;
+  /** An accessible name for the table (WCAG 2.1 AA: the table needs a name). */
+  readonly ariaLabel?: string;
 }
 
 export function DataTable<T extends object = Record<string, unknown>>({
@@ -37,6 +39,7 @@ export function DataTable<T extends object = Record<string, unknown>>({
   onPageChange,
   emptyMessage = 'No records found',
   className,
+  ariaLabel,
 }: DataTableProps<T>) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -48,7 +51,7 @@ export function DataTable<T extends object = Record<string, unknown>>({
 
   return (
     <div className={['table-container', className].filter(Boolean).join(' ')}>
-      <table className="data-table" role="table" aria-busy={loading ? 'true' : undefined}>
+      <table className="data-table" role="table" aria-busy={loading ? 'true' : undefined} aria-label={ariaLabel}>
         <thead>
           <tr>
             {columns.map((col) => {

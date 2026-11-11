@@ -116,48 +116,15 @@ export interface DashboardQuerySwitches {
   readonly empty: boolean;
 }
 
-/** A product in the catalogue. Money fields are decimal strings, never numbers. */
-export interface Product {
-  readonly id: string;
-  /** Stock-keeping unit. Unique within the catalogue, case-insensitive. */
-  readonly sku: string;
-  readonly name: string;
-  readonly category: string;
-  readonly unitOfMeasure: string;
-  readonly purchasePrice: DecimalString;
-  readonly sellingPrice: DecimalString;
-  /** Optional reorder threshold. When stock is at or below this, the item is low stock. */
-  readonly lowStockThreshold: DecimalString | null;
-  /** Product lifecycle status. */
-  readonly status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
-}
-
-/** A product list request: search, category and status filters, sort, and pagination. */
-export interface ProductQuery {
-  readonly search?: string;
-  readonly category?: string;
-  readonly status?: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
-  readonly page: number;
-  readonly pageSize: number;
-  readonly sort?: string;
-  readonly direction?: 'asc' | 'desc';
-}
-
-/** One page of products, with the total the server counted. */
-export interface ProductPage {
-  readonly items: readonly Product[];
-  readonly total: number;
-}
-
-/** The result of a product mutation. A label, never the record itself. */
-export interface ProductMutationResult {
-  readonly removedLabel: string;
-}
-
-/** The input for archiving a product. */
-export interface ArchiveProductInput {
-  readonly id: string;
-}
+/**
+ * The catalogue's product types no longer live here.
+ *
+ * The products are a real domain now: the service answers them, and the product
+ * screens read them through `services/products-client.ts`. The demonstration modules
+ * that still need a product of their own use `mocks/sample-products.ts`, which is
+ * honest about being a demonstration list rather than pretending to be the
+ * catalogue.
+ */
 
 /**
  * A contact (customer or supplier) as the SAMPLE modules still describe one.
@@ -204,16 +171,6 @@ export interface CatalogService {
   /** Removes the sample row in memory; resolves with the removed record's label
    *  so a toast can name it (FR-068). */
   removeRecord(input: RemoveRecordInput): Promise<RemoveRecordResult>;
-  /** Lists products with search, category and status filters, sort and pagination. */
-  listProducts(query: ProductQuery): Promise<ProductPage>;
-  /** Returns one product by id. */
-  getProduct(id: string): Promise<Product>;
-  /** Creates a product. Resolves with the created product's sku. */
-  createProduct(input: Omit<Product, 'id'>): Promise<{ readonly sku: string }>;
-  /** Updates a product. Resolves with the updated product's sku. */
-  updateProduct(input: Product): Promise<{ readonly sku: string }>;
-  /** Archives a product. Refuses with PRODUCT_IN_USE when open documents reference it. */
-  archiveProduct(input: ArchiveProductInput): Promise<ProductMutationResult>;
   /** Lists warehouses. */
   listWarehouses(): Promise<readonly Warehouse[]>;
   /** Returns one warehouse by id. */

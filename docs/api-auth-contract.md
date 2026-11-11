@@ -127,8 +127,8 @@ Response 200:
 {
   "user": { "id": "…", "email": "…" },
   "membership": { "id": "…", "roles": [{ "id": "…", "key": "administrator", "name": "Administrator" }], "isActive": true },
-  "organization": { "id": "…", "name": "…" },
-  "permissions": ["contacts.read", "contacts.write", "…"]
+  "organization": { "id": "…", "name": "…", "currencyCode": "USD" },
+  "permissions": ["contacts.read", "contacts.write", "products.read", "products.write", "…"]
 }
 ```
 
@@ -136,6 +136,11 @@ Response 200:
 permission guard resolves on every request. The server enforces every
 permission regardless; it travels with the identity so the interface does not
 offer an action that would be refused.
+
+`organization.currencyCode` is the ISO 4217 code (three uppercase letters) the
+organization's prices are in. It is read-only here: changing it belongs to the
+Organization settings feature, which also owns the rule that it locks once an
+order or an invoice exists.
 
 Errors: 401 `UNAUTHENTICATED` without cookie / invalid / expired / inactive
 membership. This endpoint is the frontend's "am I signed in?" probe.
@@ -146,7 +151,12 @@ Response 200: array of active memberships for the org switcher:
 
 ```json
 [
-  { "id": "<organizationId>", "name": "<organization name>", "roles": [{ "id": "…", "key": "administrator", "name": "Administrator" }] }
+  {
+    "id": "<organizationId>",
+    "name": "<organization name>",
+    "currencyCode": "USD",
+    "roles": [{ "id": "…", "key": "administrator", "name": "Administrator" }]
+  }
 ]
 ```
 

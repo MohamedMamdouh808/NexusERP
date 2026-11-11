@@ -509,6 +509,53 @@
   }
 }
 
+/* Products: the filter band and the inline "add a category or unit" rows. */
+.products-page__toolbar {
+  display: flex;
+  align-items: end;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-md);
+}
+
+.products-page__toolbar .form-control {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: auto;
+  flex: 1;
+}
+
+/* The search field is the one the reader looks at first, so it is the widest:
+   a placeholder cut in half is text that cannot be read. */
+.products-page__toolbar .form-control:first-child {
+  flex: 1.9;
+}
+
+.products-page__toolbar .form-label {
+  font-size: 0.75rem;
+  margin-bottom: var(--spacing-xs);
+}
+
+/* "Or add a category" sits under the choice it extends, in one row that
+   collapses on a narrow screen. */
+.product-new-page__inline-create {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--spacing-sm);
+  align-items: end;
+}
+
+.product-new-page__inline-create .form-control {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .product-new-page__inline-create {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Horizontal filter toolbar on list pages. */
 .contacts-page__toolbar,
 .products-page__toolbar {

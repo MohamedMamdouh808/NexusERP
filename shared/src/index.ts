@@ -15,3 +15,4 @@ export * from './schemas/index.js';
 export * from './permissions/index.js';
 export * from './audit/index.js';
 export * from './contacts/index.js';
+export * from './products/index.js';

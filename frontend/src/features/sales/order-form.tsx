@@ -7,7 +7,7 @@ import { addQuantities, compareQuantities, multiplyQuantities } from '../../lib/
 import { compactQuantity } from '../../lib/quantity';
 import { useCreateSalesOrder, useUpdateSalesOrder } from './use-sales';
 import { useStockBalances, useWarehouses } from '../inventory/use-inventory';
-import { useProducts } from '../products/use-products';
+import { SAMPLE_PRODUCTS } from '../../mocks/sample-products';
 import { useContacts } from '../contacts/use-contacts';
 import type { CreateSalesOrderInput, SalesOrder } from '../../services/catalog-service';
 
@@ -88,9 +88,13 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
   const { data: warehousesData } = useWarehouses();
   const warehouses = (warehousesData ?? []).filter((warehouse) => warehouse.status === 'ACTIVE');
 
-  // Line products: non-archived products (drafts and active).
-  const { data: productsData } = useProducts({ page: 1, pageSize: 100 });
-  const products = (productsData?.items ?? []).filter((product) => product.status !== 'ARCHIVED');
+  // Line products: the demonstration list. This module is still a demonstration
+  // module, so it must not call the real product service - a real product in a
+  // demonstration order would name a record that belongs to nothing.
+  const products = useMemo(
+    () => SAMPLE_PRODUCTS.filter((product) => product.status !== 'ARCHIVED'),
+    [],
+  );
 
   // Live availability in the chosen warehouse, from the sample the Inventory
   // screens read. Unfiltered while no warehouse is chosen; the lookup below

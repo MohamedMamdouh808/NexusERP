@@ -53,7 +53,6 @@ import {
   SAMPLE_USERS,
   SAMPLE_AUDIT_ENTRIES,
   SAMPLE_PAYMENTS,
-  SAMPLE_PRODUCTS,
   SAMPLE_PURCHASE_ORDERS,
   SAMPLE_RECORDS,
   SAMPLE_RESERVATIONS,
@@ -62,8 +61,8 @@ import {
   SAMPLE_WAREHOUSES,
 } from '../mocks/sample-data';
 import { SAMPLE_CONTACTS } from '../mocks/sample-contacts';
+import { SAMPLE_PRODUCTS, type SampleProduct } from '../mocks/sample-products';
 import type {
-  ArchiveProductInput,
   CatalogService,
   ConfirmSalesOrderInput,
   Contact,
@@ -94,10 +93,6 @@ import type {
   Page,
   PostAdjustmentInput,
   PostAdjustmentResult,
-  Product,
-  ProductPage,
-  ProductMutationResult,
-  ProductQuery,
   PurchaseOrder,
   PurchaseOrderActionResult,
   PurchaseOrderLine,
@@ -168,11 +163,6 @@ export type CatalogOperation =
   | 'listRecords'
   | 'getRecord'
   | 'removeRecord'
-  | 'listProducts'
-  | 'getProduct'
-  | 'createProduct'
-  | 'updateProduct'
-  | 'archiveProduct'
   | 'listWarehouses'
   | 'getWarehouse'
   | 'createWarehouse'
@@ -301,7 +291,9 @@ export interface SampleCatalogService extends CatalogService {
 // --- module-scoped in-memory state -----------------------------------------
 
 let rows: SampleRecord[] = SAMPLE_RECORDS.map((record) => ({ ...record }));
-let products: Product[] = SAMPLE_PRODUCTS.map((product) => ({ ...product }));
+// The demonstration documents name their products; the products themselves
+// live in the demonstration product list, not in the catalogue service any more.
+const products: SampleProduct[] = SAMPLE_PRODUCTS.map((product) => ({ ...product }));
 let contacts: Contact[] = SAMPLE_CONTACTS.map((contact) => ({ ...contact }));
 let warehouses: Warehouse[] = SAMPLE_WAREHOUSES.map((warehouse) => ({ ...warehouse }));
 let movements: Movement[] = SAMPLE_MOVEMENTS.map((movement) => ({ ...movement }));
@@ -696,90 +688,6 @@ async function removeRecord(input: RemoveRecordInput): Promise<RemoveRecordResul
   return { removedLabel: removed.name };
 }
 
-async function listProducts(query: ProductQuery): Promise<ProductPage> {
-  await beforeCall('listProducts', `page ${query.page} size ${query.pageSize}`);
-
-  let filtered = products;
-
-  if (query.search) {
-    const term = query.search.toLowerCase();
-    filtered = filtered.filter(
-      (p) => p.sku.toLowerCase().includes(term) || p.name.toLowerCase().includes(term) || p.category.toLowerCase().includes(term),
-    );
-  }
-
-  if (query.category) {
-    filtered = filtered.filter((p) => p.category === query.category);
-  }
-
-  if (query.status) {
-    filtered = filtered.filter((p) => p.status === query.status);
-  }
-
-  const sign = query.direction === 'desc' ? -1 : 1;
-  const sort = query.sort;
-  if (sort) {
-    filtered = [...filtered].sort((a, b) => {
-      const av = a[sort as keyof Product];
-      const bv = b[sort as keyof Product];
-      if (typeof av === 'string' && typeof bv === 'string') {
-        return av.localeCompare(bv, undefined, { sensitivity: 'base' }) * sign;
-      }
-      return 0;
-    });
-  }
-
-  const start = Math.max(0, (query.page - 1) * query.pageSize);
-
-  return {
-    items: filtered.slice(start, start + query.pageSize),
-    total: filtered.length,
-  };
-}
-
-async function getProduct(id: string): Promise<Product> {
-  await beforeCall('getProduct', id);
-
-  const found = products.find((product) => product.id === id);
-  if (found === undefined) {
-    throw new SampleServiceFailure(notFound(nextRequestId()));
-  }
-
-  return { ...found };
-}
-
-async function createProduct(input: Omit<Product, 'id'>): Promise<{ readonly sku: string }> {
-  await beforeCall('createProduct', input.sku);
-
-  const id = `prod-${String(products.length + 1).padStart(4, '0')}`;
-  const product: Product = { ...input, id };
-  products.push(product);
-  return { sku: product.sku };
-}
-
-async function updateProduct(input: Product): Promise<{ readonly sku: string }> {
-  await beforeCall('updateProduct', input.id);
-
-  const index = products.findIndex((product) => product.id === input.id);
-  if (index === -1) {
-    throw new SampleServiceFailure(notFound(nextRequestId()));
-  }
-
-  products[index] = { ...input };
-  return { sku: products[index].sku };
-}
-
-async function archiveProduct(input: ArchiveProductInput): Promise<ProductMutationResult> {
-  await beforeCall('archiveProduct', input.id);
-
-  const index = products.findIndex((product) => product.id === input.id);
-  if (index === -1) {
-    throw new SampleServiceFailure(notFound(nextRequestId()));
-  }
-
-  products[index] = { ...products[index], status: 'ARCHIVED' };
-  return { removedLabel: products[index].name };
-}
 
 
 /** Stock movement source number sequences. They continue after the highest
@@ -1200,7 +1108,7 @@ function buildOrderView(order: PurchaseOrder): PurchaseOrder {
 }
 
 /** Validates line input shared by create and update: real products, positive quantities, non-negative costs, duplicate products refused. */
-function validateLines(lines: readonly PurchaseOrderLineInput[]): readonly { productId: string; product: Product; quantity: string; unitCost: string }[] {
+function validateLines(lines: readonly PurchaseOrderLineInput[]): readonly { productId: string; product: SampleProduct; quantity: string; unitCost: string }[] {
   if (lines.length === 0) {
     throw new SampleServiceFailure(
       buildFailureWithCode(
@@ -1211,7 +1119,7 @@ function validateLines(lines: readonly PurchaseOrderLineInput[]): readonly { pro
     );
   }
 
-  const resolved: { productId: string; product: Product; quantity: string; unitCost: string }[] = [];
+  const resolved: { productId: string; product: SampleProduct; quantity: string; unitCost: string }[] = [];
   const seen = new Set<string>();
   for (const line of lines) {
     const product = products.find((p) => p.id === line.productId);
@@ -1676,7 +1584,7 @@ function buildSalesOrderView(order: SalesOrder): SalesOrder {
 /** Validates line input shared by create and update: real products, positive quantities, non-negative prices, duplicate products refused. */
 function validateSalesLines(
   lines: readonly SalesOrderLineInput[],
-): readonly { productId: string; product: Product; quantity: string; unitPrice: string }[] {
+): readonly { productId: string; product: SampleProduct; quantity: string; unitPrice: string }[] {
   if (lines.length === 0) {
     throw new SampleServiceFailure(
       buildFailureWithCode(
@@ -1687,7 +1595,7 @@ function validateSalesLines(
     );
   }
 
-  const resolved: { productId: string; product: Product; quantity: string; unitPrice: string }[] = [];
+  const resolved: { productId: string; product: SampleProduct; quantity: string; unitPrice: string }[] = [];
   const seen = new Set<string>();
   for (const line of lines) {
     const product = products.find((p) => p.id === line.productId);
@@ -2363,7 +2271,6 @@ function buildFailureWithCode(code: ErrorCode, requestId: string, message?: stri
 
 function reset(): void {
   rows = SAMPLE_RECORDS.map((record) => ({ ...record }));
-  products = SAMPLE_PRODUCTS.map((product) => ({ ...product }));
   contacts = SAMPLE_CONTACTS.map((contact) => ({ ...contact }));
   warehouses = SAMPLE_WAREHOUSES.map((warehouse) => ({ ...warehouse }));
   movements = SAMPLE_MOVEMENTS.map((movement) => ({ ...movement }));
@@ -2418,11 +2325,6 @@ export const sampleCatalogService: SampleCatalogService = {
   listRecords,
   getRecord,
   removeRecord,
-  listProducts,
-  getProduct,
-  createProduct,
-  updateProduct,
-  archiveProduct,
   listWarehouses,
   getWarehouse,
   createWarehouse,

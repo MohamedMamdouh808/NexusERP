@@ -78,7 +78,12 @@ export interface MeResult {
     readonly roles: readonly MembershipRole[];
     readonly isActive: boolean;
   };
-  readonly organization: { readonly id: string; readonly name: string };
+  readonly organization: {
+    readonly id: string;
+    readonly name: string;
+    /** The ISO 4217 code the organization's prices are in. Read-only. */
+    readonly currencyCode: string;
+  };
   /**
    * The caller's effective permissions.
    *
@@ -93,6 +98,8 @@ export interface MeResult {
 export interface Organization {
   readonly id: string;
   readonly name: string;
+  /** The ISO 4217 code this organization's prices are in. Read-only. */
+  readonly currencyCode: string;
   readonly roles: readonly MembershipRole[];
 }
 

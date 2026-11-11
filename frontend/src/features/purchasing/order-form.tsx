@@ -7,7 +7,7 @@ import type { ToastTone } from '../../components/ui';
 import { addQuantities, compareQuantities, multiplyQuantities } from '../../lib/quantity';
 import { useCreatePurchaseOrder, useUpdatePurchaseOrder } from './use-purchasing';
 import { useWarehouses } from '../inventory/use-inventory';
-import { useProducts } from '../products/use-products';
+import { SAMPLE_PRODUCTS } from '../../mocks/sample-products';
 import { useContacts } from '../contacts/use-contacts';
 import type { CreatePurchaseOrderInput, PurchaseOrder } from '../../services/catalog-service';
 
@@ -87,9 +87,13 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
   const { data: warehousesData } = useWarehouses();
   const warehouses = (warehousesData ?? []).filter((warehouse) => warehouse.status === 'ACTIVE');
 
-  // Line products: non-archived products (drafts and active).
-  const { data: productsData } = useProducts({ page: 1, pageSize: 100 });
-  const products = (productsData?.items ?? []).filter((product) => product.status !== 'ARCHIVED');
+  // Line products: the demonstration list. This module is still a demonstration
+  // module, so it must not call the real product service - a real product in a
+  // demonstration order would name a record that belongs to nothing.
+  const products = useMemo(
+    () => SAMPLE_PRODUCTS.filter((product) => product.status !== 'ARCHIVED'),
+    [],
+  );
 
   function pushToast(tone: ToastTone, message: string) {
     setToasts((prev) => [
