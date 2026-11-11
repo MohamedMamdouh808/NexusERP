@@ -4,9 +4,12 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../../../platform/prisma/prisma.service';
+import { IS_PUBLIC_KEY } from '../../../common/decorators/require-permission.decorator';
+import { extendRequestContext } from '../../../common/logging/request-context';
 
 export interface SessionRequest extends Request {
   userId?: string;
@@ -20,9 +23,21 @@ export interface SessionRequest extends Request {
  */
 @Injectable()
 export class SessionGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Only a genuinely PUBLIC route skips the session. A route marked
+    // `@Authenticated()` (session required, no permission required) still has
+    // its session validated here - that is the whole point of the distinction.
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic === true) return true;
+
     const request = context.switchToHttp().getRequest<SessionRequest>();
     // cookie-parser is registered globally in main.ts; its untyped declaration is
     // narrowed here so the session cookie is read as a string, never as `any`.
@@ -62,6 +77,15 @@ export class SessionGuard implements CanActivate {
 
     request.userId = session.userId;
     request.membershipId = session.membershipId;
+
+    // Bind the caller's identity and tenant to the request context. Guards run before
+    // controllers, so this is the earliest point the context can learn who is calling;
+    // without it a controller reading getRequestContext() sees nulls and queries with
+    // an empty organization id.
+    extendRequestContext({
+      userId: session.userId,
+      organizationId: session.membership.organizationId,
+    });
 
     return true;
   }

@@ -3,6 +3,7 @@ import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { PermissionGuard } from './common/guards/permission.guard';
 import { PasswordChangeGuard } from './common/guards/password-change.guard';
+import { SessionGuard } from './modules/auth/guards/session.guard';
 import { RequestIdMiddleware } from './common/logging/request-id.middleware';
 import { ConfigurationModule } from './config/configuration.module';
 import { PlatformModule } from './platform/platform.module';
@@ -11,6 +12,7 @@ import { OrganizationsModule } from './modules/organizations/organizations.modul
 import { UsersModule } from './modules/users/users.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AccessControlModule } from './modules/access-control/access-control.module';
+import { ContactsModule } from './modules/contacts/contacts.module';
 
 /**
  * The application root.
@@ -28,9 +30,23 @@ import { AccessControlModule } from './modules/access-control/access-control.mod
  * Domain modules are added here one at a time by their own features.
  */
 @Module({
-  imports: [ConfigurationModule, PlatformModule, AuthModule, OrganizationsModule, UsersModule, AccessControlModule, AuditModule],
+  imports: [
+    ConfigurationModule,
+    PlatformModule,
+    AuthModule,
+    OrganizationsModule,
+    UsersModule,
+    AccessControlModule,
+    AuditModule,
+    ContactsModule,
+  ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    // SessionGuard MUST run before PermissionGuard: the permission guard resolves
+    // the membership from the request that the session guard binds. Global guards
+    // run before controller guards, so registering the session guard only on the
+    // controller would leave the permission guard with no membership to resolve.
+    { provide: APP_GUARD, useClass: SessionGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
     { provide: APP_GUARD, useClass: PasswordChangeGuard },
   ],

@@ -32,19 +32,22 @@ import {
   type ApiFailure,
 } from '../lib/api-client';
 import {
+  changePassword,
   login,
   logout,
   me,
   organizations,
   register,
   switchOrganization,
+  type MembershipRole,
   type Organization,
 } from './auth-client';
 
 /** The active membership, typed for the top bar and the profile screen. */
 export interface SessionMembership {
   readonly id: string;
-  readonly roleKey: string;
+  /** The roles the service attached to this membership (usually one). */
+  readonly roles: readonly MembershipRole[];
 }
 
 /** The organization the session is scoped to, as /auth/me describes it. */
@@ -57,6 +60,13 @@ export interface SessionOrganization {
 export interface SessionUser {
   readonly id: string;
   readonly email: string;
+  /**
+   * True while the account still has to choose its own password.
+   *
+   * The service refuses every capability except the password change itself while
+   * this is set, so the shell has to offer the change before anything else.
+   */
+  readonly mustChangePassword: boolean;
 }
 
 export type SessionState =
@@ -69,6 +79,8 @@ export type SessionState =
       readonly organization: SessionOrganization;
       /** Every organization the user holds an active membership in. */
       readonly organizations: readonly Organization[];
+      /** The caller's effective permissions, as the service resolved them. */
+      readonly permissions: readonly string[];
     }
   | { readonly status: 'signed-out' }
   /** The service could not answer the probe; not evidence of signed-out. */
@@ -96,6 +108,21 @@ export function getSessionState(): SessionState {
 /** Reads the session inside a component; re-renders when the store changes. */
 export function useSession(): SessionState {
   return useSyncExternalStore(subscribeSession, getSessionState);
+}
+
+/**
+ * Whether the signed-in caller holds a permission.
+ *
+ * The service resolves the permissions and sends them with the identity, so
+ * this is the service's own answer, not a guess from the role names. An
+ * unsigned-in caller holds nothing.
+ *
+ * A hidden control is NOT security - the server refuses the request either way
+ * (Constitution Principle II). This only keeps the interface from offering an
+ * action that would be refused.
+ */
+export function hasPermission(state: SessionState, permission: string): boolean {
+  return state.status === 'signed-in' && state.permissions.includes(permission);
 }
 
 /**
@@ -182,11 +209,11 @@ function loadSignedInSession(): Promise<void> {
       hydrateSession({
         status: 'signed-in',
         user: meData.user,
-        membership: { id: meData.membership.id, roleKey: meData.membership.roleKey },
+        membership: { id: meData.membership.id, roles: meData.membership.roles },
         organization: meData.organization,
         organizations: orgsResult.ok ? orgsResult.data : [],
-      });
-    });
+        permissions: meData.permissions ?? [],
+      });    });
   });
 }
 
@@ -241,13 +268,29 @@ export async function signIn(email: string, password: string): Promise<SessionAc
 }
 
 /**
+ * Changes the signed-in user's own password.
+ *
+ * The service rotates the session and issues fresh cookies, so the store
+ * re-probes afterwards: what the shell shows next is the service's own answer
+ * (including the cleared forced-change flag), never a local guess.
+ */
+export async function changeOwnPassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<SessionActionOutcome> {
+  const result = await changePassword(currentPassword, newPassword);
+  if (!result.ok) return { ok: false, failure: result.failure };
+  await bootstrapSession(true);
+  return { ok: true };
+}
+
+/**
  * Registers the account, then signs the new user in by calling login: the
  * register response carries one-time tokens but sets no cookies, and tokens
  * from a body are never stored. The caller keeps the register failure (the
  * duplicate-email case still answers 500 - a known gap documented in the
  * contract) and the store is untouched in that case.
- */
-export async function registerAndSignIn(
+ */export async function registerAndSignIn(
   email: string,
   password: string,
 ): Promise<SessionActionOutcome> {

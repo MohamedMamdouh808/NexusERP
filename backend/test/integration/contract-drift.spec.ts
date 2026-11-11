@@ -103,3 +103,4 @@ describe('contract drift (T062, FR-044)', () => {
     expect(drift.removedPaths).toContain('/api/v1/gone');
   });
 });
+

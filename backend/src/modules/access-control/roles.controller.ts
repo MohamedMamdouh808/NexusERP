@@ -15,8 +15,12 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 import { roleSchema, type RoleDto } from './dto/roles.dto';
 import { RolesService } from './roles.service';
+import { AccessControlService } from './access-control.service';
 import { SessionGuard, SessionRequest } from '../../modules/auth/guards/session.guard';
-import { getRequestContext } from '../../common/logging/request-context';
+import {
+  requireOrganizationId,
+  requireUserId,
+} from '../../common/logging/request-context';
 
 /**
  * Roles and permissions endpoints. All require `roles.manage` (FR-011).
@@ -26,14 +30,16 @@ import { getRequestContext } from '../../common/logging/request-context';
 @Controller('roles')
 @UseGuards(SessionGuard)
 export class RolesController {
-  constructor(private readonly service: RolesService) {}
+  constructor(
+    private readonly service: RolesService,
+    private readonly accessControl: AccessControlService,
+  ) {}
 
   /** List the active organization's roles with their permission codes. */
   @Get()
   @RequirePermission('roles.manage')
   async listRoles() {
-    const ctx = getRequestContext();
-    return this.service.listRoles(ctx?.organizationId ?? '');
+    return this.service.listRoles(requireOrganizationId());
   }
 
   /** List the system permission catalogue. */
@@ -51,15 +57,19 @@ export class RolesController {
     @Req() request: SessionRequest,
     @Body(new ZodValidationPipe(roleSchema)) body: RoleDto,
   ) {
-    const ctx = getRequestContext();
+    // The actor's own effective permissions decide the no-escalation rule
+    // (FR-031): a role may never grant more than the actor already holds.
+    const actingEffectivePermissions = await this.accessControl.getEffectivePermissions(
+      request.membershipId ?? '',
+    );
     return this.service.createRole({
-      organizationId: ctx?.organizationId ?? '',
+      organizationId: requireOrganizationId(),
       name: body.name,
       key: body.key,
       description: body.description,
       permissionCodes: body.permissionCodes,
-      actingUserId: request.userId ?? '',
-      actingEffectivePermissions: [],
+      actingUserId: requireUserId(),
+      actingEffectivePermissions,
     });
   }
 
@@ -71,16 +81,18 @@ export class RolesController {
     @Param('id') roleId: string,
     @Body(new ZodValidationPipe(roleSchema)) body: RoleDto,
   ) {
-    const ctx = getRequestContext();
+    const actingEffectivePermissions = await this.accessControl.getEffectivePermissions(
+      request.membershipId ?? '',
+    );
     return this.service.updateRole({
       roleId,
-      organizationId: ctx?.organizationId ?? '',
+      organizationId: requireOrganizationId(),
       name: body.name,
       key: body.key,
       description: body.description,
       permissionCodes: body.permissionCodes,
-      actingUserId: request.userId ?? '',
-      actingEffectivePermissions: [],
+      actingUserId: requireUserId(),
+      actingEffectivePermissions,
     });
   }
 
@@ -88,14 +100,12 @@ export class RolesController {
   @Delete(':id')
   @RequirePermission('roles.manage')
   async deleteRole(
-    @Req() request: SessionRequest,
     @Param('id') roleId: string,
   ) {
-    const ctx = getRequestContext();
     return this.service.deleteRole({
       roleId,
-      organizationId: ctx?.organizationId ?? '',
-      actingUserId: request.userId ?? '',
+      organizationId: requireOrganizationId(),
+      actingUserId: requireUserId(),
     });
   }
 }

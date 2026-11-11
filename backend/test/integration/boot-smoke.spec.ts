@@ -108,3 +108,4 @@ describe('compiled boot smoke test', () => {
     expect(body.checks?.['database']).toBeDefined();
   });
 });
+

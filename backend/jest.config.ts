@@ -12,9 +12,13 @@ import type { Config } from 'jest';
  * `integration`. CI runs both as separate mandatory jobs.
  */
 const config: Config = {
-  // Coverage thresholds and testTimeout are GLOBAL Jest options, not per-project ones.
-  // Thresholds are enforced here rather than in a separate CI step so a developer sees
-  // the shortfall before pushing (Constitution Principle V, SC-014).
+  // Coverage thresholds are enforced here rather than in a separate CI step so a
+  // developer sees the shortfall before pushing (Constitution Principle V, SC-014).
+  //
+  // `testTimeout` is global only; the integration project overrides it per-project
+  // because its hooks (remote-PostgreSQL resets and seeds) take far longer than the
+  // 30s unit default - a killed hook leaves its seed half-finished and the NEXT test
+  // breaks on the leftover state.
   testTimeout: 30_000,
   /**
    * SC-014 requires 80% on "critical business-logic paths, including the error format,
@@ -82,6 +86,12 @@ const config: Config = {
         '^(\\.{1,2}/.*)\\.js$': '$1',
       },
       setupFiles: ['<rootDir>/test/setup-integration.ts'],
+      // Shared per-suite teardown: every spec file leaves no pooled database
+      // connections behind, and hooks (remote-PostgreSQL resets/seeds) get a
+      // 120s timeout instead of the 30s unit default - a hook killed at 30s
+      // leaves its seed half-finished and the NEXT test breaks on the leftover
+      // state (see teardown-integration.ts).
+      setupFilesAfterEnv: ['<rootDir>/test/teardown-integration.ts'],
       // Integration tests truncate shared tables between cases, so they must not run
       // against each other in parallel. Enforced by `--runInBand` in the npm script
       // rather than `maxWorkers`, which is not a per-project option.

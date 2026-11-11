@@ -41,6 +41,8 @@ interface Job {
   readonly if?: string;
   readonly needs: readonly string[];
   readonly steps: readonly Step[];
+  /** The job's own environment variables, read from its `env:` block. */
+  readonly env: Readonly<Record<string, string>>;
 }
 
 interface ParsedWorkflow {
@@ -66,6 +68,7 @@ function parseWorkflow(text: string): ParsedWorkflow {
   let job: Job | undefined;
   let step: Step | undefined;
   let collectingRun = false;
+  let inJobEnv = false;
 
   const flushStep = (): void => {
     if (step && job) {
@@ -106,7 +109,7 @@ function parseWorkflow(text: string): ParsedWorkflow {
     if (indent === 2 && !trimmed.startsWith('-') && /^[\w-]+:/.test(trimmed)) {
       flushJob();
       const id = trimmed.slice(0, trimmed.indexOf(':')).trim();
-      job = { id, name: '', needs: [], steps: [] };
+      job = { id, name: '', needs: [], steps: [], env: {} };
       jobs.push(job);
       continue;
     }
@@ -122,9 +125,22 @@ function parseWorkflow(text: string): ParsedWorkflow {
         if (key === 'name') job = { ...job, name: value };
         if (key === 'if') job = { ...job, if: value };
         if (key === 'needs') job = { ...job, needs: value.replace(/[[\]]/g, '').split(',').map((n) => n.trim()).filter(Boolean) };
+        // An `env:` block: its entries are read below, at six-space indent.
+        inJobEnv = key === 'env' && value.trim().length === 0;
+        if (!inJobEnv) job = { ...job, env: job.env };
       }
       continue;
     }
+
+    // The job's environment variables, one per line under `env:`.
+    if (inJobEnv && indent === 6 && !trimmed.startsWith('-')) {
+      const match = /^([\w-]+):\s*(.*)$/.exec(trimmed);
+      if (match) {
+        setProperty(job.env as Record<string, string>, match[1], match[2]);
+      }
+      continue;
+    }
+    inJobEnv = false;
 
     if (indent === 6 && trimmed.startsWith('-')) {
       flushStep();
@@ -353,10 +369,17 @@ test('the integration job runs the suite against a real database', () => {
   assert.ok(integration, 'the workflow has no "integration" job');
   const runsTests = integration.steps.some((step) => /test:integration/.test(step.run ?? ''));
   assert.ok(runsTests, 'the integration job does not run test:integration');
-  // The migration guard runs as a `pretest:integration` hook, so it executes before the
-  // suite; migration-check-wiring.spec.ts pins that wiring.
-  const runsMigrations = integration.steps.some((step) => /db:migrate/.test(step.run ?? ''));
-  assert.ok(runsMigrations, 'the integration job does not apply migrations');
+  // The suite runs against the ISOLATED schema, so the job prepares that schema:
+  // either by applying the migrations to it, or by dropping and rebuilding it from
+  // the current migrations. The latter is what the job does - a schema left over
+  // from an earlier run must not reach the suite.
+  const preparesSchema = integration.steps.some(
+    (step) => /db:migrate|reset-test-schema/.test(step.run ?? ''),
+  );
+  assert.ok(preparesSchema, 'the integration job does not prepare the test schema');
+  // The tests never run against the public schema.
+  const isolated = integration.env?.DATABASE_URL?.includes('schema=nexuserp_test') ?? false;
+  assert.ok(isolated, 'the integration job does not scope the tests to the isolated schema');
 });
 
 if (process.exitCode === 1) {

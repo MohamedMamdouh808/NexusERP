@@ -419,6 +419,96 @@
   color: var(--color-foreground);
 }
 
+/* The contact detail list: two label/value pairs per row, so a screen of
+   fields can be scanned instead of scrolled. The address is a block of lines
+   and takes a whole row. */
+.contact-detail-page__details {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
+  column-gap: var(--spacing-md);
+  row-gap: var(--spacing-sm);
+  align-items: baseline;
+}
+
+.contact-detail-page__details dt {
+  color: var(--color-muted-foreground);
+  white-space: nowrap;
+}
+
+.contact-detail-page__details dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.contact-detail-page__address-cell {
+  grid-column: 2 / -1;
+}
+
+@media (max-width: 900px) {
+  .contact-detail-page__details {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+}
+
+/* Contacts: form sections, two-column rows, and the address block.
+   Plain structure, no ornament: the sections give the eye an order to read in,
+   and the rows collapse to one column on a narrow screen. */
+.contact-form__section {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.contact-form__section legend {
+  font-weight: 650;
+  color: var(--color-foreground);
+  margin-bottom: var(--spacing-sm);
+  padding: 0;
+}
+
+.contact-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-sm);
+}
+
+.contact-form__roles {
+  display: flex;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.contact-form__actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-lg);
+}
+
+.contact-form__server-error {
+  margin-bottom: var(--spacing-md);
+}
+
+.contact-form__reference {
+  font-size: 0.75rem;
+  margin-top: var(--spacing-xs);
+}
+
+.contact-detail-page__address {
+  font-style: normal;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 640px) {
+  .contact-form__row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Horizontal filter toolbar on list pages. */
 .contacts-page__toolbar,
 .products-page__toolbar {
@@ -435,6 +525,18 @@
   min-width: 0;
   width: auto;
   flex: 1;
+}
+
+/* The search field is the one the reader looks at first, so it is the widest:
+   a placeholder cut in half ("Code, name, emai") is text that cannot be read. */
+.contacts-page__toolbar .form-control:first-child {
+  flex: 1.9;
+}
+
+/* The filter row of the contacts list sits between the header and the table,
+   so it is a full-width band of its own. */
+.contacts-page > .contacts-page__toolbar {
+  margin-bottom: var(--spacing-md);
 }
 
 .contacts-page__toolbar .form-label,

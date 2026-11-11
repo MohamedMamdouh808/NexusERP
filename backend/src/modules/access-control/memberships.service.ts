@@ -63,7 +63,33 @@ export class MembershipsService {
         },
       });
 
-      // 4. Link membership to roles
+      // 4. Validate roleIds: the roles must exist in THIS organization.
+      //    Without this check the link below fails on a foreign key, and the
+      //    database's error ("constraint violated") reaches the caller as an
+      //    unexplained 500 instead of a 400 that names the field. A role of
+      //    another organization is not a role of this one.
+      const roles = await tx.role.findMany({
+        where: {
+          id: { in: params.roleIds },
+          organizationId: params.organizationId,
+        },
+        select: { id: true },
+      });
+
+      if (roles.length !== params.roleIds.length) {
+        throw new AppException(
+          ERROR_CODES.VALIDATION_ERROR,
+          [
+            {
+              field: 'roleIds',
+              code: 'VALIDATION_ERROR',
+              message: 'One or more roles do not exist in this organization.',
+            },
+          ],
+        );
+      }
+
+      // 5. Link membership to roles
       for (const roleId of params.roleIds) {
         await tx.membershipRole.create({
           data: {
@@ -74,7 +100,7 @@ export class MembershipsService {
         });
       }
 
-      // 5. Audit: members.created (after = non-secret projection)
+      // 6. Audit: members.created (after = non-secret projection)
       await tx.auditLog.create({
         data: {
           organization: { connect: { id: params.organizationId } },
@@ -91,7 +117,26 @@ export class MembershipsService {
         },
       });
 
-      return membership;
+      // 6. The answer is the SAME whether the account was created now or already
+      // existed (FR-008): no "accountCreated"/"accountLinked" marker, so the answer
+      // cannot be used to tell whether an email address was already known. The
+      // membership carries its roles, because the caller assigned them.
+      const linkedRoles = await tx.membershipRole.findMany({
+        where: { membershipId: membership.id },
+        include: { role: true },
+      });
+
+      return {
+        membership: {
+          id: membership.id,
+          roles: linkedRoles.map((link) => ({
+            id: link.role.id,
+            key: link.role.key,
+            name: link.role.name,
+          })),
+          isActive: membership.isActive,
+        },
+      };
     });
   }
 
@@ -178,12 +223,16 @@ export class MembershipsService {
         }
       }
 
-      // 5. Capture before state
-      const beforeRoles = membership.roles.map((mr) => ({
-        id: mr.role.id,
-        key: mr.role.key,
-        name: mr.role.name,
-      }));
+      // 5. Capture before state. The roles are sorted by key: an audit entry
+      //    whose order changes between two identical requests cannot be read as
+      //    a difference, and the before/after pair is meant to be compared.
+      const beforeRoles = membership.roles
+        .map((mr) => ({
+          id: mr.role.id,
+          key: mr.role.key,
+          name: mr.role.name,
+        }))
+        .sort((a, b) => a.key.localeCompare(b.key));
 
       // 6. Replace role links: delete all, then create new ones
       await tx.membershipRole.deleteMany({
@@ -200,12 +249,14 @@ export class MembershipsService {
         });
       }
 
-      // 7. Capture after state
-      const afterRoles = roles.map((r) => ({
-        id: r.id,
-        key: r.key,
-        name: r.name,
-      }));
+      // 7. Capture after state, in the same stable order.
+      const afterRoles = roles
+        .map((r) => ({
+          id: r.id,
+          key: r.key,
+          name: r.name,
+        }))
+        .sort((a, b) => a.key.localeCompare(b.key));
 
       // 8. Audit: members.roles_changed
       await tx.auditLog.create({
@@ -237,17 +288,19 @@ export class MembershipsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return memberships.map((m) => ({
-      id: m.id,
-      user: m.user,
-      isActive: m.isActive,
-      roles: m.roles.map((mr) => ({
-        id: mr.role.id,
-        key: mr.role.key,
-        name: mr.role.name,
+    return {
+      memberships: memberships.map((m) => ({
+        id: m.id,
+        user: m.user,
+        isActive: m.isActive,
+        roles: m.roles.map((mr) => ({
+          id: mr.role.id,
+          key: mr.role.key,
+          name: mr.role.name,
+        })),
+        createdAt: m.createdAt,
       })),
-      createdAt: m.createdAt,
-    }));
+    };
   }
 
   /**

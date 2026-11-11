@@ -22,7 +22,13 @@ import { ERROR_CODES } from '@nexuserp/shared';
  * Allowed routes (method + path, relative to /api/v1 global prefix):
  *   POST /auth/change-password
  *   GET /auth/me
+ *   GET /auth/organizations
  *   POST /auth/logout
+ *
+ * GET /auth/organizations is the caller's OWN list of memberships. It is read-only
+ * identity data, and the client reads it while probing the session - refusing it
+ * would leave a pending-change user with an empty organization list instead of
+ * their own organization.
  */
 @Injectable()
 export class PasswordChangeGuard implements CanActivate {
@@ -56,6 +62,7 @@ export class PasswordChangeGuard implements CanActivate {
     const isAllowed =
       (method === 'POST' && path === '/auth/change-password') ||
       (method === 'GET' && path === '/auth/me') ||
+      (method === 'GET' && path === '/auth/organizations') ||
       (method === 'POST' && path === '/auth/logout');
 
     if (!isAllowed) {

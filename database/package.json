@@ -21,6 +21,7 @@
     "db:reset": "tsx scripts/db-reset-guard.ts && node ../scripts/with-root-env.mjs npx prisma migrate reset --force",
     "check:migrations": "node ../scripts/with-root-env.mjs tsx scripts/check-migration-history.ts",
     "check:rls": "node ../scripts/with-root-env.mjs tsx scripts/check-rls.ts",
+    "check:naming": "tsx scripts/check-naming-convention.ts",
     "check:schema-numeric-types": "tsx scripts/check-schema-numeric-types.ts"
   },
   "prisma": {

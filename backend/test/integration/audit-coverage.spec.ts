@@ -1,17 +1,17 @@
-import type { INestApplication } from '@nestjs/common';
+﻿import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { createTestApp } from '../fixtures/app';
+import { createTestApp, loginForCookies } from '../fixtures/app';
 import { resetDatabase, seedTestDatabase, getTestPrisma } from '../fixtures/database';
 
 /**
- * User Story 5 audit coverage: every audited action leaves exactly one entry
+ * US5: Audit coverage: every audited action leaves exactly one entry
  * committed in the same transaction as the business change (FR-015, FR-016).
  *
  * Verifies that key audited actions produce exactly one audit entry each.
  */
 describe('US5: audit coverage', () => {
   let app: INestApplication;
-  let prisma = getTestPrisma();
+  const prisma = getTestPrisma();
 
   beforeAll(async () => {
     const { app: testApp } = await createTestApp();
@@ -43,12 +43,19 @@ describe('US5: audit coverage', () => {
       },
     });
 
-    const byAction = Object.groupBy(entries, (e: { action: string }) => e.action);
+    const byAction = entries.reduce<Record<string, typeof entries>>(
+      (acc, e) => {
+        (acc[e.action] ??= []).push(e);
+        return acc;
+      },
+      {},
+    );
+
     expect(byAction['auth.register']?.length).toBe(1);
     expect(byAction['roles.catalogue_provisioned']?.length).toBe(1);
-    expect(byAction['auth.register']?.[0].userId).toBe(res.body.user.id);
-    expect(byAction['auth.register']?.[0].recordType).toBe('user');
-    expect(byAction['auth.register']?.[0].recordId).toBe(res.body.user.id);
+    expect(byAction['auth.register']?.[0]?.userId).toBe(res.body.user.id);
+    expect(byAction['auth.register']?.[0]?.recordType).toBe('user');
+    expect(byAction['auth.register']?.[0]?.recordId).toBe(res.body.user.id);
   });
 
   it('auth.login_failed: failed login writes audit entry with user id, no org', async () => {
@@ -71,25 +78,21 @@ describe('US5: audit coverage', () => {
 
     expect(entries.length).toBeGreaterThan(0);
     const latest = entries[entries.length - 1];
-    expect(latest.userId).toBeDefined();
-    expect(latest.organizationId).toBeNull();
-    expect(latest.reasonCode).toBe('invalid_credentials');
+    expect(latest?.userId).toBeDefined();
+    expect(latest?.organizationId).toBeNull();
+    expect(latest?.reasonCode).toBe('invalid_credentials');
   });
 
   it('roles.created: custom role creation writes audit entry with before/after', async () => {
-    // Get actor's org and an existing role
     // Register actor first
-    const actorRes = await request(app.getHttpServer())
+    const actorEmail = `audit-actor-${Date.now()}@example.com`;
+    await request(app.getHttpServer())
       .post('/api/v1/auth/register')
-      .send({ email: `audit-actor-${Date.now()}@example.com`, password: 'Password1234' })
+      .send({ email: actorEmail, password: 'Password1234' })
       .expect(201);
 
-    const actorCookie = actorRes.headers['set-cookie']?.join('; ') ?? '';
-    const orgId = actorRes.body.organization.id;
-
-    const adminRole = await prisma.role.findFirst({
-      where: { organizationId: orgId, key: 'administrator' },
-    });
+    // Register issues no cookies by design - only login does.
+    const actorCookie = await loginForCookies(app, actorEmail, 'Password1234');
 
     const res = await request(app.getHttpServer())
       .post('/api/v1/roles')
@@ -108,7 +111,7 @@ describe('US5: audit coverage', () => {
     });
 
     expect(entries.length).toBe(1);
-    expect(entries[0].after).toMatchObject({
+    expect(entries[0]!.after).toMatchObject({
       name: 'Audit Role',
       permissions: ['sales.read'],
     });

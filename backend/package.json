@@ -15,7 +15,7 @@
     "test": "node ../scripts/with-root-env.mjs jest --selectProjects unit --passWithNoTests",
     "test:unit": "node ../scripts/with-root-env.mjs jest --selectProjects unit",
     "test:integration": "npx tsx ../database/scripts/db-test-guard.ts && node ../scripts/with-root-env.mjs jest --selectProjects integration --runInBand",
-    "pretest:integration": "npm run check:migrations",
+    "pretest:integration": "node ../scripts/reset-test-schema.mjs --migrate && npm run check:migrations",
     "test:coverage": "node ../scripts/with-root-env.mjs jest --selectProjects unit integration --coverage --runInBand",
     "test:watch": "node ../scripts/with-root-env.mjs jest --selectProjects unit --watch",
     "db:generate": "node ../scripts/with-root-env.mjs prisma generate --schema ../database/prisma/schema.prisma",

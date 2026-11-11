@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { CONTACT_PERMISSIONS } from '@nexuserp/shared';
 
 import { PageHeader } from '../../components/shell/page-header';
 import {
@@ -11,6 +12,7 @@ import {
   Skeleton,
   Toast,
 } from '../../components/ui';
+import { hasPermission, useSession } from '../../services/auth-session';
 import { useContact, useArchiveContact, useRestoreContact } from './use-contacts';
 
 export function ContactDetailPage() {
@@ -18,19 +20,32 @@ export function ContactDetailPage() {
   const { id } = useParams();
   const contactId = id ?? '';
   const [dialogOpen, setDialogOpen] = useState(false);
+  const session = useSession();
+  const canWrite = hasPermission(session, CONTACT_PERMISSIONS.write);
 
   const { data, isPending, isError, error } = useContact(contactId);
   const archiveMutation = useArchiveContact();
   const restoreMutation = useRestoreContact();
   const [toasts, setToasts] = useState<{ id: string; message: string }[]>([]);
+  const [dialogError, setDialogError] = useState('');
 
   const contact = data;
-  const archived = contact?.status === 'ARCHIVED';
+  const archived = contact?.isArchived ?? false;
 
-  // A refused action keeps its dialog open with the reason shown in place, so
-  // the operator can read why before closing it (fr rule: confirmations that can
-  // be refused display the refusal inside the dialog).
-  const [dialogError, setDialogError] = useState('');
+  // An address is read line by line, not as one comma-joined string: the line
+  // breaks are part of an address, and a blob loses them.
+  const addressLines = contact
+    ? [
+        contact.addressLine1,
+        contact.addressLine2,
+        [contact.postalCode, contact.city].filter(Boolean).join(' '),
+        [contact.region, contact.country].filter(Boolean).join(', '),
+      ].filter((line): line is string => typeof line === 'string' && line.trim().length > 0)
+    : [];
+
+  const roles = contact
+    ? [contact.isCustomer ? 'Customer' : null, contact.isSupplier ? 'Supplier' : null].filter(Boolean).join(' & ')
+    : '';
 
   if (isPending) {
     return (
@@ -48,9 +63,7 @@ export function ContactDetailPage() {
       <section className="contact-detail-page" aria-label="Contact detail">
         <PageHeader title="Contact" />
         <Card title="Contact">
-          <ErrorState
-            message={error instanceof Error ? error.message : 'The contact could not be loaded.'}
-          />
+          <ErrorState message={error instanceof Error ? error.message : 'The contact could not be loaded.'} />
         </Card>
       </section>
     );
@@ -59,7 +72,7 @@ export function ContactDetailPage() {
   const undoLatestArchive = () => {
     restoreMutation.mutate(contactId, {
       onSuccess: () => {
-        setToasts((items) => [...items, { id: `restore-contact-${Date.now()}`, message: `${contact?.name ?? 'Contact'} restored` }]);
+        setToasts((items) => [...items, { id: `restore-contact-${Date.now()}`, message: `${contact.name} restored` }]);
       },
       onError: () => setToasts((items) => [...items, { id: `restore-contact-error-${Date.now()}`, message: 'The contact could not be restored.' }]),
     });
@@ -70,8 +83,7 @@ export function ContactDetailPage() {
     archiveMutation.mutate(contactId, {
       onSuccess: () => {
         setDialogOpen(false);
-        const toastId = `archive-contact-${Date.now()}`;
-        setToasts((items) => [...items, { id: toastId, message: `${contact?.name ?? 'Contact'} archived` }]);
+        setToasts((items) => [...items, { id: `archive-contact-${Date.now()}`, message: `${contact.name} archived` }]);
       },
       onError: (caught) => {
         setDialogError(caught instanceof Error ? caught.message : 'The contact could not be archived.');
@@ -98,17 +110,20 @@ export function ContactDetailPage() {
         title={contact.name}
         secondaryActions={[
           <div className="contact-detail-page__header-actions" key="contact-actions">
-            <Button variant="primary" onClick={() => navigate(`/contacts/${contact.id}/edit`)}>
-              Edit
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => setDialogOpen(true)}
-              disabled={archived}
-              reason={archived ? 'Already archived' : undefined}
-            >
-              {archived ? 'Restore' : 'Archive'}
-            </Button>
+            {canWrite ? (
+              <>
+                <Button variant="primary" onClick={() => navigate(`/contacts/${contact.id}/edit`)}>
+                  Edit
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={() => setDialogOpen(true)}
+                  disabled={archived && restoreMutation.isPending}
+                >
+                  {archived ? 'Restore' : 'Archive'}
+                </Button>
+              </>
+            ) : null}
             <Button variant="default" onClick={() => navigate('/contacts')}>
               Back to list
             </Button>
@@ -119,22 +134,30 @@ export function ContactDetailPage() {
         <dl className="contact-detail-page__details">
           <dt>Code</dt>
           <dd>{contact.code}</dd>
-          <dt>Role</dt>
-          <dd>
-            <Badge tone={contact.role === 'CUSTOMER' ? 'success' : 'info'}>{contact.role}</Badge>
-          </dd>
+          <dt>Roles</dt>
+          <dd>{roles}</dd>
           <dt>Status</dt>
           <dd>
-            <Badge tone={contact.status === 'ACTIVE' ? 'success' : 'destructive'}>
-              {contact.status}
-            </Badge>
+            <Badge tone={contact.isArchived ? 'destructive' : 'success'}>{contact.isArchived ? 'Archived' : 'Active'}</Badge>
           </dd>
           <dt>Email</dt>
-          <dd>{contact.email}</dd>
+          <dd>{contact.email ?? '—'}</dd>
           <dt>Phone</dt>
-          <dd>{contact.phone}</dd>
+          <dd>{contact.phone ?? '—'}</dd>
           <dt>Address</dt>
-          <dd>{contact.address}</dd>
+          <dd className="contact-detail-page__address-cell">
+            {addressLines.length === 0 ? (
+              '—'
+            ) : (
+              <address className="contact-detail-page__address">
+                {addressLines.map((line) => (
+                  <span key={line}>{line}</span>
+                ))}
+              </address>
+            )}
+          </dd>
+          <dt>Version</dt>
+          <dd>{contact.version}</dd>
         </dl>
       </Card>
 

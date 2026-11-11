@@ -7,6 +7,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  ParseUUIDPipe,
   Req,
 } from '@nestjs/common';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -19,7 +20,10 @@ import { replaceRolesSchema, type ReplaceRolesDto } from './dto/memberships.dto'
 import { MembershipsService } from './memberships.service';
 import { AccessControlService } from './access-control.service';
 import { SessionGuard, SessionRequest } from '../../modules/auth/guards/session.guard';
-import { getRequestContext } from '../../common/logging/request-context';
+import {
+  requireOrganizationId,
+  requireUserId,
+} from '../../common/logging/request-context';
 
 /**
  * Member management endpoints. All require `users.manage` (FR-005).
@@ -37,8 +41,7 @@ export class MembershipsController {
   @Get()
   @RequirePermission('users.manage')
   async list() {
-    const ctx = getRequestContext();
-    return this.service.list(ctx?.organizationId ?? '');
+    return this.service.list(requireOrganizationId());
   }
 
   /**
@@ -49,39 +52,40 @@ export class MembershipsController {
   @HttpCode(HttpStatus.CREATED)
   @RequirePermission('users.manage')
   async create(
-    @Req() request: SessionRequest,
     @Body(new ZodValidationPipe(createMemberSchema)) body: CreateMemberDto,
   ) {
-    const ctx = getRequestContext();
     return this.service.createMember({
-      organizationId: ctx?.organizationId ?? '',
+      organizationId: requireOrganizationId(),
       email: body.email,
       name: body.name,
       password: body.password,
       roleIds: body.roleIds,
-      actingUserId: request.userId ?? '',
+      actingUserId: requireUserId(),
     });
   }
 
   /**
    * Replace a membership's roles atomically with a before/after audit entry.
+   *
+   * The status is 200, not 201: a POST that changes an existing membership
+   * creates nothing, and "201 Created" would claim otherwise.
    */
   @Post(':id/roles')
+  @HttpCode(HttpStatus.OK)
   @RequirePermission('users.manage')
   async replaceRoles(
     @Req() request: SessionRequest,
-    @Param('id') membershipId: string,
+    @Param('id', ParseUUIDPipe) membershipId: string,
     @Body(new ZodValidationPipe(replaceRolesSchema)) body: ReplaceRolesDto,
   ) {
-    const ctx = getRequestContext();
     const actorPermissions = await this.accessControl.getEffectivePermissions(
       request.membershipId ?? '',
     );
     return this.service.replaceRoles({
       membershipId,
-      organizationId: ctx?.organizationId ?? '',
+      organizationId: requireOrganizationId(),
       roleIds: body.roleIds,
-      actingUserId: request.userId ?? '',
+      actingUserId: requireUserId(),
       actingEffectivePermissions: actorPermissions,
     });
   }
@@ -90,16 +94,15 @@ export class MembershipsController {
    * Deactivate a membership. Invalidates the user's sessions for this organization.
    */
   @Post(':id/deactivate')
+  @HttpCode(HttpStatus.OK)
   @RequirePermission('users.manage')
   async deactivate(
-    @Req() request: SessionRequest,
-    @Param('id') membershipId: string,
+    @Param('id', ParseUUIDPipe) membershipId: string,
   ) {
-    const ctx = getRequestContext();
     return this.service.deactivate({
       membershipId,
-      organizationId: ctx?.organizationId ?? '',
-      actingUserId: request.userId ?? '',
+      organizationId: requireOrganizationId(),
+      actingUserId: requireUserId(),
     });
   }
 
@@ -107,16 +110,15 @@ export class MembershipsController {
    * Reactivate a deactivated membership.
    */
   @Post(':id/reactivate')
+  @HttpCode(HttpStatus.OK)
   @RequirePermission('users.manage')
   async reactivate(
-    @Req() request: SessionRequest,
-    @Param('id') membershipId: string,
+    @Param('id', ParseUUIDPipe) membershipId: string,
   ) {
-    const ctx = getRequestContext();
     return this.service.reactivate({
       membershipId,
-      organizationId: ctx?.organizationId ?? '',
-      actingUserId: request.userId ?? '',
+      organizationId: requireOrganizationId(),
+      actingUserId: requireUserId(),
     });
   }
 }

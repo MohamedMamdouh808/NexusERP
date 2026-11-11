@@ -7,7 +7,7 @@ import {
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { SessionGuard } from '../../modules/auth/guards/session.guard';
 import { AuditService } from './audit.service';
-import { getRequestContext } from '../../common/logging/request-context';
+import { requireOrganizationId } from '../../common/logging/request-context';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 
@@ -39,9 +39,8 @@ export class AuditController {
   async list(
     @Query(new ZodValidationPipe(auditListSchema)) query: z.infer<typeof auditListSchema>,
   ) {
-    const ctx = getRequestContext();
     return this.service.list({
-      organizationId: ctx?.organizationId ?? '',
+      organizationId: requireOrganizationId(),
       from: query.from ? new Date(query.from) : undefined,
       to: query.to ? new Date(query.to) : undefined,
       userId: query.userId,

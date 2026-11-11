@@ -81,7 +81,7 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
   const updateMutation = useUpdateSalesOrder();
 
   // Customers: non-archived contacts with the CUSTOMER role.
-  const { data: contactsData } = useContacts({ role: 'CUSTOMER', status: 'ACTIVE', page: 1, pageSize: 100 });
+  const { data: contactsData } = useContacts({ role: 'customer', status: 'active', page: 1, pageSize: 100 });
   const customers = contactsData?.items ?? [];
 
   // Shipping warehouses: active warehouses only.

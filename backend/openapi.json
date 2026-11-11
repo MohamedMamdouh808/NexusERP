@@ -18,6 +18,150 @@
         ],
         "type": "object"
       },
+      "ContactResponseDto": {
+        "properties": {
+          "addressLine1": {
+            "description": "Address line 1",
+            "type": "object"
+          },
+          "addressLine2": {
+            "description": "Address line 2",
+            "type": "object"
+          },
+          "city": {
+            "description": "City",
+            "type": "object"
+          },
+          "code": {
+            "description": "Auto-assigned human-readable sequence code (e.g., CUST-00001, SUPP-00001)",
+            "type": "string"
+          },
+          "country": {
+            "description": "Country",
+            "type": "object"
+          },
+          "createdAt": {
+            "description": "Record creation timestamp",
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "description": "Contact email",
+            "type": "object"
+          },
+          "id": {
+            "description": "Contact unique identifier (UUID)",
+            "type": "string"
+          },
+          "isArchived": {
+            "description": "Archived flag",
+            "type": "boolean"
+          },
+          "isCustomer": {
+            "description": "Customer role flag",
+            "type": "boolean"
+          },
+          "isSupplier": {
+            "description": "Supplier role flag",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Contact name",
+            "type": "string"
+          },
+          "organizationId": {
+            "description": "Organization identifier (UUID)",
+            "type": "string"
+          },
+          "phone": {
+            "description": "Contact phone",
+            "type": "object"
+          },
+          "postalCode": {
+            "description": "Postal code",
+            "type": "object"
+          },
+          "region": {
+            "description": "Region or state",
+            "type": "object"
+          },
+          "updatedAt": {
+            "description": "Record last updated timestamp",
+            "format": "date-time",
+            "type": "string"
+          },
+          "version": {
+            "description": "Optimistic locking version counter",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "code",
+          "name",
+          "isCustomer",
+          "isSupplier",
+          "isArchived",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "CreateContactDto": {
+        "properties": {
+          "addressLine1": {
+            "description": "Address line 1",
+            "type": "string"
+          },
+          "addressLine2": {
+            "description": "Address line 2",
+            "type": "string"
+          },
+          "city": {
+            "description": "City",
+            "type": "string"
+          },
+          "country": {
+            "description": "Country",
+            "type": "string"
+          },
+          "email": {
+            "description": "Contact email (unique per organization when non-empty)",
+            "type": "string"
+          },
+          "isCustomer": {
+            "description": "Flag indicating whether this contact is a customer",
+            "type": "boolean"
+          },
+          "isSupplier": {
+            "description": "Flag indicating whether this contact is a supplier",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Contact name or company name",
+            "maxLength": 255,
+            "type": "string"
+          },
+          "phone": {
+            "description": "Phone number",
+            "type": "string"
+          },
+          "postalCode": {
+            "description": "Postal code",
+            "type": "string"
+          },
+          "region": {
+            "description": "Region or state",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "DatabaseCheckResultDto": {
         "properties": {
           "latencyMs": {
@@ -187,6 +331,64 @@
           "checks"
         ],
         "type": "object"
+      },
+      "UpdateContactDto": {
+        "properties": {
+          "addressLine1": {
+            "description": "Address line 1",
+            "type": "string"
+          },
+          "addressLine2": {
+            "description": "Address line 2",
+            "type": "string"
+          },
+          "city": {
+            "description": "City",
+            "type": "string"
+          },
+          "country": {
+            "description": "Country",
+            "type": "string"
+          },
+          "email": {
+            "description": "Contact email (unique per organization when non-empty)",
+            "type": "string"
+          },
+          "isCustomer": {
+            "description": "Flag indicating whether this contact is a customer",
+            "type": "boolean"
+          },
+          "isSupplier": {
+            "description": "Flag indicating whether this contact is a supplier",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Contact name or company name",
+            "maxLength": 255,
+            "type": "string"
+          },
+          "phone": {
+            "description": "Phone number",
+            "type": "string"
+          },
+          "postalCode": {
+            "description": "Postal code",
+            "type": "string"
+          },
+          "region": {
+            "description": "Region or state",
+            "type": "string"
+          },
+          "version": {
+            "description": "Optimistic locking version expected by caller",
+            "minimum": 1,
+            "type": "number"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "type": "object"
       }
     }
   },
@@ -307,6 +509,310 @@
         },
         "tags": [
           "Auth"
+        ]
+      }
+    },
+    "/api/v1/contacts": {
+      "get": {
+        "operationId": "ContactsController_list",
+        "parameters": [
+          {
+            "description": "Search term across code, name, email, or phone",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Role filter",
+            "in": "query",
+            "name": "role",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "enum": [
+                "all",
+                "customer",
+                "supplier"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Archival status filter",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "active",
+              "enum": [
+                "all",
+                "active",
+                "archived"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page number",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Page size",
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Sort column",
+            "in": "query",
+            "name": "sortBy",
+            "required": false,
+            "schema": {
+              "default": "name",
+              "enum": [
+                "name",
+                "code",
+                "createdAt"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sort direction",
+            "in": "query",
+            "name": "sortOrder",
+            "required": false,
+            "schema": {
+              "default": "asc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of contacts"
+          },
+          "403": {
+            "description": "Forbidden (requires contacts.read)"
+          }
+        },
+        "summary": "List contacts with search, filters, sorting, and pagination",
+        "tags": [
+          "Contacts"
+        ]
+      },
+      "post": {
+        "operationId": "ContactsController_create",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateContactDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactResponseDto"
+                }
+              }
+            },
+            "description": "Contact successfully created"
+          },
+          "400": {
+            "description": "Validation error (e.g. missing role)"
+          },
+          "403": {
+            "description": "Forbidden (requires contacts.write)"
+          },
+          "409": {
+            "description": "Duplicate contact email within organization"
+          }
+        },
+        "summary": "Create a new customer or supplier contact",
+        "tags": [
+          "Contacts"
+        ]
+      }
+    },
+    "/api/v1/contacts/{id}": {
+      "get": {
+        "operationId": "ContactsController_findById",
+        "parameters": [
+          {
+            "description": "Contact UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactResponseDto"
+                }
+              }
+            },
+            "description": "Contact details"
+          },
+          "403": {
+            "description": "Forbidden (requires contacts.read)"
+          },
+          "404": {
+            "description": "Contact not found or cross-tenant"
+          }
+        },
+        "summary": "Get a contact by ID",
+        "tags": [
+          "Contacts"
+        ]
+      },
+      "put": {
+        "operationId": "ContactsController_update",
+        "parameters": [
+          {
+            "description": "Contact UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContactDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactResponseDto"
+                }
+              }
+            },
+            "description": "Updated contact details"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Forbidden (requires contacts.write)"
+          },
+          "404": {
+            "description": "Contact not found or cross-tenant"
+          },
+          "409": {
+            "description": "Stale version or duplicate email"
+          }
+        },
+        "summary": "Update contact details with optimistic concurrency check",
+        "tags": [
+          "Contacts"
+        ]
+      }
+    },
+    "/api/v1/contacts/{id}/archive": {
+      "post": {
+        "operationId": "ContactsController_archive",
+        "parameters": [
+          {
+            "description": "Contact UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contact archived"
+          },
+          "403": {
+            "description": "Forbidden (requires contacts.write)"
+          },
+          "404": {
+            "description": "Contact not found or cross-tenant"
+          },
+          "409": {
+            "description": "Contact in use by active documents"
+          }
+        },
+        "summary": "Archive a contact (soft-delete)",
+        "tags": [
+          "Contacts"
+        ]
+      }
+    },
+    "/api/v1/contacts/{id}/restore": {
+      "post": {
+        "operationId": "ContactsController_restore",
+        "parameters": [
+          {
+            "description": "Contact UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contact restored"
+          },
+          "403": {
+            "description": "Forbidden (requires contacts.write)"
+          },
+          "404": {
+            "description": "Contact not found or cross-tenant"
+          }
+        },
+        "summary": "Restore an archived contact",
+        "tags": [
+          "Contacts"
         ]
       }
     },

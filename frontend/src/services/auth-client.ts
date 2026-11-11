@@ -29,10 +29,22 @@ const API_BASE = '/api/v1';
  * follow-up login call instead of using them. They are typed for the contract,
  * never read.
  */
+/**
+ * One role attached to a membership. The service answers a membership's roles
+ * as an array (`roles: [{ id, key, name }]`) because a membership may hold
+ * several; the interface names the first one and honest-empty when there is
+ * none (see `components/shell/role-label.ts`).
+ */
+export interface MembershipRole {
+  readonly id: string;
+  readonly key: string;
+  readonly name: string;
+}
+
 export interface RegisterResult {
   readonly user: { readonly id: string; readonly email: string };
   readonly organization: { readonly id: string; readonly name: string };
-  readonly membership: { readonly id: string; readonly roleKey: string };
+  readonly membership: { readonly id: string; readonly roles: readonly MembershipRole[] };
   readonly session: { readonly id: string };
   readonly sessionToken: string;
   readonly csrfToken: string;
@@ -40,30 +52,48 @@ export interface RegisterResult {
 
 /** The login response 200 body - tokens live in the cookies, NOT in the body. */
 export interface LoginResult {
-  readonly user: { readonly id: string; readonly email: string };
+  readonly user: {
+    readonly id: string;
+    readonly email: string;
+    /** True while the account still has to choose its own password. */
+    readonly mustChangePassword: boolean;
+  };
   readonly membership: {
     readonly id: string;
-    readonly roleKey: string;
+    readonly roles: readonly MembershipRole[];
     readonly organization: { readonly id: string; readonly name: string };
   };
 }
 
 /** GET /auth/me 200 body: the active membership and its organization. */
 export interface MeResult {
-  readonly user: { readonly id: string; readonly email: string };
+  readonly user: {
+    readonly id: string;
+    readonly email: string;
+    /** True while the account still has to choose its own password. */
+    readonly mustChangePassword: boolean;
+  };
   readonly membership: {
     readonly id: string;
-    readonly roleKey: string;
+    readonly roles: readonly MembershipRole[];
     readonly isActive: boolean;
   };
   readonly organization: { readonly id: string; readonly name: string };
+  /**
+   * The caller's effective permissions.
+   *
+   * The server enforces every permission on every request; these travel with
+   * the identity so the interface does not offer an action that would be
+   * refused (a hidden control is not security - the server is).
+   */
+  readonly permissions: readonly string[];
 }
 
 /** One active membership, as the org switcher lists them. */
 export interface Organization {
   readonly id: string;
   readonly name: string;
-  readonly roleKey: string;
+  readonly roles: readonly MembershipRole[];
 }
 
 /** POST /api/v1/auth/register - creates user, org, membership, warehouse, sequences. */
@@ -101,6 +131,23 @@ export async function logout(): Promise<ApiResult<{ readonly message: string }>>
   return requestJson(`${API_BASE}/auth/logout`, { method: 'POST' });
 }
 
+/**
+ * POST /api/v1/auth/change-password - changes the caller's OWN password.
+ *
+ * The service rotates the session and issues fresh cookies, so nothing from the
+ * body is stored: the store re-probes afterwards.
+ */
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<ApiResult<{ readonly message: string }>> {
+  return requestJson(`${API_BASE}/auth/change-password`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
 /** GET /api/v1/auth/me - current user, active membership and organization. */
 export async function me(): Promise<ApiResult<MeResult>> {
   return requestJson(`${API_BASE}/auth/me`, { method: 'GET' });
@@ -131,6 +178,6 @@ export async function switchOrganization(
 
 /** The switch response shape - kept for the contract, never trusted for names. */
 export interface SwitchOrganizationResult {
-  readonly membership: { readonly id: string; readonly roleKey: string };
+  readonly membership: { readonly id: string; readonly roles: readonly MembershipRole[] };
   readonly organization: { readonly id: string; readonly name: string };
 }

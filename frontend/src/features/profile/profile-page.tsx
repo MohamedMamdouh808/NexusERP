@@ -54,7 +54,7 @@ export function ProfilePage() {
             <dt>Email</dt>
             <dd>{session.user.email}</dd>
             <dt>Role</dt>
-            <dd>{roleLabel(session.membership.roleKey)}</dd>
+            <dd>{roleLabel(session.membership.roles)}</dd>
             <dt>Organization</dt>
             <dd>{session.organization.name}</dd>
           </dl>

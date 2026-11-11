@@ -60,8 +60,11 @@ export interface DatabaseTarget {
 }
 
 export function parseDatabaseUrl(url: string): DatabaseTarget {
+  // Capture groups: 1 username, 2 host, 3 database, 4 query string.
   const match = url.match(/^postgres(?:ql)?:\/\/([^:@/]+)(?::[^@]*)?@([^:/\s]+)(?::\d+)?\/([^?\s]+)(\?[^\s]*)?/);
-  const searchParams = match?.[5] ? new URLSearchParams(match[5]) : new URLSearchParams();
+  // NOTE: group 4, not 5 - there are exactly four capturing groups above; reading
+  // group 5 made `schema` silently empty and defeated every guard that relied on it.
+  const searchParams = match?.[4] ? new URLSearchParams(match[4]) : new URLSearchParams();
   return {
     username: match?.[1] ?? null,
     host: match?.[2] ?? null,
@@ -76,7 +79,10 @@ export function replaceSchema(url: string, schema: string): string {
   const hasQuery = url.includes('?');
   const existingSchema = url.match(/[?&]schema=[^&]*/);
   if (existingSchema) {
-    return url.replace(existingSchema[0], `schema=${schema}`);
+    // Keep the leading `?` or `&` from the match - dropping it glues the schema
+    // onto the database name (e.g. `postgresschema=x`) and Prisma then reports
+    // "Database `postgresschema=x` does not exist".
+    return url.replace(existingSchema[0], `${existingSchema[0][0]}schema=${schema}`);
   }
   const separator = hasQuery ? '&' : '?';
   return `${url}${separator}schema=${schema}`;
@@ -85,7 +91,16 @@ export function replaceSchema(url: string, schema: string): string {
 /** Returns true when the URL targets the public schema (no schema param means public). */
 export function isPublicSchema(url: string): boolean {
   const schemaMatch = url.match(/[?&]schema=([^&]*)/);
-  return schemaMatch === null || schemaMatch[1] === 'public';
+  const searchPathMatch = url.match(/[?&]search_path=([^&]*)/);
+
+  // If schema is explicitly set, check its value
+  if (schemaMatch) return schemaMatch[1] === 'public';
+
+  // If search_path is explicitly set, check its value
+  if (searchPathMatch) return searchPathMatch[1] === 'public';
+
+  // Neither specified: PostgreSQL defaults to the public schema.
+  return true;
 }
 
 /** Local development hostnames that are always allowed. */

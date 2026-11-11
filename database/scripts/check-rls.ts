@@ -17,8 +17,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, resolve } from 'node:path';
 
 const repoRoot = resolve(__dirname, '..', '..');
 const migrationsDir = join(repoRoot, 'database', 'prisma', 'migrations');

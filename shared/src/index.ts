@@ -14,3 +14,4 @@ export * from './errors/index.js';
 export * from './schemas/index.js';
 export * from './permissions/index.js';
 export * from './audit/index.js';
+export * from './contacts/index.js';

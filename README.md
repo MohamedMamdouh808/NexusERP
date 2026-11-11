@@ -132,11 +132,55 @@ Run from the repository root.
 
 ## 🧪 Testing
 
-Integration tests require a running PostgreSQL 17 instance and will refuse to run without `DATABASE_URL`. Start your local PostgreSQL 17 first, then:
+Integration tests require a running PostgreSQL 17 instance and will refuse to run without `DATABASE_URL`.
+
+### The tests run in an isolated schema, never in `public`
+
+The integration suite runs **only** against the `nexuserp_test` schema. The
+shared `public` schema is never written to by a test run, and the suite proves
+it: the row counts of `public` are identical before and after a run.
+
+Every run starts from a **freshly rebuilt** schema: the test schema is dropped,
+recreated empty, and the current migrations are applied to it. A stale table or
+function from an earlier debugging session therefore cannot reach a run and
+change what the tests measure.
 
 ```bash
-DATABASE_URL="postgresql://nexuserp:nexuserp_dev_password@127.0.0.1:5432/nexuserp?schema=public" npm run test:integration
+# Locally, against the hosted database: the wrapper points DATABASE_URL at the
+# isolated schema and caps the pool so a booted app plus the test client stay
+# under the pooler's session limit.
+node scripts/with-test-schema-env.mjs npm run test:integration
+
+# Against a local PostgreSQL, the isolated schema is named in the URL:
+DATABASE_URL="postgresql://nexuserp:nexuserp_dev_password@127.0.0.1:5432/nexuserp?schema=nexuserp_test" npm run test:integration
 ```
+
+`npm run test:integration` rebuilds the test schema before the first suite
+(`pretest:integration` → `scripts/reset-test-schema.mjs --migrate`). The
+rebuild touches the test schema only; `public` is never read, written, or
+dropped by it.
+
+### The invariants, against either schema
+
+```bash
+npm run verify:invariants:test   # the isolated schema (what CI runs)
+npm run verify:invariants         # the public schema, by hand against Supabase
+npm run check:guards              # migrations, RLS, naming, boundaries, structure, secrets
+```
+
+`scripts/check-schema-lint.mjs` reports the same warning classes the hosted
+Supabase linter reports (RLS disabled, a mutable function `search_path`, a
+security-definer view, duplicate indexes, unindexed foreign keys, overlapping
+permissive policies). It runs inside the database, so it works the same way in
+CI as it does by hand.
+
+### Naming convention
+
+Every new table and column is **snake_case** (see
+[database/README.md](database/README.md)). `npm run check:naming` fails the
+build when a new migration breaks the rule, and names the file, the line and
+the identifier. The migrations that predate the rule are grandfathered through
+an explicit allowlist in `database/scripts/check-naming-convention.ts`.
 
 ### Test Structure
 

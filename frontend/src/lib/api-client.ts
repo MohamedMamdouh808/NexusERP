@@ -167,6 +167,11 @@ export async function requestJson<T>(
       ...init,
       headers,
       credentials: 'same-origin',
+      // The interface never reads a cached answer. A cached /auth/me is how a
+      // signed-out reader keeps seeing a session, and a cached list is how a
+      // reader sees a record that was changed a moment ago. The service's
+      // answers are live or they are nothing.
+      cache: 'no-store',
     });
   } catch {
     return {

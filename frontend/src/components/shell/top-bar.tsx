@@ -168,7 +168,7 @@ export function TopBar({
           </span>
           <span className="top-bar__user-copy">
             <span className="top-bar__user-name">{user.email}</span>
-            <span className="top-bar__user-status">{roleLabel(membership.roleKey)}</span>
+            <span className="top-bar__user-status">{roleLabel(membership.roles)}</span>
           </span>
           <Icon name="chevronDown" />
         </>

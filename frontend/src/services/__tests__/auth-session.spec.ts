@@ -24,22 +24,30 @@ import { requestJson } from '../../lib/api-client';
  */
 
 const ME_SIGNED_IN = {
-  user: { id: 'user-1', email: 'nora@example.com' },
-  membership: { id: 'membership-1', roleKey: 'administrator', isActive: true },
+  user: { id: 'user-1', email: 'nora@example.com', mustChangePassword: false },
+  membership: {
+    id: 'membership-1',
+    roles: [{ id: 'role-1', key: 'administrator', name: 'Administrator' }],
+    isActive: true,
+  },
   organization: { id: 'org-1', name: "Nora's Organization" },
 };
 
 const LOGIN_OK = {
-  user: { id: 'user-1', email: 'nora@example.com' },
+  user: { id: 'user-1', email: 'nora@example.com', mustChangePassword: false },
   membership: {
     id: 'membership-1',
-    roleKey: 'administrator',
+    roles: [{ id: 'role-1', key: 'administrator', name: 'Administrator' }],
     organization: { id: 'org-1', name: "Nora's Organization" },
   },
 };
 
 const ORGANIZATIONS = [
-  { id: 'org-1', name: "Nora's Organization", roleKey: 'administrator' },
+  {
+    id: 'org-1',
+    name: "Nora's Organization",
+    roles: [{ id: 'role-1', key: 'administrator', name: 'Administrator' }],
+  },
 ];
 
 function envelope(status: number, code: string, message: string): Response {
@@ -213,13 +221,17 @@ describe('signOut', () => {
 
 describe('switchOrganizationForSession', () => {
   it('switches through the real endpoint and refetches names the service vouches for', async () => {
-    const OTHER = { id: 'org-2', name: 'Other Organization', roleKey: 'member' };
+    const OTHER = {
+      id: 'org-2',
+      name: 'Other Organization',
+      roles: [{ id: 'role-2', key: 'member', name: 'Member' }],
+    };
     let switched = false;
     stubFetch((path) => {
       if (path.endsWith('/auth/me')) {
         return jsonResponse(
           switched
-            ? { ...ME_SIGNED_IN, membership: { ...ME_SIGNED_IN.membership, id: 'membership-2', roleKey: 'member' }, organization: OTHER }
+            ? { ...ME_SIGNED_IN, membership: { ...ME_SIGNED_IN.membership, id: 'membership-2', roles: [{ id: 'role-2', key: 'member', name: 'Member' }] }, organization: OTHER }
             : ME_SIGNED_IN,
         );
       }
@@ -230,7 +242,7 @@ describe('switchOrganizationForSession', () => {
         switched = true;
         // The service's known defect: the switch body echoes the id, not the name.
         return jsonResponse({
-          membership: { id: 'membership-2', roleKey: 'member' },
+          membership: { id: 'membership-2', roles: [{ id: 'role-2', key: 'member', name: 'Member' }] },
           organization: { id: 'org-2', name: 'org-2' },
         });
       }
@@ -246,7 +258,7 @@ describe('switchOrganizationForSession', () => {
     if (state.status !== 'signed-in') throw new Error('expected signed-in');
     // The top bar reads the REFETCHED truth, never the switch body's name.
     expect(state.organization).toEqual(OTHER);
-    expect(state.membership.roleKey).toBe('member');
+    expect(state.membership.roles[0]?.key).toBe('member');
   });
 });
 

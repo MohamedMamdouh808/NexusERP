@@ -80,7 +80,7 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
   const updateMutation = useUpdatePurchaseOrder();
 
   // Suppliers: non-archived contacts with the SUPPLIER role.
-  const { data: contactsData } = useContacts({ role: 'SUPPLIER', status: 'ACTIVE', page: 1, pageSize: 100 });
+  const { data: contactsData } = useContacts({ role: 'supplier', status: 'active', page: 1, pageSize: 100 });
   const suppliers = contactsData?.items ?? [];
 
   // Destination warehouses: active warehouses only.

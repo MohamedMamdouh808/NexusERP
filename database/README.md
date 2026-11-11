@@ -4,6 +4,27 @@ This document describes the database conventions established for NexusERP.
 
 ## Schema Conventions
 
+### Naming Convention
+
+- Every table and every column is **snake_case**: lowercase letters, digits and underscores, never starting with a digit. `organization_id`, `is_customer`, `created_at` — not `organizationId`, `isCustomer`, `createdAt`.
+- The Prisma model keeps the camelCase field name it is natural to write in TypeScript and states the database name in `@map`:
+
+  ```prisma
+  model Contact {
+    id             String   @id @default(uuid()) @db.Uuid
+    organizationId String   @map("organization_id") @db.Uuid
+    isCustomer     Boolean  @default(false) @map("is_customer")
+    createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    @@map("contacts")
+  }
+  ```
+
+  The model name is PascalCase (a TypeScript convention), the table and column names in the database are snake_case.
+- **A migration is never edited after it is applied.** A name that must change is changed by a NEW migration (rename the column, add the new one, copy, drop the old).
+- The migrations that predate this convention are **grandfathered** through an explicit allowlist in `scripts/check-naming-convention.ts`. Every entry there is a decision someone wrote down; the list only ever grows.
+- `npm run check:naming` fails the build when a NEW migration creates a camelCase table or column, and names the file, the line and the identifier. It reads files only: it never opens a database and never prints a connection string.
+
 ### Tenant Scoping Convention
 
 - Every organization-owned table carries `organization_id`, NOT NULL, indexed.

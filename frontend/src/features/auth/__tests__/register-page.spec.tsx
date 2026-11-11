@@ -24,23 +24,31 @@ function stubApi(handler: (path: string) => Response): void {
 
 function envelopes(): (path: string) => Response {
   const REGISTER_OK = {
-    user: { id: 'user-9', email: 'new.user@example.com' },
+    user: { id: 'user-9', email: 'new.user@example.com', mustChangePassword: false },
     organization: { id: 'org-9', name: "new.user@example.com's Organization" },
   };
   const LOGIN_OK = {
-    user: { id: 'user-9', email: 'new.user@example.com' },
+    user: { id: 'user-9', email: 'new.user@example.com', mustChangePassword: false },
     membership: {
       id: 'membership-9',
-      roleKey: 'administrator',
+      roles: [{ id: 'role-9', key: 'administrator', name: 'Administrator' }],
       organization: { id: 'org-9', name: "new.user@example.com's Organization" },
     },
   };
   const ME_OK = {
-    user: { id: 'user-9', email: 'new.user@example.com' },
-    membership: { id: 'membership-9', roleKey: 'administrator', isActive: true },
+    user: { id: 'user-9', email: 'new.user@example.com', mustChangePassword: false },
+    membership: {
+      id: 'membership-9',
+      roles: [{ id: 'role-9', key: 'administrator', name: 'Administrator' }],
+      isActive: true,
+    },
     organization: { id: 'org-9', name: "new.user@example.com's Organization" },
   };
-  const ORGS = [{ id: 'org-9', name: "new.user@example.com's Organization", roleKey: 'administrator' }];
+  const ORGS = [{
+    id: 'org-9',
+    name: "new.user@example.com's Organization",
+    roles: [{ id: 'role-9', key: 'administrator', name: 'Administrator' }],
+  }];
   return (path) => {
     if (path.endsWith('/auth/register')) return jsonResponse(REGISTER_OK, { status: 201 });
     if (path.endsWith('/auth/login')) return jsonResponse(LOGIN_OK);

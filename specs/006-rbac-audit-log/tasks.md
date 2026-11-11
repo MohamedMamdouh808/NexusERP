@@ -100,15 +100,15 @@ persistence layers are not acceptable substitutes for critical-path tests.
 
 > **NOTE**: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T020 [P] [US2] Contract test for POST /api/v1/memberships validation (400 naming the field for missing/invalid password and empty/unknown roleIds) in backend/src/modules/access-control/__tests__/memberships.contract.spec.ts
-- [ ] T021 [P] [US2] Integration test: created member is flagged mustChangePassword; the sign-in response states it; every other capability is refused with 403 PASSWORD_CHANGE_REQUIRED (FR-006/FR-007/FR-028/SC-010) in backend/test/integration/members-create.spec.ts
-- [ ] T022 [P] [US2] Integration test: creation with an existing email (same or another organization) is byte-identical to a fresh account and leaves the existing password and flag untouched (FR-008/SC-014) in backend/test/integration/members-create.spec.ts
-- [ ] T023 [P] [US2] Integration test: roles replace is atomic with one audit entry carrying before/after role sets, and the new permissions apply from the member's next request (FR-004/FR-005) in backend/test/integration/members-roles.spec.ts
-- [ ] T024 [P] [US2] Integration test: successful change-password rotates the current session and CSRF cookie, invalidates all other sessions in every organization, and clears the flag (FR-027/SC-011) in backend/test/integration/change-password.spec.ts
-- [ ] T025 [P] [US2] Integration test: wrong current password returns 400 INVALID_CURRENT_PASSWORD (never 401) and the 6th wrong verification within 15 minutes returns 429 with Retry-After (FR-025/SC-012) in backend/test/integration/change-password.spec.ts
-- [ ] T026 [P] [US2] Integration test: an actor without users.manage receives 403 on every member endpoint with no state change (FR-021/SC-002) in backend/test/integration/members-permissions.spec.ts
-- [ ] T027 [P] [US2] Integration test: a membership id of another organization returns 404 on roles replace (SC-001) in backend/test/integration/members-isolation.spec.ts
-- [ ] T028 [P] [US2] Integration test: a forced audit-write failure rolls back member creation entirely (FR-016/SC-006) in backend/test/integration/members-rollback.spec.ts
+- [x] T020 [P] [US2] Contract test for POST /api/v1/memberships validation (400 naming the field for missing/invalid password and empty/unknown roleIds) in backend/src/modules/access-control/__tests__/memberships.contract.spec.ts
+- [x] T021 [P] [US2] Integration test: created member flagged mustChangePassword; the sign-in response states it; every other capability is refused with 403 PASSWORD_CHANGE_REQUIRED (FR-006/FR-007/FR-028/SC-010) in backend/test/integration/members-create.spec.ts
+- [x] T022 [P] [US2] Integration test: creation with an existing email (same or another organization) is byte-identical to a fresh account and leaves the existing password and flag untouched (FR-008/SC-014) in backend/test/integration/members-create.spec.ts
+- [x] T023 [P] [US2] Integration test: roles replace is atomic with one audit entry carrying before/after role sets, and the new permissions apply from the member's next request (FR-004/FR-005) in backend/test/integration/members-roles.spec.ts
+- [x] T024 [P] [US2] Integration test: successful change-password rotates the current session and CSRF cookie, invalidates all other sessions in every organization, and clears the flag (FR-027/SC-011) in backend/test/integration/change-password.spec.ts
+- [x] T025 [P] [US2] Integration test: wrong current password returns 400 INVALID_CURRENT_PASSWORD (never 401) and the 6th wrong verification within 15 minutes returns 429 with Retry-After (FR-025/SC-012) in backend/test/integration/change-password.spec.ts
+- [x] T026 [P] [US2] Integration test: an actor without users.manage receives 403 on every member endpoint with no state change (FR-021/SC-002) in backend/test/integration/members-permissions.spec.ts
+- [x] T027 [P] [US2] Integration test: a membership id of another organization returns 404 on roles replace (SC-001) in backend/test/integration/members-isolation.spec.ts
+- [x] T028 [P] [US2] Integration test: a forced audit-write failure rolls back member creation entirely (FR-016/SC-006) in backend/test/integration/members-rollback.spec.ts
 
 ### Implementation for User Story 2
 
@@ -138,11 +138,11 @@ persistence layers are not acceptable substitutes for critical-path tests.
 
 > **NOTE**: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T040 [P] [US3] Integration test: single active Administrator — deactivation refused 409 LAST_ADMINISTRATOR and roles change excluding Administrator refused 409 (FR-009/SC-003) in backend/test/integration/last-administrator.spec.ts
-- [ ] T041 [P] [US3] Integration test: with two active Administrators, deactivation and the role change succeed and are audited (US3 scenario 3) in backend/test/integration/last-administrator.spec.ts
-- [ ] T042 [P] [US3] Integration test: deactivation invalidates the member's existing sessions for that organization; a fresh sign-in is refused while inactive (FR-010/SC-004) in backend/test/integration/membership-deactivate.spec.ts
-- [ ] T043 [P] [US3] Integration test: state machine — deactivating an already-inactive membership and reactivating an already-active one both return 409 INVALID_STATE_TRANSITION (FR-010) in backend/test/integration/membership-deactivate.spec.ts
-- [ ] T044 [P] [US3] Integration test: permission (403 without users.manage) and cross-organization 404 on deactivate/reactivate (SC-001/SC-002) in backend/test/integration/membership-deactivate.spec.ts
+- [x] T040 [P] [US3] Integration test: single active Administrator — deactivation refused 409 LAST_ADMINISTRATOR and roles change excluding Administrator refused 409 (FR-009/SC-003) in backend/test/integration/last-administrator.spec.ts
+- [x] T041 [P] [US3] Integration test: with two active Administrators, deactivation and the role change succeed and are audited (US3 scenario 3) in backend/test/integration/last-administrator.spec.ts
+- [x] T042 [P] [US3] Integration test: deactivation invalidates the member's existing sessions for that organization; a fresh sign-in is refused while inactive (FR-010/SC-004) in backend/test/integration/membership-deactivate.spec.ts
+- [x] T043 [P] [US3] Integration test: state machine — deactivating an already-inactive membership and reactivating an already-active one both return 409 INVALID_STATE_TRANSITION (FR-010) in backend/test/integration/membership-deactivate.spec.ts
+- [x] T044 [P] [US3] Integration test: permission (403 without users.manage) and cross-organization 404 on deactivate/reactivate (SC-001/SC-002) in backend/test/integration/membership-deactivate.spec.ts
 
 ### Implementation for User Story 3
 
@@ -164,13 +164,13 @@ persistence layers are not acceptable substitutes for critical-path tests.
 
 > **NOTE**: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T048 [P] [US4] Integration test: create a custom role and verify it is available for assignment (US4 scenario 1) in backend/test/integration/custom-roles.spec.ts
-- [ ] T049 [P] [US4] Integration test: system roles refuse update and deletion with 403 (FR-013/US4 scenario 2) in backend/test/integration/custom-roles.spec.ts
-- [ ] T050 [P] [US4] Integration test: deleting an assigned role returns 409; after unassigning, deletion succeeds and audit references remain readable (US4 scenario 3) in backend/test/integration/custom-roles.spec.ts
-- [ ] T051 [P] [US4] Integration test: a roles.manage holder without audit.read is refused 403 NOT_ENOUGH_PERMISSIONS naming the permission when creating/editing/assigning such a role; an Administrator succeeds; editing down is allowed (FR-031/SC-015) in backend/test/integration/custom-roles.spec.ts
-- [ ] T052 [P] [US4] Integration test: case-insensitive name collision returns 409; an unknown permission code returns 400; a role of another organization returns 404 (FR-014) in backend/test/integration/custom-roles.spec.ts
-- [ ] T053 [P] [US4] Integration test: a permission added to the catalogue appears on every organization's Administrator role, and the last-Administrator rule still holds when custom roles carry administrative permissions (FR-032/SC-016) in backend/test/integration/custom-roles.spec.ts
-- [ ] T054 [P] [US4] Integration test: permission (403 without roles.manage) and cross-organization 404 on the role endpoints (SC-001/SC-002) in backend/test/integration/custom-roles.spec.ts
+- [x] T048 [P] [US4] Integration test: create a custom role and verify it is available for assignment (US4 scenario 1) in backend/test/integration/custom-roles.spec.ts
+- [x] T049 [P] [US4] Integration test: system roles refuse update and deletion with 403 (FR-013/US4 scenario 2) in backend/test/integration/custom-roles.spec.ts
+- [x] T050 [P] [US4] Integration test: deleting an assigned role returns 409; after unassigning, deletion succeeds and audit references remain readable (US4 scenario 3) in backend/test/integration/custom-roles.spec.ts
+- [x] T051 [P] [US4] Integration test: a roles.manage holder without audit.read is refused 403 NOT_ENOUGH_PERMISSIONS naming the permission when creating/editing/assigning such a role; an Administrator succeeds; editing down is allowed (FR-031/SC-015) in backend/test/integration/custom-roles.spec.ts
+- [x] T052 [P] [US4] Integration test: case-insensitive name collision returns 409; an unknown permission code returns 400; a role of another organization returns 404 (FR-014) in backend/test/integration/custom-roles.spec.ts
+- [x] T053 [P] [US4] Integration test: a permission added to the catalogue appears on every organization's Administrator role, and the last-Administrator rule still holds when custom roles carry administrative permissions (FR-032/SC-016) in backend/test/integration/custom-roles.spec.ts
+- [x] T054 [P] [US4] Integration test: permission (403 without roles.manage) and cross-organization 404 on the role endpoints (SC-001/SC-002) in backend/test/integration/custom-roles.spec.ts
 
 ### Implementation for User Story 4
 
@@ -196,14 +196,14 @@ persistence layers are not acceptable substitutes for critical-path tests.
 
 > **NOTE**: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T062 [P] [US5] Integration test: each audited action leaves exactly one entry with organization, acting user, action code, record type/id, timestamp and before/after values (FR-015/US5 scenario 1) in backend/test/integration/audit-log.spec.ts
-- [ ] T063 [P] [US5] Integration test: listing with each filter (period, user, action, record) and paging returns only matching entries of the active organization with a total count (FR-020/US5 scenario 2) in backend/test/integration/audit-log.spec.ts
-- [ ] T064 [P] [US5] Integration test: an actor without audit.read receives 403 (FR-020/US5 scenario 3) in backend/test/integration/audit-log.spec.ts
-- [ ] T065 [P] [US5] Integration test: a scan of all audit entries and log output produced by the feature shows no password, hash, token or session identifier (FR-019/SC-007) in backend/test/integration/audit-secrets.spec.ts
-- [ ] T066 [P] [US5] Integration test: organization-less entries never appear in any organization listing, filter or page; repeated failures of one account in a window produce exactly one first-failure entry plus the lockout entry (FR-030/SC-013) in backend/test/integration/audit-login-failures.spec.ts
-- [ ] T067 [P] [US5] Integration test: UPDATE, DELETE and TRUNCATE on audit_logs are rejected for the application database role (FR-017/SC-005) in backend/test/integration/audit-immutability.spec.ts
-- [ ] T068 [P] [US5] Integration test: a forced audit-write failure rolls back the business action with no partial state (FR-016/SC-006) in backend/test/integration/audit-rollback.spec.ts
-- [ ] T069 [P] [US5] Integration test: a second organization's actor sees none of the first organization's entries (tenant isolation) in backend/test/integration/audit-log.spec.ts
+- [x] T062 [P] [US5] Integration test: each audited action leaves exactly one entry with organization, acting user, action code, record type/id, timestamp and before/after values (FR-015/US5 scenario 1) in backend/test/integration/audit-log.spec.ts
+- [x] T063 [P] [US5] Integration test: listing with each filter (period, user, action, record) and paging returns only matching entries of the active organization with a total count (FR-020/US5 scenario 2) in backend/test/integration/audit-log.spec.ts
+- [x] T064 [P] [US5] Integration test: an actor without audit.read receives 403 (FR-020/US5 scenario 3) in backend/test/integration/audit-log.spec.ts
+- [x] T065 [P] [US5] Integration test: a scan of all audit entries and log output produced by the feature shows no password, hash, token or session identifier (FR-019/SC-007) in backend/test/integration/audit-secrets.spec.ts
+- [x] T066 [P] [US5] Integration test: organization-less entries never appear in any organization listing, filter or page; repeated failures of one account in a window produce exactly one first-failure entry plus the lockout entry (FR-030/SC-013) in backend/test/integration/audit-login-failures.spec.ts
+- [x] T067 [P] [US5] Integration test: UPDATE, DELETE and TRUNCATE on audit_logs are rejected for the application database role (FR-017/SC-005) in backend/test/integration/audit-immutability.spec.ts
+- [x] T068 [P] [US5] Integration test: a forced audit-write failure rolls back the business action with no partial state (FR-016/SC-006) in backend/test/integration/audit-rollback.spec.ts
+- [x] T069 [P] [US5] Integration test: a second organization's actor sees none of the first organization's entries (tenant isolation) in backend/test/integration/audit-log.spec.ts
 
 ### Implementation for User Story 5
 
@@ -222,14 +222,14 @@ persistence layers are not acceptable substitutes for critical-path tests.
 
 - [x] T074 [P] Extend docs/api-auth-contract.md with POST /auth/change-password and the forced-change gating (from contracts/auth-change-password.md)
 - [x] T075 [P] Document the member, role and audit endpoints in docs/ (reference specs/006-rbac-audit-log/contracts/)
-- [ ] T076 Regenerate backend/openapi.json via npm run openapi:generate and verify npm run openapi:diff passes
+- [x] T076 Regenerate backend/openapi.json via npm run openapi:generate and verify npm run openapi:diff passes
 - [x] T077 Code cleanup and refactoring across backend/src/modules/access-control/, backend/src/modules/audit/ and backend/src/modules/auth/
 - [x] T078 [P] Additional unit tests for services and guards in backend/src/modules/access-control/__tests__/ and backend/src/modules/auth/__tests__/
 - [x] T079 Security hardening sweep: no password, hash, token or session identifier in any log output or audit entry (SC-007)
-- [ ] T080 [P] Tenant-isolation sweep across every endpoint added in this feature (Principle I)
-- [ ] T081 [P] Transaction rollback and audit-coupling regression run against real PostgreSQL (Principle III)
+- [x] T080 [P] Tenant-isolation sweep across every endpoint added in this feature (Principle I)
+- [x] T081 [P] Transaction rollback and audit-coupling regression run against real PostgreSQL (Principle III)
 - [x] T082 Verify critical-path coverage is at least 80% in the CI report (Principle V)
-- [ ] T083 [P] Accessibility and UX-rule review against PRD 7.3 and WCAG 2.1 AA (Principle VIII) - N/A for backend-only feature
+- [x] T083 [P] Accessibility and UX-rule review against PRD 7.3 and WCAG 2.1 AA (Principle VIII) - N/A for backend-only feature
 - [x] T084 Run all guards: check:migrations, check:rls, check:schema-numeric-types, check:boundaries, check:structure, check:secrets
 - [x] T085 Run quickstart.md validation end-to-end (db:migrate:dev, db:generate, db:seed, guards, test:integration)
 

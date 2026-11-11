@@ -18,7 +18,8 @@ import {
   type SessionState,
   type SessionUser,
 } from '../services/auth-session';
-import type { Organization } from '../services/auth-client';
+import type { MembershipRole, Organization } from '../services/auth-client';
+import { PERMISSION_CATALOG } from '@nexuserp/shared';
 
 export interface SeedSignedInOptions {
   readonly email?: string;
@@ -27,20 +28,36 @@ export interface SeedSignedInOptions {
   readonly organization?: Organization;
   /** Full switcher list; defaults to just the active organization. */
   readonly organizations?: readonly Organization[];
+  /**
+   * The caller's effective permissions. Defaults to the whole catalogue,
+   * which is what an Administrator holds - the case most screens are written
+   * against. A test that needs a reader-only caller says so.
+   */
+  readonly permissions?: readonly string[];
 }
 
-const DEFAULT_USER: SessionUser = { id: 'test-user-1', email: 'nora.eaton@example.test' };
-const DEFAULT_MEMBERSHIP: SessionMembership = { id: 'test-membership-1', roleKey: 'administrator' };
+const DEFAULT_USER: SessionUser = {
+  id: 'test-user-1',
+  email: 'nora.eaton@example.test',
+  mustChangePassword: false,
+};
+const DEFAULT_MEMBERSHIP: SessionMembership = {
+  id: 'test-membership-1',
+  roles: [{ id: 'test-role-administrator', key: 'administrator', name: 'Administrator' }],
+};
+const TEST_ROLE_ADMINISTRATOR: readonly MembershipRole[] = [
+  { id: 'test-role-administrator', key: 'administrator', name: 'Administrator' },
+];
 export const TEST_ORGANIZATION: Organization = {
   id: 'test-org-1',
   name: 'Test Organization (One)',
-  roleKey: 'administrator',
+  roles: TEST_ROLE_ADMINISTRATOR,
 };
 /** A second membership, so a test can make the switcher real (>1 membership). */
 export const TEST_ORGANIZATION_TWO: Organization = {
   id: 'test-org-2',
   name: 'Test Organization (Two)',
-  roleKey: 'administrator',
+  roles: TEST_ROLE_ADMINISTRATOR,
 };
 
 /** Puts the store into the signed-in state a /auth/me answer has just produced. */
@@ -50,10 +67,14 @@ export function seedSignedInSession(options: SeedSignedInOptions = {}): SessionS
     status: 'signed-in',
     user: { ...DEFAULT_USER, ...(options.email !== undefined ? { email: options.email } : {}) },
     membership: options.roleKey !== undefined
-      ? { ...DEFAULT_MEMBERSHIP, roleKey: options.roleKey }
+      ? {
+          ...DEFAULT_MEMBERSHIP,
+          roles: [{ id: 'test-role-custom', key: options.roleKey, name: options.roleKey }],
+        }
       : DEFAULT_MEMBERSHIP,
     organization,
     organizations: options.organizations ?? [organization],
+    permissions: options.permissions ?? PERMISSION_CATALOG.map((permission) => permission.code),
   };
   hydrateSession(state);
   return state;

@@ -2,9 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { sampleCatalogService } from '../../services/sample-catalog-service';
+import { listContacts, type Contact } from '../../services/contacts-client';
 import { NAVIGATION } from '../shell/navigation';
 import { Input } from './index';
 import { Icon } from './icon';
+
+/** The role a contact holds, in the words the interface uses elsewhere. */
+function contactRoleLabel(contact: Contact): string {
+  if (contact.isCustomer && contact.isSupplier) return 'Customer & Supplier';
+  return contact.isCustomer ? 'Customer' : 'Supplier';
+}
 
 export interface CommandPaletteProps {
   readonly open: boolean;
@@ -30,7 +37,20 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const searching = normalized.length >= 2;
 
   const products = useQuery({ queryKey: ['command-palette', 'products', normalized], queryFn: () => sampleCatalogService.listProducts({ search: normalized, page: 1, pageSize: 5 }), enabled: searching });
-  const contacts = useQuery({ queryKey: ['command-palette', 'contacts', normalized], queryFn: () => sampleCatalogService.listContacts({ search: normalized, page: 1, pageSize: 5 }), enabled: searching });
+  // Contacts are a REAL domain now, so the palette searches the real service.
+  // A palette result that pointed at a mock contact would send the user to a
+  // record that does not exist.
+  const contacts = useQuery({
+    queryKey: ['command-palette', 'contacts', normalized],
+    queryFn: async () => {
+      const result = await listContacts({ search: normalized, page: 1, pageSize: 5 });
+      // A palette search that fails shows no contacts - it does not raise an
+      // error state over a quick-jump palette, and it does not keep retrying.
+      return result.ok ? result.data : { items: [], total: 0, page: 1, pageSize: 5 };
+    },
+    enabled: searching,
+    retry: false,
+  });
   const orders = useQuery({ queryKey: ['command-palette', 'purchase-orders', normalized], queryFn: () => sampleCatalogService.listPurchaseOrders({ search: normalized, page: 1, pageSize: 5 }), enabled: searching });
   const salesOrders = useQuery({ queryKey: ['command-palette', 'sales-orders', normalized], queryFn: () => sampleCatalogService.listSalesOrders({ search: normalized, page: 1, pageSize: 5 }), enabled: searching });
   const invoices = useQuery({ queryKey: ['command-palette', 'invoices', normalized], queryFn: () => sampleCatalogService.listInvoices({ search: normalized, page: 1, pageSize: 5 }), enabled: searching });
@@ -84,7 +104,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
     const records: CommandItem[] = [
       ...(products.data?.items ?? []).map((item) => ({ id: `product-${item.id}`, label: item.name, hint: `Product · ${item.sku}`, keywords: [item.sku, item.name, item.category], run: () => navigate(`/products/${item.id}`) })),
-      ...(contacts.data?.items ?? []).map((item) => ({ id: `contact-${item.id}`, label: item.name, hint: `${item.role} · ${item.code}`, keywords: [item.code, item.name, item.email, item.phone], run: () => navigate(`/contacts/${item.id}`) })),
+      ...(contacts.data?.items ?? []).map((item) => ({ id: `contact-${item.id}`, label: item.name, hint: `${contactRoleLabel(item)} · ${item.code}`, keywords: [item.code, item.name, item.email ?? '', item.phone ?? ''], run: () => navigate(`/contacts/${item.id}`) })),
       ...(orders.data?.items ?? []).map((item) => ({ id: `po-${item.id}`, label: item.number ?? 'Purchase order', hint: `Purchase order · ${item.supplierName}`, keywords: [item.number, item.supplierName, item.status], run: () => navigate(`/purchasing/${item.id}`) })),
       ...(salesOrders.data?.items ?? []).map((item) => ({ id: `so-${item.id}`, label: item.number ?? 'Sales order', hint: `Sales order · ${item.customerName}`, keywords: [item.number, item.customerName, item.status], run: () => navigate(`/sales/${item.id}`) })),
       ...(invoices.data?.items ?? []).map((item) => ({ id: `invoice-${item.id}`, label: item.number ?? 'Draft invoice', hint: `Invoice · ${item.customerName}`, keywords: [item.number ?? '', item.customerName, item.status], run: () => navigate(`/invoicing/${item.id}`) })),

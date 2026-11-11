@@ -5,20 +5,24 @@
  * Read-only database invariant verification for feature 006 (RBAC and Audit Log).
  *
  * Connects with DATABASE_URL and fails with a clear message when any invariant
- * is false. Intended to run:
- *   - in CI against the test schema (DATABASE_URL with schema=nexuserp_test)
- *   - by hand against Supabase (DATABASE_URL with schema=public)
+ * is false. The schema is the one the URL names, so the SAME script verifies
+ * the isolated test schema in CI and the shared public schema by hand:
+ *
+ *   - in CI against the test schema: DATABASE_URL with schema=nexuserp_test
+ *   - by hand against Supabase: DATABASE_URL with schema=public
  *
  * Never modifies data. Never prints DATABASE_URL or any password.
  *
  * Invariants checked:
  *  1. No membership without a role (every active membership has >= 1 role)
  *  2. Every role has at least one permission link
- *  3. Every public table (except _prisma_migrations) has RLS enabled
+ *  3. Every table in the schema except _prisma_migrations has RLS enabled
  *  4. No table is readable by the anon or authenticated roles
  *  5. audit_logs has UPDATE, DELETE, and TRUNCATE protection
  *  6. No audit entry with a null organization is returned by an organization
  *     listing (i.e., NULL-organization entries never match org-scoped queries)
+ *  7. Every contact belongs to an organization, and the case-insensitive unique
+ *     email index exists per organization
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -64,11 +68,16 @@ function pass(message) {
 
 async function main() {
   const databaseUrl = loadDatabaseUrl();
-  console.log(`Connecting to: ${maskUrl(databaseUrl)}\n`);
 
   const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
 
   try {
+    // The schema under verification is the one the URL names. It is printed by
+    // NAME only - the URL itself carries the password and is never printed.
+    const schemaRow = await prisma.$queryRawUnsafe(`SELECT current_schema()::text AS s`);
+    const targetSchema = schemaRow[0]?.s ?? 'public';
+    console.log(`Verifying the schema "${targetSchema}" (${maskUrl(databaseUrl)})\n`);
+
     // ------------------------------------------------------------------
     // 1. No membership without a role (active memberships)
     // ------------------------------------------------------------------
@@ -102,21 +111,40 @@ async function main() {
     }
 
     // ------------------------------------------------------------------
-    // 3. Every public table (except _prisma_migrations) has RLS enabled
+    // 3. Every public/target table (except _prisma_migrations) has RLS enabled
     // ------------------------------------------------------------------
     const tablesWithoutRls = await prisma.$queryRawUnsafe(
       `SELECT relname FROM pg_class
        WHERE relkind = 'r'
-         AND relnamespace = 'public'::regnamespace
+         AND relnamespace = $1::regnamespace
          AND relname <> '_prisma_migrations'
          AND NOT relrowsecurity
        ORDER BY relname`,
+      targetSchema,
     );
     if (tablesWithoutRls.length > 0) {
       const names = tablesWithoutRls.map((r) => r.relname).join(', ');
       fail(`${tablesWithoutRls.length} table(s) lack RLS: ${names}`);
     } else {
-      pass('Every public table has RLS enabled');
+      pass(`Every table in schema "${targetSchema}" has RLS enabled`);
+    }
+
+    // The contacts table is named explicitly. It is the newest tenant-scoped
+    // table, and "every table has RLS" is a claim nobody can check by eye at
+    // 3am when exactly one table is unprotected.
+    const contactsRls = await prisma.$queryRawUnsafe(
+      `SELECT relrowsecurity FROM pg_class
+       WHERE relkind = 'r'
+         AND relnamespace = $1::regnamespace
+         AND relname = 'contacts'`,
+      targetSchema,
+    );
+    if (contactsRls.length === 0) {
+      fail('the contacts table does not exist in this schema');
+    } else if (!contactsRls[0].relrowsecurity) {
+      fail('the contacts table lacks RLS');
+    } else {
+      pass('The contacts table has RLS enabled');
     }
 
     // ------------------------------------------------------------------
@@ -127,10 +155,11 @@ async function main() {
        FROM information_schema.role_table_grants g
        JOIN pg_class c ON c.relname = g.table_name
        JOIN pg_namespace n ON n.oid = c.relnamespace
-       WHERE n.nspname = 'public'
+       WHERE n.nspname = $1
          AND g.grantee IN ('anon', 'authenticated')
          AND g.privilege_type = 'SELECT'
        ORDER BY c.relname`,
+      targetSchema,
     );
     if (readableByAnon.length > 0) {
       const names = readableByAnon.map((r) => r.relname).join(', ');
@@ -140,7 +169,7 @@ async function main() {
     }
 
     // ------------------------------------------------------------------
-    // 5. audit_logs has UPDATE and DELETE triggers; TRUNCATE privilege revoked
+    // 5. audit_logs has UPDATE, DELETE, and TRUNCATE protection
     // ------------------------------------------------------------------
     const triggers = await prisma.$queryRawUnsafe(
       `SELECT tgname FROM pg_trigger
@@ -151,7 +180,8 @@ async function main() {
     const triggerNames = triggers.map((t) => t.tgname);
     const hasUpdateTrigger = triggerNames.some((n) => n.includes('update'));
     const hasDeleteTrigger = triggerNames.some((n) => n.includes('delete'));
-    const hasTruncateRevoked = await checkTruncateRevoked(prisma);
+    const hasTruncateTrigger = triggerNames.some((n) => n.includes('truncate'));
+    const hasTruncateRevoked = await checkTruncateRevoked(prisma, targetSchema);
 
     if (!hasUpdateTrigger) {
       fail('audit_logs is missing an UPDATE rejection trigger');
@@ -162,6 +192,11 @@ async function main() {
       fail('audit_logs is missing a DELETE rejection trigger');
     } else {
       pass('audit_logs has DELETE rejection trigger');
+    }
+    if (!hasTruncateTrigger) {
+      fail('audit_logs is missing a TRUNCATE rejection trigger');
+    } else {
+      pass('audit_logs has TRUNCATE rejection trigger');
     }
     if (!hasTruncateRevoked) {
       fail('audit_logs TRUNCATE privilege is not revoked from non-owner roles');
@@ -195,6 +230,31 @@ async function main() {
     }
 
     // ------------------------------------------------------------------
+    // 7. Contacts: every contact belongs to an organization, and the
+    //    case-insensitive email uniqueness is enforced per organization
+    // ------------------------------------------------------------------
+    const contactsWithoutOrganization = await prisma.$queryRawUnsafe(
+      `SELECT count(*) AS c FROM "contacts" WHERE "organization_id" IS NULL`,
+    );
+    const contactsCount = Number(contactsWithoutOrganization[0]?.c);
+    if (contactsCount > 0) {
+      fail(`${contactsCount} contact(s) have no organization`);
+    } else {
+      pass('Every contact belongs to an organization');
+    }
+
+    const contactsEmailIndex = await prisma.$queryRawUnsafe(
+      `SELECT indexdef FROM pg_indexes
+        WHERE schemaname = current_schema() AND tablename = 'contacts'
+          AND indexdef ILIKE '%lower%email%'`,
+    );
+    if (contactsEmailIndex.length === 0) {
+      fail('contacts has no case-insensitive unique email index per organization');
+    } else {
+      pass('contacts enforces a case-insensitive unique email per organization');
+    }
+
+    // ------------------------------------------------------------------
     // Summary
     // ------------------------------------------------------------------
     console.log(`\n${failures.length === 0 ? 'ALL INVARIANT CHECKS PASSED' : `${failures.length} INVARIANT CHECK(S) FAILED`}`);
@@ -205,12 +265,14 @@ async function main() {
 }
 
 /** Checks that TRUNCATE privilege is revoked from non-owner roles on audit_logs. */
-async function checkTruncateRevoked(prisma) {
+async function checkTruncateRevoked(prisma, targetSchema = 'public') {
   const truncPrivs = await prisma.$queryRawUnsafe(
     `SELECT DISTINCT grantee FROM information_schema.role_table_grants
-     WHERE table_name = 'audit_logs'
+     WHERE table_schema = $1
+       AND table_name = 'audit_logs'
        AND privilege_type = 'TRUNCATE'
-       AND grantee NOT IN ('pg_database_owner', 'pg_membership')`,
+       AND grantee NOT IN ('pg_database_owner', 'pg_membership', 'postgres')`,
+    targetSchema,
   );
   // If only the table owner or system roles have TRUNCATE, non-owners are revoked
   return truncPrivs.length === 0;

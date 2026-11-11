@@ -8,6 +8,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../platform/prisma/prisma.service';
 import {
+  IS_AUTHENTICATED_KEY,
   IS_PUBLIC_KEY,
   REQUIRED_PERMISSION_KEY,
 } from '../decorators/require-permission.decorator';
@@ -51,6 +52,16 @@ export class PermissionGuard implements CanActivate {
       context.getClass(),
     ]);
     if (isPublic === true) return true;
+
+    // A route that needs a session but no particular permission (the caller's own
+    // identity: /auth/me, /auth/organizations, /auth/change-password, ...) declares
+    // that with @Authenticated(). The session guard has already validated the
+    // session; there is simply no permission to demand.
+    const isAuthenticatedOnly = this.reflector.getAllAndOverride<boolean>(
+      IS_AUTHENTICATED_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (isAuthenticatedOnly === true) return true;
 
     const required = this.reflector.getAllAndOverride<string>(REQUIRED_PERMISSION_KEY, [
       context.getHandler(),

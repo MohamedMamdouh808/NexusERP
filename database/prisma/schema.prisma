@@ -151,6 +151,7 @@ model Organization {
   sequences   DocumentSequence[]
   roles       Role[]
   auditLogs   AuditLog[]
+  contacts    Contact[]
 
   @@map("organizations")
 }
@@ -215,6 +216,11 @@ model MembershipRole {
   @@unique([organizationId, membershipId, roleId])
   @@index([organizationId, roleId])
   @@index([organizationId, membershipId])
+  // The composite foreign keys carry their own indexes: a foreign key on
+  // (membershipId, organizationId) is served by an index whose LEADING columns
+  // are those two, in that order.
+  @@index([membershipId, organizationId], map: "membership_roles_membership_id_organization_id_idx")
+  @@index([roleId, organizationId], map: "membership_roles_role_id_organization_id_idx")
   @@map("membership_roles")
 }
 
@@ -230,11 +236,15 @@ model RolePermission {
   permission    Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
 
   @@id([roleId, permissionId])
+  // The permission foreign key carries its own index: without one, revoking a
+  // permission scans the whole grant table.
+  @@index([permissionId], map: "role_permissions_permission_id_idx")
   @@map("role_permissions")
 }
 
 /// Append-only audit log of every audited action. organizationId and userId are
-/// nullable: anonymous auth events (unknown-email sign-in failures) carry neither.
+/// nullable: anonymous auth events (unknown-email sign-in failures) carry neither,
+/// and actor deletion sets them null rather than removing the entry.
 /// Updates, deletions and truncations are rejected for the application database role
 /// (FR-017). RLS enabled with no policies (FR-023).
 model AuditLog {
@@ -252,8 +262,11 @@ model AuditLog {
   unknownAccountMarker String?     @db.VarChar(128)
   createdAt            DateTime    @default(now()) @db.Timestamptz(6)
 
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // onDelete: SetNull - the log survives actor/organization deletion (FR-017: the
+  // trail is append-only; a delete cascade would violate it, and it would also
+  // destroy the record of a deleted account's actions).
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, createdAt])
   @@index([organizationId, userId])
@@ -275,6 +288,10 @@ model Session {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
+  // The foreign keys carry their own indexes: without one, deleting a user or
+  // a membership scans the whole session table.
+  @@index([userId], map: "sessions_user_id_idx")
+  @@index([membershipId], map: "sessions_membership_id_idx")
   @@map("sessions")
 }
 
@@ -320,3 +337,35 @@ model DocumentSequence {
   @@index([organizationId])
   @@map("document_sequences")
 }
+
+/// A commercial party (customer, supplier, or both) scoped to an organization.
+model Contact {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  code           String       @db.VarChar(32)
+  name           String       @db.VarChar(255)
+  email          String?      @db.VarChar(255)
+  phone          String?      @db.VarChar(64)
+  isCustomer     Boolean      @default(false) @map("is_customer")
+  isSupplier     Boolean      @default(false) @map("is_supplier")
+  addressLine1   String?      @map("address_line1") @db.VarChar(255)
+  addressLine2   String?      @map("address_line2") @db.VarChar(255)
+  city           String?      @db.VarChar(100)
+  region         String?      @db.VarChar(100)
+  postalCode     String?      @map("postal_code") @db.VarChar(32)
+  country        String?      @db.VarChar(100)
+  isArchived     Boolean      @default(false) @map("is_archived")
+  version        Int          @default(1)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, id], map: "contacts_organization_id_id_key")
+  @@unique([organizationId, code], map: "contacts_organization_id_code_key")
+  @@index([organizationId, isArchived], map: "contacts_org_archived_idx")
+  @@index([organizationId, isCustomer], map: "contacts_org_customer_idx")
+  @@index([organizationId, isSupplier], map: "contacts_org_supplier_idx")
+  @@map("contacts")
+}
+

@@ -44,7 +44,6 @@ import {
   toThousandths,
 } from '../lib/quantity';
 import {
-  SAMPLE_CONTACTS,
   SAMPLE_DASHBOARD_SUMMARIES,
   SAMPLE_GOODS_RECEIPTS,
   SAMPLE_INVOICES,
@@ -62,15 +61,12 @@ import {
   SAMPLE_SHIPMENTS,
   SAMPLE_WAREHOUSES,
 } from '../mocks/sample-data';
+import { SAMPLE_CONTACTS } from '../mocks/sample-contacts';
 import type {
-  ArchiveContactInput,
   ArchiveProductInput,
   CatalogService,
   ConfirmSalesOrderInput,
   Contact,
-  ContactPage,
-  ContactQuery,
-  ContactMutationResult,
   CreateInvoiceFromOrderInput,
   CreateInvoiceFromOrderResult,
   CreatePurchaseOrderInput,
@@ -177,12 +173,6 @@ export type CatalogOperation =
   | 'createProduct'
   | 'updateProduct'
   | 'archiveProduct'
-  | 'listContacts'
-  | 'getContact'
-  | 'createContact'
-  | 'updateContact'
-  | 'archiveContact'
-  | 'restoreContact'
   | 'listWarehouses'
   | 'getWarehouse'
   | 'createWarehouse'
@@ -791,110 +781,6 @@ async function archiveProduct(input: ArchiveProductInput): Promise<ProductMutati
   return { removedLabel: products[index].name };
 }
 
-async function listContacts(query: ContactQuery): Promise<ContactPage> {
-  await beforeCall('listContacts', `page ${query.page} size ${query.pageSize}`);
-
-  let filtered = contacts;
-
-  if (query.search) {
-    const term = query.search.toLowerCase();
-    filtered = filtered.filter(
-      (c) =>
-        c.code.toLowerCase().includes(term) ||
-        c.name.toLowerCase().includes(term) ||
-        c.email.toLowerCase().includes(term),
-    );
-  }
-
-  if (query.role) {
-    filtered = filtered.filter((c) => c.role === query.role);
-  }
-
-  if (query.status) {
-    filtered = filtered.filter((c) => c.status === query.status);
-  }
-
-  const sign = query.direction === 'desc' ? -1 : 1;
-  const sort = query.sort;
-  if (sort) {
-    filtered = [...filtered].sort((a, b) => {
-      const av = a[sort as keyof Contact];
-      const bv = b[sort as keyof Contact];
-      if (typeof av === 'string' && typeof bv === 'string') {
-        return av.localeCompare(bv, undefined, { sensitivity: 'base' }) * sign;
-      }
-      return 0;
-    });
-  }
-
-  const start = Math.max(0, (query.page - 1) * query.pageSize);
-
-  return {
-    items: filtered.slice(start, start + query.pageSize),
-    total: filtered.length,
-  };
-}
-
-async function getContact(id: string): Promise<Contact> {
-  await beforeCall('getContact', id);
-
-  const found = contacts.find((contact) => contact.id === id);
-  if (found === undefined) {
-    throw new SampleServiceFailure(notFound(nextRequestId()));
-  }
-
-  return { ...found };
-}
-
-async function createContact(input: Omit<Contact, 'id'>): Promise<{ readonly code: string }> {
-  await beforeCall('createContact', input.code);
-
-  const id = `contact-${String(contacts.length + 1).padStart(4, '0')}`;
-  const contact: Contact = { ...input, id };
-  contacts.push(contact);
-  return { code: contact.code };
-}
-
-async function updateContact(input: Contact): Promise<{ readonly code: string }> {
-  await beforeCall('updateContact', input.id);
-
-  const index = contacts.findIndex((contact) => contact.id === input.id);
-  if (index === -1) {
-    throw new SampleServiceFailure(notFound(nextRequestId()));
-  }
-
-  contacts[index] = { ...input };
-  return { code: contacts[index].code };
-}
-
-async function archiveContact(input: ArchiveContactInput): Promise<ContactMutationResult> {
-  await beforeCall('archiveContact', input.id);
-
-  const index = contacts.findIndex((contact) => contact.id === input.id);
-  if (index === -1) {
-    throw new SampleServiceFailure(notFound(nextRequestId()));
-  }
-
-  const hasOpenOrder = salesOrders.some((order) => order.customerId === input.id && (order.status === 'DRAFT' || order.status === 'CONFIRMED'));
-  const hasUnpaidInvoice = invoices.some((invoice) => invoice.customerId === input.id && invoice.status !== 'VOID' && invoice.status !== 'DRAFT' && compareDecimal(invoiceBalance(invoice.id), '0.00', 2) > 0);
-  if (hasOpenOrder || hasUnpaidInvoice) {
-    throw new SampleServiceFailure(buildFailureWithCode(ERROR_CODES.CONFLICT, nextRequestId(), 'This customer has open orders or unpaid invoices.'));
-  }
-  contacts[index] = { ...contacts[index], status: 'ARCHIVED' };
-  return { removedLabel: contacts[index].name };
-}
-
-async function restoreContact(input: ArchiveContactInput): Promise<ContactMutationResult> {
-  await beforeCall('restoreContact', input.id);
-
-  const index = contacts.findIndex((contact) => contact.id === input.id);
-  if (index === -1) {
-    throw new SampleServiceFailure(notFound(nextRequestId()));
-  }
-
-  contacts[index] = { ...contacts[index], status: 'ACTIVE' };
-  return { removedLabel: contacts[index].name };
-}
 
 /** Stock movement source number sequences. They continue after the highest
  *  number the sample ledger already uses, so a number the service assigns can
@@ -2255,12 +2141,6 @@ function invoiceActiveAllocations(invoiceId: string) {
     payment.allocations.filter((allocation) => allocation.invoiceId === invoiceId).map((allocation) => ({ payment, allocation })),
   );
 }
-function invoiceBalance(invoiceId: string): string {
-  const invoice = invoices.find((entry) => entry.id === invoiceId);
-  if (!invoice) return '0.00';
-  const paid = invoiceActiveAllocations(invoiceId).reduce((sum, row) => sum + toCents(row.allocation.amount), 0n);
-  return centsToString(toCents(invoice.total) - paid);
-}
 function invoicePaid(invoiceId: string): string {
   return centsToString(invoiceActiveAllocations(invoiceId).reduce((sum, row) => sum + toCents(row.allocation.amount), 0n));
 }
@@ -2543,12 +2423,6 @@ export const sampleCatalogService: SampleCatalogService = {
   createProduct,
   updateProduct,
   archiveProduct,
-  listContacts,
-  getContact,
-  createContact,
-  updateContact,
-  archiveContact,
-  restoreContact,
   listWarehouses,
   getWarehouse,
   createWarehouse,

@@ -3,6 +3,7 @@ import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { AllExceptionsFilter } from '../../src/common/errors/all-exceptions.filter';
 import { Public, RequirePermission } from '../../src/common/decorators/require-permission.decorator';
 import { PermissionGuard } from '../../src/common/guards/permission.guard';
+import { PrismaService } from '../../src/platform/prisma/prisma.service';
 
 /**
  * Probe controllers for the default-deny test (T106).
@@ -71,6 +72,12 @@ export class BadPermissionController {
   providers: [
     { provide: APP_GUARD, useClass: PermissionGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    // The permission guard gained a database dependency when permission resolution was
+    // wired to the effective-permission union (006). It only touches the database when a
+    // session/membership is bound to the request, which never happens for these probe
+    // routes (no session guard is registered here), but Nest still must resolve the
+    // constructor - so the probe provides the same production service.
+    PrismaService,
   ],
 })
 export class ProbeModule {}

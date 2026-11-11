@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { CONTACT_PERMISSIONS, type ContactSortField, type ContactSortOrder } from '@nexuserp/shared';
 
 import { PageHeader } from '../../components/shell/page-header';
-import { SampleDataBanner } from '../../components/ui/sample-data-banner';
 import {
   Badge,
   Button,
@@ -16,78 +16,106 @@ import {
   Skeleton,
 } from '../../components/ui';
 import type { Column } from '../../components/ui';
+import { hasPermission, useSession } from '../../services/auth-session';
 import { useContacts } from './use-contacts';
+import type { Contact } from '../../services/contacts-client';
 
-const ROLES = ['CUSTOMER', 'SUPPLIER'] as const;
-const STATUSES = ['ACTIVE', 'ARCHIVED'] as const;
+const ROLE_OPTIONS = [
+  { value: 'all', label: 'All roles' },
+  { value: 'customer', label: 'Customer' },
+  { value: 'supplier', label: 'Supplier' },
+];
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'archived', label: 'Archived' },
+  { value: 'all', label: 'All statuses' },
+];
 
-function roleTone(role: string): 'success' | 'warning' | 'info' | 'neutral' | 'destructive' {
-  if (role === 'CUSTOMER') return 'success';
-  if (role === 'SUPPLIER') return 'info';
-  return 'neutral';
-}
-
-function statusTone(status: string): 'success' | 'warning' | 'info' | 'neutral' | 'destructive' {
-  if (status === 'ARCHIVED') return 'destructive';
-  if (status === 'ACTIVE') return 'success';
-  return 'neutral';
+function roleLabel(contact: Contact): string {
+  if (contact.isCustomer && contact.isSupplier) return 'Customer & Supplier';
+  if (contact.isCustomer) return 'Customer';
+  return 'Supplier';
 }
 
 export function ContactsPage() {
   const navigate = useNavigate();
+  const session = useSession();
+  const canWrite = hasPermission(session, CONTACT_PERMISSIONS.write);
   const [search, setSearch] = useState('');
-  const [role, setRole] = useState<string>('');
-  const [status, setStatus] = useState<string>('');
+  const [role, setRole] = useState<string>('all');
+  const [status, setStatus] = useState<string>('active');
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize] = useState(25);
+  const [sortBy, setSortBy] = useState<ContactSortField>('name');
+  const [sortOrder, setSortOrder] = useState<ContactSortOrder>('asc');
 
   const { data, isPending, isError, error } = useContacts({
-    search,
-    role: (role as 'CUSTOMER' | 'SUPPLIER') || undefined,
-    status: (status as 'ACTIVE' | 'ARCHIVED') || undefined,
+    search: search.trim() || undefined,
+    role: role as 'all' | 'customer' | 'supplier',
+    status: status as 'all' | 'active' | 'archived',
     page,
     pageSize,
-    sort: 'code',
-    direction: 'asc',
+    sortBy,
+    sortOrder,
   });
 
   const contacts = data?.items ?? [];
   const total = data?.total ?? 0;
 
-  const columns: Column<{
-    id: string;
-    code: string;
-    name: string;
-    role: string;
-    status: string;
-    email: string;
-    phone: string;
-    address: string;
-  }>[] = useMemo(
+  function applySort(column: string, direction: 'asc' | 'desc') {
+    if (column !== 'name' && column !== 'code' && column !== 'createdAt') return;
+    setSortBy(column as ContactSortField);
+    setSortOrder(direction);
+    setPage(1);
+  }
+
+  const columns: Column<Contact>[] = useMemo(
     () => [
-      { key: 'code', header: 'Code' },
-      { key: 'name', header: 'Name' },
-      { key: 'role', header: 'Role', render: (row) => <Badge tone={roleTone(row.role)}>{row.role}</Badge> },
-      { key: 'status', header: 'Status', render: (row) => <Badge tone={statusTone(row.status)}>{row.status}</Badge> },
-      { key: 'email', header: 'Email' },
-      { key: 'phone', header: 'Phone' },
+      { key: 'code', header: 'Code', sortable: true },
+      {
+        key: 'name',
+        header: 'Name',
+        sortable: true,
+        render: (row) => <Link to={`/contacts/${row.id}`}>{row.name}</Link>,
+      },
+      { key: 'role', header: 'Role', render: (row) => <Badge tone="info">{roleLabel(row)}</Badge> },
+      {
+        key: 'status',
+        header: 'Status',
+        render: (row) => (
+          <Badge tone={row.isArchived ? 'destructive' : 'success'}>
+            {row.isArchived ? 'Archived' : 'Active'}
+          </Badge>
+        ),
+      },
+      { key: 'email', header: 'Email', render: (row) => row.email ?? '—' },
       {
         key: 'actions',
         header: 'Actions',
         render: (row) => {
-          const archived = row.status === 'ARCHIVED';
           const entries = [
-            { kind: 'item' as const, id: 'view', label: 'View', onSelect: () => navigate(`/contacts/${row.id}`) },
-            { kind: 'item' as const, id: 'edit', label: 'Edit', onSelect: () => navigate(`/contacts/${row.id}/edit`) },
-            archived
-              ? { kind: 'unavailable' as const, id: 'restore', label: 'Restore', reason: 'Open the contact to restore it.' }
-              : { kind: 'unavailable' as const, id: 'archive', label: 'Archive', reason: 'Open the contact to archive it.' },
+            {
+              kind: 'item' as const,
+              id: 'view',
+              label: 'View',
+              onSelect: () => navigate(`/contacts/${row.id}`),
+            },
+            ...(canWrite
+              ? [
+                  {
+                    kind: 'item' as const,
+                    id: 'edit',
+                    label: 'Edit',
+                    onSelect: () => navigate(`/contacts/${row.id}/edit`),
+                  },
+                ]
+              : []),
           ];
           return <KebabMenu label={`Actions for ${row.name}`} entries={entries} />;
         },
       },
     ],
-    [navigate],
+    [canWrite, navigate],
   );
 
   const apiFailure =
@@ -99,50 +127,52 @@ export function ContactsPage() {
     <section className="contacts-page" aria-label="Customers &amp; Suppliers">
       <PageHeader
         title="Customers &amp; Suppliers"
-        description="Directory of customers and suppliers across all sample warehouses."
-        secondaryActions={[
-          <div className="contacts-page__toolbar" key="contacts-toolbar">
-            <Input
-              id="contact-search"
-              label="Search"
-              placeholder="Code, name or email"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-            />
-            <Select
-              id="contact-role"
-              label="Role"
-              options={ROLES.map((value) => ({ value, label: value }))}
-              value={role}
-              onChange={(event) => {
-                setRole(event.target.value);
-                setPage(1);
-              }}
-              placeholder="All roles"
-            />
-            <Select
-              id="contact-status"
-              label="Status"
-              options={STATUSES.map((value) => ({ value, label: value }))}
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value);
-                setPage(1);
-              }}
-              placeholder="All statuses"
-            />
-          </div>,
-        ]}
+        description="Directory of customers and suppliers."
         primaryAction={
-          <Button variant="primary" onClick={() => navigate('/contacts/new')}>
-            New Contact
-          </Button>
+          canWrite ? (
+            <Button variant="primary" onClick={() => navigate('/contacts/new')}>
+              New Contact
+            </Button>
+          ) : undefined
         }
       />
-      <SampleDataBanner moduleKey="contacts" />
+      {/* The filters get their own row: inside the header they compete with the
+          title and the action, and the action is the one that must stay
+          readable. */}
+      <div className="contacts-page__toolbar">
+        <Input
+          id="contact-search"
+          label="Search"
+          placeholder="Code, name, email"
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setPage(1);
+          }}
+        />
+        <Select
+          id="contact-role"
+          label="Role"
+          options={ROLE_OPTIONS}
+          value={role}
+          onChange={(event) => {
+            setRole(event.target.value);
+            setPage(1);
+          }}
+          placeholder="All roles"
+        />
+        <Select
+          id="contact-status"
+          label="Status"
+          options={STATUS_OPTIONS}
+          value={status}
+          onChange={(event) => {
+            setStatus(event.target.value);
+            setPage(1);
+          }}
+          placeholder="All statuses"
+        />
+      </div>
       {isPending ? (
         <Card title="Contacts">
           <Skeleton label="Loading contacts" />
@@ -152,9 +182,7 @@ export function ContactsPage() {
           <ErrorState
             message={error instanceof Error ? error.message : 'The contacts could not be loaded.'}
             requestId={apiFailure?.requestId}
-            onRetry={() => {
-              setPage(1);
-            }}
+            onRetry={() => setPage(1)}
           />
         </Card>
       ) : contacts.length === 0 ? (
@@ -164,8 +192,8 @@ export function ContactsPage() {
           actionLabel="Clear filters"
           onAction={() => {
             setSearch('');
-            setRole('');
-            setStatus('');
+            setRole('all');
+            setStatus('active');
             setPage(1);
           }}
         />
@@ -177,8 +205,9 @@ export function ContactsPage() {
             total={total}
             page={page}
             pageSize={pageSize}
-            sortColumn="code"
-            sortDirection="asc"
+            sortColumn={sortBy}
+            sortDirection={sortOrder}
+            onSortChange={applySort}
             onPageChange={setPage}
             emptyMessage="No contacts found."
           />

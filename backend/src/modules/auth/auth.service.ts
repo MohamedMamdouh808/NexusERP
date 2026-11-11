@@ -256,6 +256,12 @@ export class AuthService {
       include: { role: true },
     });
 
+    // The caller's effective permissions travel with the identity. The server
+    // enforces every permission anyway; this lets the interface avoid offering
+    // an action that would be refused - it is the same union the permission
+    // guard resolves on every request.
+    const permissions = await this.accessControl.getEffectivePermissions(membership.id);
+
     return {
       user: {
         id: membership.user.id,
@@ -275,6 +281,7 @@ export class AuthService {
         id: membership.organization.id,
         name: membership.organization.name,
       },
+      permissions,
     };
   }
 
@@ -350,17 +357,21 @@ export class AuthService {
       orderBy: { createdAt: 'asc' },
     });
 
-    return memberships.map(async (membership) => {
-      const roles = await this.prisma.membershipRole.findMany({
-        where: { membershipId: membership.id },
-        select: { role: { select: { id: true, key: true, name: true } } },
-      });
-      return {
-        id: membership.organization.id,
-        name: membership.organization.name,
-        roles: roles.map((r) => r.role),
-      };
-    });
+    // Promise.all, not a bare `map(async ...)`: the bare map returns an array of
+    // PROMISES, which JSON-serializes to `[{}, {}]` - every entry an empty object.
+    return Promise.all(
+      memberships.map(async (membership) => {
+        const roles = await this.prisma.membershipRole.findMany({
+          where: { membershipId: membership.id },
+          select: { role: { select: { id: true, key: true, name: true } } },
+        });
+        return {
+          id: membership.organization.id,
+          name: membership.organization.name,
+          roles: roles.map((r) => r.role),
+        };
+      }),
+    );
   }
 
   /**
@@ -434,35 +445,34 @@ export class AuthService {
         data: { passwordHash, mustChangePassword: false },
       });
 
-      // 4. Invalidate all other sessions in every organization
+      // 4. Identify the CURRENT session by its token hash.
+      //    The cookie carries the raw token, not the row id, so looking the session
+      //    up by `id` finds nothing - and the rotation then tries to write an EMPTY
+      //    membership id into a uuid column, which the database rejects with an
+      //    error that names nothing useful.
+      const currentTokenHash = createHash('sha256').update(params.sessionId).digest('hex');
+      const currentSession = await tx.session.findUnique({
+        where: { tokenHash: currentTokenHash },
+        select: { id: true, membershipId: true },
+      });
+
+      if (!currentSession) {
+        throw new AppException(ERROR_CODES.UNAUTHENTICATED, [], 'No session to rotate.');
+      }
+
+      // 5. Invalidate all other sessions in every organization (the current one is
+      //    rotated below, not merely kept).
       await tx.session.deleteMany({
-        where: { userId: params.userId, id: { not: params.sessionId } },
+        where: { userId: params.userId, id: { not: currentSession.id } },
       });
 
-      // 5. Rotate current session: delete + recreate with fresh token
-      const existingSession = await tx.session.findUnique({
-        where: { id: params.sessionId },
-        select: { membershipId: true },
-      });
+      // 6. Rotate the current session: delete + recreate with a fresh token
       await tx.session.delete({
-        where: { id: params.sessionId },
+        where: { id: currentSession.id },
       });
-      const rawToken = randomBytes(32).toString('hex');
-      const tokenHash = createHash('sha256').update(rawToken).digest('hex');
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 12 * 60 * 60 * 1000);
-      await tx.session.create({
-        data: {
-          tokenHash,
-          userId: params.userId,
-          membershipId: existingSession?.membershipId ?? '',
-          expiresAt,
-          createdAt: now,
-          lastUsedAt: now,
-        },
-      });
+      const { rawToken } = await this.createSession(tx, params.userId, currentSession.membershipId);
 
-      // 6. Audit: auth.password_changed
+      // 7. Audit: auth.password_changed
       await tx.auditLog.create({
         data: {
           user: { connect: { id: params.userId } },
@@ -530,6 +540,12 @@ export class AuthService {
    * Checks whether the given email has exceeded the failed-verification limit.
    * Throws 429 with Retry-After if more than MAX_FAILURES failures occurred
    * within FAILURE_WINDOW_MS.
+   *
+   * The count INCLUDES the failure that was just recorded, so the threshold is
+   * "more than": five wrong verifications are answered with the specific
+   * reason (400 INVALID_CURRENT_PASSWORD), and the SIXTH is refused with 429
+   * (FR-025, SC-012). A limiter that refused the fifth would answer a
+   * different question than the one it was asked.
    */
   async checkFailedVerificationLimit(email: string): Promise<void> {
     const windowStartMs = Date.now() - AuthService.FAILURE_WINDOW_MS;
@@ -543,7 +559,7 @@ export class AuthService {
       },
     });
 
-    if (failureCount >= AuthService.MAX_FAILURES) {
+    if (failureCount > AuthService.MAX_FAILURES) {
       // Audit: lockout event (FR-015, FR-030)
       const lockedUser = await this.prisma.user.findUnique({
         where: { email },
@@ -574,13 +590,14 @@ export class AuthService {
           )
         : AuthService.FAILURE_WINDOW_MS / 1000;
 
+      const waitSeconds = Math.max(1, retryAfterSeconds);
+
       throw new AppException(
         ERROR_CODES.TOO_MANY_REQUESTS,
         [],
-        `Too many failed verifications. Please try again in ${Math.max(
-          1,
-          retryAfterSeconds,
-        )} seconds.`,
+        `Too many failed verifications. Please try again in ${waitSeconds} seconds.`,
+        // The filter turns this into the Retry-After header.
+        waitSeconds,
       );
     }
   }

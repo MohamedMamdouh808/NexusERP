@@ -30,21 +30,29 @@ function envelope(status: number, code: string, message: string): Response {
 }
 
 const LOGIN_OK = {
-  user: { id: 'user-1', email: 'nora@example.com' },
+  user: { id: 'user-1', email: 'nora@example.com', mustChangePassword: false },
   membership: {
     id: 'membership-1',
-    roleKey: 'administrator',
+    roles: [{ id: 'role-1', key: 'administrator', name: 'Administrator' }],
     organization: { id: 'org-1', name: "Nora's Organization" },
   },
 };
 
 const ME_SIGNED_IN = {
-  user: { id: 'user-1', email: 'nora@example.com' },
-  membership: { id: 'membership-1', roleKey: 'administrator', isActive: true },
+  user: { id: 'user-1', email: 'nora@example.com', mustChangePassword: false },
+  membership: {
+    id: 'membership-1',
+    roles: [{ id: 'role-1', key: 'administrator', name: 'Administrator' }],
+    isActive: true,
+  },
   organization: { id: 'org-1', name: "Nora's Organization" },
 };
 
-const ORGANIZATIONS = [{ id: 'org-1', name: "Nora's Organization", roleKey: 'administrator' }];
+const ORGANIZATIONS = [{
+  id: 'org-1',
+  name: "Nora's Organization",
+  roles: [{ id: 'role-1', key: 'administrator', name: 'Administrator' }],
+}];
 
 beforeEach(() => {
   // A recording base stub: any test that does not set a specific handler can

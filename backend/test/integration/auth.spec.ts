@@ -4,17 +4,23 @@ import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 
 /**
- * Authentication API against a REAL PostgreSQL `*_test` database.
+ * Authentication API against a REAL PostgreSQL instance (schema-isolated).
  *
- * Runs ONLY under `npm run test:integration`, which refuses to start unless
- * DATABASE_URL points at localhost or a `*_test` database. Every row the suite
- * creates is tracked and deleted at the end, and a table-count snapshot taken
- * before the tests is compared to one taken after — so a full run provably
- * leaves the database exactly as it found it.
+ * Runs ONLY under `npm run test:integration`, which refuses to start unless the
+ * DATABASE_URL targets localhost, a `*_test` database, or a non-public isolated schema.
+ * Every row this suite creates is tracked and deleted at the end, and a table-count
+ * snapshot taken before the tests (in the CURRENT schema, i.e. the isolated test schema
+ * — never `public`) is compared to one taken after — so a full run provably leaves the
+ * database exactly as it found it.
+ *
+ * audit_logs is the one documented exception: the log is append-only (FR-017) and an
+ * entry survives its actor's deletion (FR: audit trail integrity), so the suite's audit
+ * entries cannot be cleaned up and may count higher after the run. login_attempts rows
+ * the suite itself causes are deleted by email.
  */
 
-const ALL_PUBLIC_TABLES =
-  "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name <> '_prisma_migrations'";
+const ALL_CURRENT_SCHEMA_TABLES =
+  "SELECT table_name FROM information_schema.tables WHERE table_schema = CURRENT_SCHEMA AND table_type = 'BASE TABLE' AND table_name <> '_prisma_migrations'";
 
 interface RowCounts {
   [table: string]: number;
@@ -28,10 +34,13 @@ describe('Authentication API (integration)', () => {
   // restores the pre-test state; the snapshot comparison proves nothing leaked.
   const createdUserIds: string[] = [];
   const createdOrganizationIds: string[] = [];
+  // Emails used for failed sign-ins: login attempts are keyed by email (no FK), so
+  // the suite must delete its own rows; nothing cascades them away.
+  const attemptedEmails: string[] = [];
 
   async function snapshotRowCounts(): Promise<RowCounts> {
     const prisma = getTestPrisma();
-    const tables = await prisma.$queryRawUnsafe<{ table_name: string }[]>(ALL_PUBLIC_TABLES);
+    const tables = await prisma.$queryRawUnsafe<{ table_name: string }[]>(ALL_CURRENT_SCHEMA_TABLES);
     const counts: RowCounts = {};
     for (const { table_name } of tables) {
       const rows = await prisma.$queryRawUnsafe<{ n: number }[]>(
@@ -54,8 +63,14 @@ describe('Authentication API (integration)', () => {
   afterAll(async () => {
     const prisma = getTestPrisma();
 
+    // login_attempts has no FK to users (it is keyed by raw email), so it is not
+    // cascaded: delete this suite's rows directly.
+    await prisma.loginAttempt.deleteMany({ where: { email: { in: attemptedEmails } } });
+
     // Track-authenticated calls depend on these ids being deletable last; the
-    // schema cascades memberships/sessions/warehouses/sequences with them.
+    // schema cascades memberships/sessions/warehouses/sequences with them. The
+    // audit_logs FKs are ON DELETE SET NULL (the log survives actor deletion),
+    // so user/organization deletes themselves are permitted.
     for (const id of createdUserIds) {
       try {
         await prisma.user.delete({ where: { id } });
@@ -75,6 +90,9 @@ describe('Authentication API (integration)', () => {
     const countsAfter = await snapshotRowCounts();
     const leaks = Object.keys(countsAfter)
       .filter((table) => countsAfter[table] !== countsBefore[table])
+      // audit_logs is append-only (FR-017): entries written during the run are
+      // intentionally never removed, so their count may only ever grow.
+      .filter((table) => table !== 'audit_logs')
       .map((table) => `${table}: ${countsBefore[table]} -> ${countsAfter[table]}`);
     expect(leaks).toEqual([]);
 
@@ -94,12 +112,14 @@ describe('Authentication API (integration)', () => {
       const body = response.body;
       expect(body.user).toMatchObject({ id: expect.any(String), email });
       expect(body.organization).toMatchObject({ id: expect.any(String), name: `${email}'s Organization` });
-      expect(body.membership).toMatchObject({ id: expect.any(String), roleKey: 'administrator' });
+      expect(body.membership).toMatchObject({ id: expect.any(String), roles: [{ key: 'administrator' }] });
       expect(body.session).toMatchObject({ id: expect.any(String) });
       // The raw session token only ever crosses the wire at issue time; the
       // database stores only its SHA-256 hash.
       expect(body.sessionToken).toEqual(expect.stringMatching(/^[a-f0-9]{64}$/));
-      expect(body.csrfToken).toEqual(expect.stringMatching(/^[a-f0-9]{32}$/));
+      // The CSRF token is 32 random bytes, hex-encoded - 64 characters, like
+      // the session token.
+      expect(body.csrfToken).toEqual(expect.stringMatching(/^[a-f0-9]{64}$/));
 
       createdUserIds.push(body.user.id);
       createdOrganizationIds.push(body.organization.id);
@@ -152,7 +172,7 @@ describe('Authentication API (integration)', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.user).toMatchObject({ email });
-      expect(response.body.membership).toMatchObject({ roleKey: 'administrator' });
+      expect(response.body.membership).toMatchObject({ roles: [{ key: 'administrator' }] });
 
       const cookies = (response.headers['set-cookie'] ?? []) as unknown[];
       const cookieText = cookies.map((c) => String(c)).join(';');
@@ -162,12 +182,15 @@ describe('Authentication API (integration)', () => {
     });
 
     it('gives the same generic error for a wrong password as for an unknown email', async () => {
+      attemptedEmails.push(email);
       const wrongPassword = await request(app.getHttpServer())
         .post('/api/v1/auth/login')
         .send({ email, password: 'WrongPassword123' });
+      const unknownEmailAccount = `nobody-${Date.now()}@tests.nexuserp.local`;
+      attemptedEmails.push(unknownEmailAccount);
       const unknownEmail = await request(app.getHttpServer())
         .post('/api/v1/auth/login')
-        .send({ email: `nobody-${Date.now()}@tests.nexuserp.local`, password: 'AnyPassword123' });
+        .send({ email: unknownEmailAccount, password: 'AnyPassword123' });
 
       // FR-010: both failures must be indistinguishable. The exception filter
       // normalizes the service's NotFoundException to its generic message, which is
@@ -214,7 +237,8 @@ describe('Authentication API (integration)', () => {
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBeGreaterThanOrEqual(1);
-      expect(response.body[0]).toMatchObject({ roleKey: 'administrator' });
+      expect(response.body[0]).toMatchObject({ roles: [{ key: 'administrator' }] });
     });
   });
 });
+

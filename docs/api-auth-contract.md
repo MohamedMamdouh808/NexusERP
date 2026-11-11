@@ -65,7 +65,8 @@ yet (planned before any cross-site exposure; same-origin dev is not exposed).
 ### POST /api/v1/auth/register — public
 
 Creates, in ONE transaction: user (Argon2id hash), first organization,
-Administrator membership (`roleKey: "administrator"`, active), default
+Administrator membership (active, the `administrator` role attached), the five
+per-organization template roles with their permission links, a default
 warehouse, default `invoice` document sequence, and the first session.
 
 Request:
@@ -81,7 +82,7 @@ Responses:
 
 | Status | Body | Notes |
 |--------|------|-------|
-| 201    | `{ user: { id, email }, organization: { id, name: "<email>'s Organization" }, membership: { id, roleKey }, session: { id }, sessionToken, csrfToken }` | `sessionToken`/`csrfToken` are returned ONCE here; no cookies are set on this endpoint. |
+| 201    | `{ user: { id, email }, organization: { id, name: "<email>'s Organization" }, membership: { id, roles: [{ id, key, name }] }, session: { id }, sessionToken, csrfToken }` | `sessionToken`/`csrfToken` are returned ONCE here; no cookies are set on this endpoint. |
 | 400    | envelope `VALIDATION_ERROR` with `details[].field` = `email`/`password` | |
 | 409/500 | duplicate email currently produces 500 (`INTERNAL_ERROR` with `requestId`) | **Known gap**: duplicate email is not yet mapped to `CONFLICT`; do not rely on it. |
 
@@ -97,7 +98,7 @@ Responses:
 
 | Status | Body | Notes |
 |--------|------|-------|
-| 200    | `{ user: { id, email }, membership: { id, roleKey, organization: { id, name } } }` | Tokens are in the cookies, NOT in the body. |
+| 200    | `{ user: { id, email }, membership: { id, roles: [{ id, key, name }], organization: { id, name } } }` | Tokens are in the cookies, NOT in the body. |
 | 404    | envelope `NOT_FOUND`, message `"Record not found."` | Wrong password and unknown email are indistinguishable by design (same status, same generic message, FR-010). The service throws `NotFoundException`; the filter normalizes the message. The spec's intent is a generic 4xx; today it is **404** — the frontend must treat any failure as "invalid email or password" without branching on status. |
 | 400    | envelope `VALIDATION_ERROR` | Malformed body. |
 
@@ -125,10 +126,16 @@ Response 200:
 ```json
 {
   "user": { "id": "…", "email": "…" },
-  "membership": { "id": "…", "roleKey": "administrator", "isActive": true },
-  "organization": { "id": "…", "name": "…" }
+  "membership": { "id": "…", "roles": [{ "id": "…", "key": "administrator", "name": "Administrator" }], "isActive": true },
+  "organization": { "id": "…", "name": "…" },
+  "permissions": ["contacts.read", "contacts.write", "…"]
 }
 ```
+
+`permissions` is the caller's effective permission set — the same union the
+permission guard resolves on every request. The server enforces every
+permission regardless; it travels with the identity so the interface does not
+offer an action that would be refused.
 
 Errors: 401 `UNAUTHENTICATED` without cookie / invalid / expired / inactive
 membership. This endpoint is the frontend's "am I signed in?" probe.
@@ -139,7 +146,7 @@ Response 200: array of active memberships for the org switcher:
 
 ```json
 [
-  { "id": "<organizationId>", "name": "<organization name>", "roleKey": "administrator" }
+  { "id": "<organizationId>", "name": "<organization name>", "roles": [{ "id": "…", "key": "administrator", "name": "Administrator" }] }
 ]
 ```
 
@@ -151,7 +158,7 @@ Request: `{ "organizationId": "<uuid>" }` (Zod: uuid, strict). Switches every
 active session row of the user to the target membership; tenant scope then
 follows the session.
 
-Responses: 200 with `{ membership: { id, roleKey }, organization: { id, name } }`
+Responses: 200 with `{ membership: { id, roles: [{ id, key, name }] }, organization: { id, name } }`
 — ⚠ the service currently returns `name: <organizationId>` (a defect: the
 organization's real name must be fetched instead). 403 if the user lacks an
 active membership in the target organization — ⚠ currently pre-empted by the

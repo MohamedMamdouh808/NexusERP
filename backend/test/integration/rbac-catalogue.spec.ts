@@ -79,3 +79,4 @@ describe('US1: role catalogue provisioning on registration', () => {
     expect(aliceOrg!.id).not.toBe(bobOrg!.id);
   });
 });
+

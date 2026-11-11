@@ -127,11 +127,16 @@ export function prepareTestSchema(): void {
 }
 
 /**
- * Truncates every table so each test starts from a known empty state.
+ * Truncates the reference tables so each test starts from a known empty state.
  *
  * `CASCADE` handles foreign keys between the tables. This is a truncation rather than a
  * transaction rollback so a test that intentionally commits still leaves nothing behind.
  * Only tables in the test schema are touched; public schema is never modified.
+ *
+ * The audit log is deliberately not truncated - it is append-only at the database level
+ * (feature 006) and must stay that way even in tests. Tenant rows created by earlier
+ * runs therefore remain; the seed's organization-default pass is batched so their
+ * presence does not make each run progressively slower.
  */
 export async function resetDatabase(): Promise<void> {
   const prisma = getTestPrisma();

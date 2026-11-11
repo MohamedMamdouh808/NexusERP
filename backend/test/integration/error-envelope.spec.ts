@@ -105,3 +105,4 @@ describe('error envelope and request identifiers (HTTP)', () => {
     await request(server).get('/health').expect(404);
   });
 });
+

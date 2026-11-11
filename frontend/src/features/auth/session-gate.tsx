@@ -12,6 +12,10 @@
  *  - **unreachable** - the service could not answer the probe. NOT a sign-out:
  *    an offline service must not erase a session it never rejected, so this is
  *    an honest error with a retry.
+ *  - **signed-in, but a password change is pending** - the account was created
+ *    by an administrator with a temporary password, and the service refuses
+ *    every other capability until the user chooses one. The change screen
+ *    replaces the shell until that is done.
  */
 
 import type { ReactNode } from 'react';
@@ -20,6 +24,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 
 import { bootstrapSession, useSession } from '../../services/auth-session';
 import { ErrorState } from '../../components/ui';
+import { ChangePasswordScreen } from './change-password-screen';
 
 export function SessionGate({ children }: { children: ReactNode }) {
   const session = useSession();
@@ -53,6 +58,14 @@ export function SessionGate({ children }: { children: ReactNode }) {
 
   if (session.status === 'signed-out') {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+
+  // A signed-in user whose account still has to choose its own password: the
+  // service refuses every other capability until they do, so the shell's pages
+  // cannot answer yet. The change comes first - the shell would only show
+  // failures (FR-006, FR-007, FR-028).
+  if (session.user.mustChangePassword) {
+    return <ChangePasswordScreen email={session.user.email} />;
   }
 
   return <>{children}</>;

@@ -37,6 +37,10 @@
     "check:schema-numeric-types": "npm run check:schema-numeric-types --workspace @nexuserp/database",
     "check:migrations": "npm run check:migrations --workspace @nexuserp/database",
     "check:rls": "npm run check:rls --workspace @nexuserp/database",
+    "check:naming": "npm run check:naming --workspace @nexuserp/database",
+    "check:guards": "npm run check:migrations && npm run check:rls && npm run check:naming && npm run check:boundaries && npm run check:structure && npm run check:secrets",
+    "verify:invariants": "node scripts/verify-db-invariants.mjs",
+    "verify:invariants:test": "node scripts/with-test-schema-env.mjs node scripts/verify-db-invariants.mjs",
     "check:boundaries": "tsx scripts/check-boundaries.ts",
     "check:structure": "tsx scripts/check-structure.ts",
     "check:secrets": "node scripts/check-secrets.mjs"

@@ -126,6 +126,29 @@ describe('AllExceptionsFilter', () => {
     expect(body.details[1]?.field).toBe('customer');
   });
 
+  it('gives a Zod validation failure the field each issue belongs to (FR-024)', () => {
+    // The Zod pipes report issues as { path, message }. Without the path the
+    // message would be unnamed, and a form could not put it under the control
+    // that caused it.
+    const exception = new HttpException(
+      {
+        message: 'Validation failed.',
+        issues: [
+          { path: 'password', message: 'Password must be at least 12 characters long.' },
+          { path: 'roleIds', message: 'At least one role is required.' },
+        ],
+      },
+      HttpStatus.BAD_REQUEST,
+    );
+    const body = capture(exception).body as { code: string; details: { field: string; message: string }[] };
+
+    expect(body.code).toBe(ERROR_CODES.VALIDATION_ERROR);
+    expect(body.details).toHaveLength(2);
+    expect(body.details[0]?.field).toBe('password');
+    expect(body.details[0]?.message).toBe('Password must be at least 12 characters long.');
+    expect(body.details[1]?.field).toBe('roleIds');
+  });
+
   it('preserves an AppException code, status, and details', () => {
     const exception = new AppException(ERROR_CODES.INSUFFICIENT_STOCK, [
       { field: null, code: 'SHORT', message: 'product X is short' },
@@ -135,6 +158,26 @@ describe('AllExceptionsFilter', () => {
     expect(state.status).toBe(409);
     expect(body.code).toBe(ERROR_CODES.INSUFFICIENT_STOCK);
     expect(body.details).toHaveLength(1);
+  });
+
+  it('tells a rate-limited caller how long to wait (Retry-After)', () => {
+    const exception = new AppException(
+      ERROR_CODES.TOO_MANY_REQUESTS,
+      [],
+      'Too many failed verifications. Please try again in 42 seconds.',
+      42,
+    );
+    const state = capture(exception);
+
+    expect(state.status).toBe(429);
+    expect(state.headers['retry-after']).toBe('42');
+    expect((state.body as { code: string }).code).toBe(ERROR_CODES.TOO_MANY_REQUESTS);
+  });
+
+  it('sends no Retry-After when the failure is not a rate limit', () => {
+    const state = capture(new AppException(ERROR_CODES.NOT_FOUND, [], 'Record not found.'));
+
+    expect(state.headers['retry-after']).toBeUndefined();
   });
 
   it('does not trust a message supplied by an arbitrary thrown error', () => {

@@ -56,22 +56,31 @@ export class AccessControlService {
       roleByTemplateKey.set(template.key, role.id);
     }
 
+    // Pre-fetch all catalog permissions in one single query rather than 68 individual queries
+    const allPermissions = await client.permission.findMany({
+      select: { id: true, code: true },
+    });
+    const permissionByCode = new Map(allPermissions.map((p) => [p.code, p.id]));
+
+    // Batch prepare rolePermission rows
+    const rolePermissionData: { roleId: string; permissionId: string }[] = [];
     for (const template of ROLE_TEMPLATES) {
       const roleId = roleByTemplateKey.get(template.key);
       if (!roleId) continue;
 
       for (const code of template.permissions) {
-        const permission = await client.permission.findUnique({
-          where: { code },
-        });
-        if (!permission) continue;
-
-        await client.rolePermission.upsert({
-          where: { roleId_permissionId: { roleId, permissionId: permission.id } },
-          update: {},
-          create: { roleId, permissionId: permission.id },
-        });
+        const permissionId = permissionByCode.get(code);
+        if (permissionId) {
+          rolePermissionData.push({ roleId, permissionId });
+        }
       }
+    }
+
+    if (rolePermissionData.length > 0) {
+      await client.rolePermission.createMany({
+        data: rolePermissionData,
+        skipDuplicates: true,
+      });
     }
 
     return roleByTemplateKey;

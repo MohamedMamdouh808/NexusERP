@@ -69,6 +69,7 @@ const ALLOWED_CREDENTIALS = new Map([
   ['user:pass', 'a fixture connection string'],
   ['user:pw', 'a fixture connection string'],
   ['u:p', 'a fixture connection string in the log-redaction test'],
+  ['postgres.ymnafwpxuvaptfswwskq:[redacted]', 'masked Supabase pooler user with redacted placeholder in docs/backend-readiness.md'],
 ]);
 
 /** Files whose contents are not scanned, each with the reason it is safe to skip. */

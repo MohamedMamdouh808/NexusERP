@@ -35,12 +35,24 @@ import { getRequestId } from '../logging/request-context';
 export class AppException extends HttpException {
   readonly errorCode: ErrorCode;
   readonly details: readonly ErrorDetail[];
+  /**
+   * How long the caller should wait, in seconds, when the failure is a rate
+   * limit. The filter turns it into the `Retry-After` header: a client that is
+   * told to wait must be told HOW LONG, in the header every client reads.
+   */
+  readonly retryAfterSeconds?: number;
 
-  constructor(errorCode: ErrorCode, details: readonly ErrorDetail[] = [], message?: string) {
+  constructor(
+    errorCode: ErrorCode,
+    details: readonly ErrorDetail[] = [],
+    message?: string,
+    retryAfterSeconds?: number,
+  ) {
     const status = ERROR_CODE_STATUS[errorCode];
     super(message ?? DEFAULT_ERROR_MESSAGES[errorCode], status);
     this.errorCode = errorCode;
     this.details = details;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -54,7 +66,28 @@ function toValidationDetails(exception: HttpException): ErrorDetail[] {
   const response = exception.getResponse();
   if (typeof response !== 'object' || response === null) return [];
 
-  const candidate = response as { message?: unknown };
+  const candidate = response as { message?: unknown; issues?: unknown };
+
+  // The Zod pipes report their issues with a dotted path per issue. That path
+  // IS the field the message belongs under, and without it every Zod-validated
+  // body answers with an unnamed message - a form cannot put the message under
+  // the control that caused it (FR-024).
+  if (Array.isArray(candidate.issues)) {
+    const details = candidate.issues
+      .map((raw) => {
+        const issue = raw as { path?: unknown; message?: unknown };
+        const path = typeof issue.path === 'string' ? issue.path : '';
+        const message = typeof issue.message === 'string' ? issue.message : '';
+        return {
+          field: path.length > 0 ? path : null,
+          code: 'VALIDATION_ERROR',
+          message: message.length > 0 ? message : DEFAULT_ERROR_MESSAGES[ERROR_CODES.VALIDATION_ERROR],
+        };
+      })
+      .filter((detail) => detail.message.length > 0);
+    if (details.length > 0) return details;
+  }
+
   if (typeof candidate.message !== 'string' && !Array.isArray(candidate.message)) return [];
 
   const messages = Array.isArray(candidate.message) ? candidate.message : [candidate.message];
@@ -83,7 +116,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = http.getResponse<Response>();
     const requestId = getRequestId() ?? 'unknown';
 
-    const { status, code, message, details } = this.classify(exception);
+    const { status, code, message, details, retryAfterSeconds } = this.classify(exception);
 
     if (status >= Number(HttpStatus.INTERNAL_SERVER_ERROR)) {
       // The stack lives here and ONLY here (FR-040). It is never returned.
@@ -100,6 +133,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? DEFAULT_ERROR_MESSAGES[ERROR_CODES.INTERNAL_ERROR].replace('{requestId}', requestId)
         : message;
 
+    // A client that is told to wait is told HOW LONG, in the header every
+    // client reads. The message repeats it for the reader.
+    if (retryAfterSeconds !== undefined) {
+      response.setHeader('Retry-After', String(Math.max(1, Math.ceil(retryAfterSeconds))));
+    }
+
     response.status(status).json({ code, message: finalMessage, details, requestId });
   }
 
@@ -109,6 +148,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     code: ErrorCode;
     message: string;
     details: readonly ErrorDetail[];
+    retryAfterSeconds?: number;
   } {
     if (exception instanceof AppException) {
       return {
@@ -116,6 +156,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
         code: exception.errorCode,
         message: exception.message,
         details: exception.details,
+        ...(exception.retryAfterSeconds !== undefined
+          ? { retryAfterSeconds: exception.retryAfterSeconds }
+          : {}),
       };
     }
 

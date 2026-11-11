@@ -159,7 +159,13 @@ export interface ArchiveProductInput {
   readonly id: string;
 }
 
-/** A contact (customer or supplier). Money fields are decimal strings, never numbers. */
+/**
+ * A contact (customer or supplier) as the SAMPLE modules still describe one.
+ *
+ * The Contacts domain itself is real now and reads `services/contacts-client.ts`;
+ * this shape stays only because the sample sales, purchasing and invoicing
+ * modules name their customers and suppliers with it.
+ */
 export interface Contact {
   readonly id: string;
   readonly code: string;
@@ -182,26 +188,14 @@ export interface ContactQuery {
   readonly direction?: 'asc' | 'desc';
 }
 
-/** One page of contacts, with the total the server counted. */
-export interface ContactPage {
-  readonly items: readonly Contact[];
-  readonly total: number;
-}
-
-/** The result of a contact mutation. A label, never the record itself. */
-export interface ContactMutationResult {
-  readonly removedLabel: string;
-}
-
-/** The input for archiving a contact. */
-export interface ArchiveContactInput {
-  readonly id: string;
-}
-
 /**
  * The interface the sample implementation satisfies today and the REST client
  * satisfies later. It stays focused on the dashboard summary and the list,
  * detail, and mutation operations the shell and gallery exercise.
+ *
+ * Contacts are NOT part of it: the Contacts domain is real and reads the
+ * service through `services/contacts-client.ts`, so a mock contact method here
+ * would be a second, lying answer to the same question.
  */
 export interface CatalogService {
   getDashboardSummary(period: DashboardPeriod): Promise<DashboardSummary>;
@@ -220,18 +214,6 @@ export interface CatalogService {
   updateProduct(input: Product): Promise<{ readonly sku: string }>;
   /** Archives a product. Refuses with PRODUCT_IN_USE when open documents reference it. */
   archiveProduct(input: ArchiveProductInput): Promise<ProductMutationResult>;
-  /** Lists contacts with search, role and status filters, sort and pagination. */
-  listContacts(query: ContactQuery): Promise<ContactPage>;
-  /** Returns one contact by id. */
-  getContact(id: string): Promise<Contact>;
-  /** Creates a contact. Resolves with the created contact's code. */
-  createContact(input: Omit<Contact, 'id'>): Promise<{ readonly code: string }>;
-  /** Updates a contact. Resolves with the updated contact's code. */
-  updateContact(input: Contact): Promise<{ readonly code: string }>;
-  /** Archives a contact. Refuses with CONTACT_IN_USE when open documents reference it. */
-  archiveContact(input: ArchiveContactInput): Promise<ContactMutationResult>;
-  /** Restores an archived contact. */
-  restoreContact(input: ArchiveContactInput): Promise<ContactMutationResult>;
   /** Lists warehouses. */
   listWarehouses(): Promise<readonly Warehouse[]>;
   /** Returns one warehouse by id. */

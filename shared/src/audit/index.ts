@@ -25,6 +25,12 @@ export const AUDIT_ACTIONS = {
   membersRolesChanged: 'members.roles_changed',
   membersDeactivated: 'members.deactivated',
   membersReactivated: 'members.reactivated',
+
+  // Contacts
+  contactsCreated: 'contacts.created',
+  contactsUpdated: 'contacts.updated',
+  contactsArchived: 'contacts.archived',
+  contactsRestored: 'contacts.restored',
 } as const;
 
 /** The type of a single audit action code value. */

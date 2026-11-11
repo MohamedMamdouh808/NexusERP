@@ -11,7 +11,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { Public } from '../../common/decorators/require-permission.decorator';
+import { Authenticated, Public } from '../../common/decorators/require-permission.decorator';
 import { ERROR_CODES } from '@nexuserp/shared';
 import { AppException } from '../../common/errors/all-exceptions.filter';
 import { AuthService } from './auth.service';
@@ -84,7 +84,12 @@ export class AuthController {
 
   /**
    * Log out. Invalidates the session and clears cookies. Requires a valid session.
+   *
+   * `@Authenticated()` means "a session, but no specific permission": the session
+   * guard still authenticates the caller. Without it the default-deny guard answers
+   * 403 for everybody, and the session is never invalidated server-side.
    */
+  @Authenticated()
   @Post('logout')
   @UseGuards(SessionGuard)
   @HttpCode(HttpStatus.OK)
@@ -109,7 +114,7 @@ export class AuthController {
    * Returns the current user's identity and active organization membership.
    * Requires a valid session.
    */
-  @Public()
+  @Authenticated()
   @Get('me')
   @UseGuards(SessionGuard)
   async me(@Req() request: SessionRequest) {
@@ -124,7 +129,14 @@ export class AuthController {
    * Change the authenticated user's own password. Rotates the current session,
      * invalidates all other sessions in every organization, and clears the
      * forced-change flag. CSRF-protected.
+   *
+   * `@Authenticated()` here means "a session, but no specific PERMISSION": the
+   * global SessionGuard still demands a valid session, and the global
+   * PasswordChangeGuard still lets this one endpoint through while the forced
+   * change is pending. Without it the default-deny guard rejects every caller
+   * with 403 - including the users the endpoint exists for.
    */
+  @Authenticated()
   @Post('change-password')
   @UseGuards(SessionGuard)
   @HttpCode(HttpStatus.OK)
@@ -169,7 +181,7 @@ export class AuthController {
    * Returns all organizations the user is a member of, for the organization
    * switcher in the top bar. Requires a valid session.
    */
-  @Public()
+  @Authenticated()
   @Get('organizations')
   @UseGuards(SessionGuard)
   async organizations(@Req() request: SessionRequest) {
@@ -183,7 +195,14 @@ export class AuthController {
   /**
    * Switches the active organization for the session. Requires membership in
    * the target organization. State-changing: CSRF token validated.
+   *
+   * `@Authenticated()` means "a session, but no specific permission": the session
+   * guard still authenticates the caller, and the service still refuses a target
+   * organization the caller is not a member of. Without it the default-deny
+   * guard answers 403 for everybody and the switcher in the top bar can never
+   * switch.
    */
+  @Authenticated()
   @Post('switch-organization')
   @UseGuards(SessionGuard)
   async switchOrganization(

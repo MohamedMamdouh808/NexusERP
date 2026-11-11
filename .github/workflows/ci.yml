@@ -111,7 +111,10 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
-      DATABASE_URL: postgresql://nexuserp:nexuserp@127.0.0.1:5432/nexuserp?schema=public
+      # The integration tests run ONLY in the isolated schema. The public schema
+      # of this database is left alone, and the migration-validation job below
+      # is the one that proves the migrations apply to an empty database.
+      DATABASE_URL: postgresql://nexuserp:nexuserp@127.0.0.1:5432/nexuserp?schema=nexuserp_test
       NODE_ENV: test
       SESSION_SECRET: ci-session-secret-0123456789
       CSRF_SECRET: ci-csrf-secret-0123456789
@@ -128,10 +131,14 @@ jobs:
             echo "package-lock.json changed during npm ci; commit the updated lockfile." >&2
             exit 1
           fi
-      - name: Apply migrations
-        run: npm run db:migrate
+      - name: Rebuild the isolated test schema from the current migrations
+        run: node scripts/reset-test-schema.mjs --migrate
       - name: Integration tests
         run: npm run test:integration
+      - name: Database invariants hold in the test schema
+        run: npm run verify:invariants:test
+      - name: The test schema carries no lint warning
+        run: node scripts/with-test-schema-env.mjs node scripts/check-schema-lint.mjs
 
   migrations:
     name: Migration validation
@@ -171,6 +178,10 @@ jobs:
         run: npm run db:migrate
       - name: Applied history matches the repository
         run: npm run check:migrations
+      - name: Every new table and column is snake_case
+        run: npm run check:naming
+      - name: The database invariants hold in the migrated schema
+        run: npm run verify:invariants
 
   contract:
     name: Contract drift

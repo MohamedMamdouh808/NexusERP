@@ -19,7 +19,6 @@ import {
   isLocalHost,
   isPublicSchema,
   loadDatabaseTarget,
-  replaceSchema,
 } from './db-url';
 
 const loaded = loadDatabaseTarget();
@@ -34,11 +33,18 @@ if (!loaded) {
 const { target, url } = loaded;
 const databaseNameAllowed = target.database !== null && target.database.endsWith('_test');
 
-if (!isLocalHost(target.host) && !databaseNameAllowed) {
+// Schema isolation (Task 0): a hosted database is acceptable when the URL itself scopes
+// every connection to a non-public schema - tests then write only inside that schema and
+// the public schema stays untouched (enforced by the isPublicSchema refusal below and by
+// the test bootstrap).
+const targetSchemaAllowed = target.schema !== null && target.schema !== 'public';
+
+if (!isLocalHost(target.host) && !databaseNameAllowed && !targetSchemaAllowed) {
   console.error(
-    `test:integration: refused — host "${target.host ?? '(unknown)'}" is not localhost/127.0.0.1 and ` +
-      `database "${target.database ?? '(unknown)'}" does not end with "_test". ` +
-      `Integration tests would write into this database. Target (password masked): ${target.maskedUrl}`,
+    `test:integration: refused — host "${target.host ?? '(unknown)'}" is not localhost/127.0.0.1, ` +
+      `database "${target.database ?? '(unknown)'}" does not end with "_test", and no isolated ` +
+      `schema is declared (e.g. schema=nexuserp_test). Integration tests would write into ` +
+      `this database. Target (password masked): ${target.maskedUrl}`,
   );
   process.exit(1);
 }
@@ -61,4 +67,7 @@ if (refMismatch !== null) {
 console.log(`test:integration: allowed — host "${target.host}", database "${target.database}", schema "${target.schema ?? 'public'}"`);
 if (databaseNameAllowed && !isLocalHost(target.host)) {
   console.log('test:integration: database name ends with "_test"; hosted test database permitted.');
+}
+if (targetSchemaAllowed && !isLocalHost(target.host) && !databaseNameAllowed) {
+  console.log(`test:integration: schema isolation active; tests are scoped to "${target.schema}".`);
 }

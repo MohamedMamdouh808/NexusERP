@@ -1,5 +1,5 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-specs/006-rbac-audit-log/plan.md
+specs/007-contacts-e2e/plan.md
 <!-- SPECKIT END -->

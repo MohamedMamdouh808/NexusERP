@@ -108,3 +108,4 @@ describe('US1: effective permissions are the union of held roles', () => {
     expect(codes.length).toBeGreaterThan(inventoryPerms.length);
   });
 });
+

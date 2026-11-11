@@ -74,7 +74,6 @@ async function upsertPermission(
 async function upsertRoleTemplate(
   target: PrismaClient,
   role: RoleTemplateDefinition,
-  permissionIdByCode: ReadonlyMap<string, string>,
 ): Promise<string> {
   const record = await target.roleTemplate.upsert({
     where: { key: role.key },
@@ -90,22 +89,6 @@ async function upsertRoleTemplate(
       isSystem: true,
     },
   });
-
-  // The composite primary key makes a duplicate grant impossible; an upsert keyed on
-  // the pair keeps a re-run from failing on a grant it already made.
-  for (const code of role.permissions) {
-    const permissionId = permissionIdByCode.get(code);
-    if (!permissionId) {
-      throw new Error(`Permission "${code}" granted by "${role.key}" was not loaded.`);
-    }
-    await target.roleTemplatePermission.upsert({
-      where: {
-        roleTemplateId_permissionId: { roleTemplateId: record.id, permissionId },
-      },
-      update: {},
-      create: { roleTemplateId: record.id, permissionId },
-    });
-  }
 
   return record.id;
 }
@@ -132,40 +115,78 @@ export async function seed(target: PrismaClient = prisma): Promise<SeedSummary> 
     permissionIdByCode.set(permission.code, await upsertPermission(target, permission));
   }
 
+  const roleTemplateIdByKey = new Map<string, string>();
   for (const role of ROLE_TEMPLATES) {
-    await upsertRoleTemplate(target, role, permissionIdByCode);
+    roleTemplateIdByKey.set(role.key, await upsertRoleTemplate(target, role));
   }
+
+  // One insert for every grant, rather than one round trip per grant. Against a hosted
+  // database the per-row version made the seed take over a minute; the composite primary
+  // key plus skipDuplicates keeps the re-run idempotent.
+  const grants = ROLE_TEMPLATES.flatMap((role) => {
+    const roleTemplateId = roleTemplateIdByKey.get(role.key);
+    if (!roleTemplateId) {
+      throw new Error(`Role template "${role.key}" was not loaded.`);
+    }
+    return role.permissions.map((code) => {
+      const permissionId = permissionIdByCode.get(code);
+      if (!permissionId) {
+        throw new Error(`Permission "${code}" granted by "${role.key}" was not loaded.`);
+      }
+      return { roleTemplateId, permissionId };
+    });
+  });
+
+  await target.roleTemplatePermission.createMany({
+    data: grants,
+    skipDuplicates: true,
+  });
 
   // Ensure every existing organization has a default warehouse and document
   // sequence. Organizations are created during registration (not here), so this
   // is idempotent and safe to re-run: it only adds missing defaults for
   // organizations that already exist.
-  const organizations = await target.organization.findMany();
-  for (const organization of organizations) {
-    const existingWarehouse = await target.warehouse.findFirst({
-      where: { organizationId: organization.id, isDefault: true },
+  const organizations = await target.organization.findMany({ select: { id: true } });
+  const [defaultWarehouses, invoiceSequences] = await Promise.all([
+    target.warehouse.findMany({
+      where: { isDefault: true },
+      select: { organizationId: true },
+    }),
+    target.documentSequence.findMany({
+      where: { name: 'invoice' },
+      select: { organizationId: true },
+    }),
+  ]);
+  const organizationsWithWarehouse = new Set(
+    defaultWarehouses.map((warehouse) => warehouse.organizationId),
+  );
+  const organizationsWithSequence = new Set(
+    invoiceSequences.map((sequence) => sequence.organizationId),
+  );
+  const organizationsMissingWarehouse = organizations.filter(
+    (organization) => !organizationsWithWarehouse.has(organization.id),
+  );
+  const organizationsMissingSequence = organizations.filter(
+    (organization) => !organizationsWithSequence.has(organization.id),
+  );
+
+  if (organizationsMissingWarehouse.length > 0) {
+    await target.warehouse.createMany({
+      data: organizationsMissingWarehouse.map((organization) => ({
+        organizationId: organization.id,
+        name: 'Default Warehouse',
+        isDefault: true,
+      })),
     });
-    if (!existingWarehouse) {
-      await target.warehouse.create({
-        data: {
-          organizationId: organization.id,
-          name: 'Default Warehouse',
-          isDefault: true,
-        },
-      });
-    }
-    const existingSequence = await target.documentSequence.findFirst({
-      where: { organizationId: organization.id, name: 'invoice' },
+  }
+  if (organizationsMissingSequence.length > 0) {
+    await target.documentSequence.createMany({
+      data: organizationsMissingSequence.map((organization) => ({
+        organizationId: organization.id,
+        name: 'invoice',
+        currentValue: 0,
+      })),
     });
-    if (!existingSequence) {
-      await target.documentSequence.create({
-        data: {
-          organizationId: organization.id,
-          name: 'invoice',
-          currentValue: 0,
-        },
-      });
-    }
   }
 
   const [permissionCount, roleCount, grantCount, warehouseCount, sequenceCount] =
