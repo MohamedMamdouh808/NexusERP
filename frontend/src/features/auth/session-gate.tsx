@@ -21,6 +21,7 @@
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { bootstrapSession, useSession } from '../../services/auth-session';
 import { ErrorState } from '../../components/ui';
@@ -29,6 +30,7 @@ import { ChangePasswordScreen } from './change-password-screen';
 export function SessionGate({ children }: { children: ReactNode }) {
   const session = useSession();
   const location = useLocation();
+  const { t } = useTranslation();
 
   useEffect(() => {
     void bootstrapSession();
@@ -37,7 +39,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
   if (session.status === 'pending') {
     return (
       <div className="auth-screen" role="status">
-        <p className="auth-screen__status">Checking your session…</p>
+        <p className="auth-screen__status">{t('auth.sessionGate.checking')}</p>
       </div>
     );
   }
@@ -49,6 +51,7 @@ export function SessionGate({ children }: { children: ReactNode }) {
           <ErrorState
             message={session.failure.message}
             requestId={session.failure.requestId}
+            status={session.failure.status}
             onRetry={() => void bootstrapSession(true)}
           />
         </div>

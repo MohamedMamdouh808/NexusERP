@@ -71,6 +71,18 @@ describe('Feedback primitives states (T045, FR-031-FR-033, FR-050)', () => {
       expect(onRetry).toHaveBeenCalled();
     });
 
+    it('renders the HTTP status when the failure carries no usable identifier', () => {
+      render(
+        <ErrorState
+          message="The service returned a response this application could not read."
+          requestId="unknown"
+          status={500}
+        />,
+      );
+      expect(screen.getByText(/Reference ID:/)).toBeInTheDocument();
+      expect(screen.getByText('HTTP 500')).toBeInTheDocument();
+    });
+
     it('renders non-retryable error without retry control', () => {
       render(
         <ErrorState

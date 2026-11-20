@@ -1,30 +1,26 @@
 import { Module } from '@nestjs/common';
+
 import {
   ProductCategoriesController,
   ProductsController,
   UnitsOfMeasureController,
 } from './products.controller';
 import { ProductsService } from './products.service';
-import { PRODUCTS_USAGE_HOOK, DefaultProductsUsageHook } from './products-usage.hook';
 import { AuditModule } from '../audit/audit.module';
+import { InventoryModule } from '../inventory/inventory.module';
 
 /**
  * The product catalogue.
  *
- * The usage check is a seam: the default provider reports that nothing is in
- * use, and the purchasing, sales and inventory features replace it with one
- * that checks their open documents and reserved stock.
+ * The usage check is a seam: the products module asks whether a product is
+ * still referenced, and the inventory feature answers it - a product with
+ * reserved stock cannot be archived. The products module reads no stock table
+ * of its own (Constitution Principle VI).
  */
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, InventoryModule],
   controllers: [ProductsController, ProductCategoriesController, UnitsOfMeasureController],
-  providers: [
-    ProductsService,
-    {
-      provide: PRODUCTS_USAGE_HOOK,
-      useClass: DefaultProductsUsageHook,
-    },
-  ],
-  exports: [ProductsService, PRODUCTS_USAGE_HOOK],
+  providers: [ProductsService],
+  exports: [ProductsService],
 })
 export class ProductsModule {}

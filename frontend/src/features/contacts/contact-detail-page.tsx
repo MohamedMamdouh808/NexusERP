@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CONTACT_PERMISSIONS } from '@nexuserp/shared';
@@ -21,6 +23,7 @@ export function ContactDetailPage() {
   const contactId = id ?? '';
   const [dialogOpen, setDialogOpen] = useState(false);
   const session = useSession();
+  const { t } = useTranslation();
   const canWrite = hasPermission(session, CONTACT_PERMISSIONS.write);
 
   const { data, isPending, isError, error } = useContact(contactId);
@@ -44,15 +47,17 @@ export function ContactDetailPage() {
     : [];
 
   const roles = contact
-    ? [contact.isCustomer ? 'Customer' : null, contact.isSupplier ? 'Supplier' : null].filter(Boolean).join(' & ')
+    ? [contact.isCustomer ? t('contacts.form.roleCustomer') : null, contact.isSupplier ? t('contacts.form.roleSupplier') : null]
+        .filter(Boolean)
+        .join(' & ')
     : '';
 
   if (isPending) {
     return (
-      <section className="contact-detail-page" aria-label="Contact detail">
-        <PageHeader title="Contact" />
-        <Card title="Contact">
-          <Skeleton label="Loading contact" />
+      <section className="contact-detail-page" aria-label={t('contacts.detail.title')}>
+        <PageHeader title={t('contacts.detail.pageTitle')} />
+        <Card title={t('contacts.detail.pageTitle')}>
+          <Skeleton label={t('contacts.detail.loading')} />
         </Card>
       </section>
     );
@@ -60,10 +65,10 @@ export function ContactDetailPage() {
 
   if (isError || contact === undefined) {
     return (
-      <section className="contact-detail-page" aria-label="Contact detail">
-        <PageHeader title="Contact" />
-        <Card title="Contact">
-          <ErrorState message={error instanceof Error ? error.message : 'The contact could not be loaded.'} />
+      <section className="contact-detail-page" aria-label={t('contacts.detail.title')}>
+        <PageHeader title={t('contacts.detail.pageTitle')} />
+        <Card title={t('contacts.detail.pageTitle')}>
+          <ErrorState message={error instanceof Error ? error.message : t('contacts.detail.loadError')} />
         </Card>
       </section>
     );
@@ -72,9 +77,9 @@ export function ContactDetailPage() {
   const undoLatestArchive = () => {
     restoreMutation.mutate(contactId, {
       onSuccess: () => {
-        setToasts((items) => [...items, { id: `restore-contact-${Date.now()}`, message: `${contact.name} restored` }]);
+        setToasts((items) => [...items, { id: `restore-contact-${Date.now()}`, message: t('contacts.form.restoredToast', { name: contact.name }) }]);
       },
-      onError: () => setToasts((items) => [...items, { id: `restore-contact-error-${Date.now()}`, message: 'The contact could not be restored.' }]),
+      onError: () => setToasts((items) => [...items, { id: `restore-contact-error-${Date.now()}`, message: t('contacts.detail.restoreError') }]),
     });
   };
 
@@ -83,10 +88,10 @@ export function ContactDetailPage() {
     archiveMutation.mutate(contactId, {
       onSuccess: () => {
         setDialogOpen(false);
-        setToasts((items) => [...items, { id: `archive-contact-${Date.now()}`, message: `${contact.name} archived` }]);
+        setToasts((items) => [...items, { id: `archive-contact-${Date.now()}`, message: t('contacts.form.archivedToast', { name: contact.name }) }]);
       },
       onError: (caught) => {
-        setDialogError(caught instanceof Error ? caught.message : 'The contact could not be archived.');
+        setDialogError(caught instanceof Error ? caught.message : t('contacts.detail.archiveError'));
       },
     });
   };
@@ -99,13 +104,13 @@ export function ContactDetailPage() {
         navigate('/contacts');
       },
       onError: (caught) => {
-        setDialogError(caught instanceof Error ? caught.message : 'The contact could not be restored.');
+        setDialogError(caught instanceof Error ? caught.message : t('contacts.detail.restoreError'));
       },
     });
   };
 
   return (
-    <section className="contact-detail-page" aria-label="Contact detail">
+    <section className="contact-detail-page" aria-label={t('contacts.detail.title')}>
       <PageHeader
         title={contact.name}
         secondaryActions={[
@@ -113,38 +118,38 @@ export function ContactDetailPage() {
             {canWrite ? (
               <>
                 <Button variant="primary" onClick={() => navigate(`/contacts/${contact.id}/edit`)}>
-                  Edit
+                  {t('contacts.detail.edit')}
                 </Button>
                 <Button
                   variant="danger"
                   onClick={() => setDialogOpen(true)}
                   disabled={archived && restoreMutation.isPending}
                 >
-                  {archived ? 'Restore' : 'Archive'}
+                  {archived ? t('contacts.detail.restore') : t('contacts.detail.archive')}
                 </Button>
               </>
             ) : null}
             <Button variant="default" onClick={() => navigate('/contacts')}>
-              Back to list
+              {t('contacts.detail.backToList')}
             </Button>
           </div>,
         ]}
       />
-      <Card title="Contact details">
+      <Card title={t('contacts.detail.title')}>
         <dl className="contact-detail-page__details">
-          <dt>Code</dt>
+          <dt>{t('contacts.detail.code')}</dt>
           <dd>{contact.code}</dd>
-          <dt>Roles</dt>
+          <dt>{t('contacts.detail.role')}</dt>
           <dd>{roles}</dd>
-          <dt>Status</dt>
+          <dt>{t('contacts.detail.status')}</dt>
           <dd>
-            <Badge tone={contact.isArchived ? 'destructive' : 'success'}>{contact.isArchived ? 'Archived' : 'Active'}</Badge>
+            <Badge tone={contact.isArchived ? 'destructive' : 'success'}>{contact.isArchived ? t('common.status.archived') : t('common.status.active')}</Badge>
           </dd>
-          <dt>Email</dt>
+          <dt>{t('contacts.detail.email')}</dt>
           <dd>{contact.email ?? '—'}</dd>
-          <dt>Phone</dt>
+          <dt>{t('contacts.detail.phone')}</dt>
           <dd>{contact.phone ?? '—'}</dd>
-          <dt>Address</dt>
+          <dt>{t('contacts.detail.address')}</dt>
           <dd className="contact-detail-page__address-cell">
             {addressLines.length === 0 ? (
               '—'
@@ -156,7 +161,7 @@ export function ContactDetailPage() {
               </address>
             )}
           </dd>
-          <dt>Version</dt>
+          <dt>{t('contacts.detail.version')}</dt>
           <dd>{contact.version}</dd>
         </dl>
       </Card>
@@ -167,7 +172,7 @@ export function ContactDetailPage() {
           id={toast.id}
           tone={toast.id.includes('error') ? 'failure' : 'success'}
           message={toast.message}
-          actionLabel={toast.id.startsWith('archive-contact-') ? 'Undo' : undefined}
+          actionLabel={toast.id.startsWith('archive-contact-') ? t('contacts.detail.undo') : undefined}
           onAction={toast.id.startsWith('archive-contact-') ? undoLatestArchive : undefined}
           onDismiss={(id) => setToasts((items) => items.filter((item) => item.id !== id))}
         />
@@ -181,13 +186,13 @@ export function ContactDetailPage() {
           }
         }}
         onConfirm={archived ? handleRestore : handleArchive}
-        title={archived ? 'Restore contact' : 'Archive contact'}
+        title={archived ? t('contacts.detail.restoreTitle') : t('contacts.detail.archiveTitle')}
         description={
           archived
-            ? `Are you sure you want to restore “${contact.name}”? The contact will be active again in the directory.`
-            : `Are you sure you want to archive “${contact.name}”? Archived contacts are hidden from the directory but can be restored later.`
+            ? t('contacts.detail.restoreDescription', { name: contact.name })
+            : t('contacts.detail.archiveDescription', { name: contact.name })
         }
-        actionLabel={archived ? 'Restore' : 'Archive'}
+        actionLabel={archived ? t('contacts.detail.restoreLabel') : t('contacts.detail.archiveLabel')}
         destructive={!archived}
         loading={archiveMutation.isPending || restoreMutation.isPending}
         error={dialogError}

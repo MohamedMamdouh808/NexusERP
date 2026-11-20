@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
-import { NAVIGATION } from './navigation';
+import { GROUP_LABEL_KEYS, NAVIGATION, NAV_LABEL_KEYS } from './navigation';
 
 /**
  * The breadcrumb every page inside the shell opens with (T027, FR-018).
@@ -23,7 +24,7 @@ export interface BreadcrumbCrumb {
 }
 
 /** The trail for an address, or an empty list when it is not a destination. */
-export function breadcrumbTrail(pathname: string): readonly BreadcrumbCrumb[] {
+function trailFor(pathname: string): readonly BreadcrumbCrumb[] {
   for (const group of NAVIGATION) {
     for (const entry of group.entries) {
       if (entry.state === 'available' && entry.path === pathname) {
@@ -39,12 +40,22 @@ export function breadcrumbTrail(pathname: string): readonly BreadcrumbCrumb[] {
 }
 
 export function Breadcrumb() {
-  const trail = breadcrumbTrail(useLocation().pathname);
+  const { t } = useTranslation();
+  const crumbLabel = (label: string) =>
+    NAV_LABEL_KEYS[label] !== undefined
+      ? t(`shell.sidebar.entries.${NAV_LABEL_KEYS[label]}`)
+      : GROUP_LABEL_KEYS[label] !== undefined
+        ? t(`shell.sidebar.groups.${GROUP_LABEL_KEYS[label]}`)
+        : label;
+  const trail = trailFor(useLocation().pathname).map((crumb) => ({
+    ...crumb,
+    label: crumbLabel(crumb.label),
+  }));
 
   if (trail.length === 0) return null;
 
   return (
-    <nav className="breadcrumb" aria-label="Breadcrumb">
+    <nav className="breadcrumb" aria-label={t('shell.breadcrumb.ariaLabel')}>
       <ol className="breadcrumb__list">
         {trail.map((crumb) => (
           <li

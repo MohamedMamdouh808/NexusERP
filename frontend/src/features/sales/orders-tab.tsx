@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -14,15 +16,17 @@ import {
   Skeleton,
   Toast,
 } from '../../components/ui';
+import { INVENTORY_PERMISSIONS, SALES_PERMISSIONS } from '@nexuserp/shared';
 import type { Column, ToastTone } from '../../components/ui';
-import { formatMoneyGrouped } from '../../lib/format';
+import { formatMoneyLocalized, useOrganizationCurrency } from '../../lib/i18n-format';
+import { hasPermission, useSession } from '../../services/auth-session';
 import {
   useCancelSalesOrder,
   useConfirmSalesOrder,
   useSalesOrders,
   useShipSalesOrder,
 } from './use-sales';
-import type { SalesOrderStatus } from '../../services/catalog-service';
+import type { SalesOrderSortField, SalesOrderStatus } from '../../services/catalog-service';
 
 const STATUSES: readonly SalesOrderStatus[] = [
   'DRAFT',
@@ -39,36 +43,47 @@ type OrderRow = {
   status: SalesOrderStatus;
   orderDate: string;
   total: string;
+  /** Confirm and cancel refuse a stale version, so the row carries it. */
+  version: number;
 };
 
 export function OrdersTab() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const currency = useOrganizationCurrency();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>('');
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
-  const [sort, setSort] = useState('number');
+  const [sort, setSort] = useState<SalesOrderSortField>('number');
   const [direction, setDirection] = useState<'asc' | 'desc'>('asc');
 
   // Local toasts: the shell has no toast provider, so pages render Toast rows (see the gallery pattern).
   const [toasts, setToasts] = useState<{ id: string; tone: ToastTone; message: string }[]>([]);
-  const [confirmTarget, setConfirmTarget] = useState<{ id: string; number: string } | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; number: string; version: number } | null>(null);
   const [shipTarget, setShipTarget] = useState<{ id: string; number: string } | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<{ id: string; number: string; status: SalesOrderStatus } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; number: string; status: SalesOrderStatus; version: number } | null>(null);
   // Mutations that can be refused with reasons show the banner inside the
   // dialog, which stays open; a retry reuses the key generated at open.
   const [confirmError, setConfirmError] = useState<string | undefined>(undefined);
   const [shipError, setShipError] = useState<string | undefined>(undefined);
   const [confirmKey, setConfirmKey] = useState('');
   const [shipKey, setShipKey] = useState('');
+  const [cancelKey, setCancelKey] = useState('');
 
-  const { data, isPending, isError, error } = useSalesOrders({
+  const session = useSession();
+  // What the member may do: writes are sales.write, the shipment is a stock
+  // movement and declares inventory.ship.
+  const canWrite = hasPermission(session, SALES_PERMISSIONS.write);
+  const mayShip = hasPermission(session, INVENTORY_PERMISSIONS.ship);
+
+  const { data, isPending, isError, error, refetch } = useSalesOrders({
     search,
     status: (status as SalesOrderStatus) || undefined,
     page,
     pageSize,
-    sort,
-    direction,
+    sortBy: sort,
+    sortOrder: direction,
   });
   const confirmMutation = useConfirmSalesOrder();
   const shipMutation = useShipSalesOrder();
@@ -90,7 +105,7 @@ export function OrdersTab() {
     // retry while it stays open, so a double click reserves one set.
     setConfirmKey(`cnf-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     setConfirmError(undefined);
-    setConfirmTarget({ id: row.id, number: row.number });
+    setConfirmTarget({ id: row.id, number: row.number, version: row.version });
   }
 
   function openShipFromRow(row: OrderRow) {
@@ -100,21 +115,27 @@ export function OrdersTab() {
     setShipTarget({ id: row.id, number: row.number });
   }
 
+  function openCancelFromRow(row: OrderRow) {
+    // The cancel dialog follows the same rule: one key per open dialog.
+    setCancelKey(`cnc-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    setCancelTarget({ id: row.id, number: row.number, status: row.status, version: row.version });
+  }
+
   function handleConfirm() {
     if (confirmTarget === null) return;
     confirmMutation.mutate(
-      { orderId: confirmTarget.id, idempotencyKey: confirmKey },
+      { orderId: confirmTarget.id, idempotencyKey: confirmKey, version: confirmTarget.version },
       {
         onSuccess: (result) => {
           setConfirmTarget(null);
           setConfirmError(undefined);
-          pushToast('success', `Sales order ${result.number} confirmed. Stock is reserved.`);
+          pushToast('success', t('sales.detail.confirmedToast', { number: result.number }));
         },
         onError: (mutationError) => {
           // The dialog stays open: the shortage is visible where the action
           // was taken, and the same idempotency key is reused on retry.
           setConfirmError(
-            mutationError instanceof Error ? mutationError.message : 'The order could not be confirmed.',
+            mutationError instanceof Error ? mutationError.message : t('sales.detail.confirmFailed'),
           );
         },
       },
@@ -129,10 +150,10 @@ export function OrdersTab() {
         onSuccess: (result) => {
           setShipTarget(null);
           setShipError(undefined);
-          pushToast('success', `Shipment ${result.shipmentNumber} shipped. Stock is deducted.`);
+          pushToast('success', t('sales.detail.shippedToast', { number: result.shipment.number }));
         },
         onError: (mutationError) => {
-          setShipError(mutationError instanceof Error ? mutationError.message : 'The order could not be shipped.');
+          setShipError(mutationError instanceof Error ? mutationError.message : t('sales.detail.shipFailed'));
         },
       },
     );
@@ -140,16 +161,19 @@ export function OrdersTab() {
 
   function handleCancelConfirmed() {
     if (cancelTarget === null) return;
-    cancelMutation.mutate(cancelTarget.id, {
-      onSuccess: (result) => {
-        setCancelTarget(null);
-        pushToast('success', `Sales order ${result.number} cancelled.`);
+    cancelMutation.mutate(
+      { orderId: cancelTarget.id, idempotencyKey: cancelKey, version: cancelTarget.version },
+      {
+        onSuccess: (result) => {
+          setCancelTarget(null);
+          pushToast('success', t('sales.detail.cancelledToast', { number: result.number }));
+        },
+        onError: (mutationError) => {
+          setCancelTarget(null);
+          pushToast('failure', mutationError instanceof Error ? mutationError.message : t('sales.detail.cancelFailed'));
+        },
       },
-      onError: (mutationError) => {
-        setCancelTarget(null);
-        pushToast('failure', mutationError instanceof Error ? mutationError.message : 'The order could not be cancelled.');
-      },
-    });
+    );
   }
 
   // The dialog titles the order directly: the kebab passes the row's number.
@@ -161,7 +185,7 @@ export function OrdersTab() {
     () => [
       {
         key: 'number',
-        header: 'SO number',
+        header: t('sales.orders.columns.soNumber'),
         sortable: true,
         render: (row) => (
           <a href={`/sales/${row.id}`} className="inventory-product-link">
@@ -169,51 +193,51 @@ export function OrdersTab() {
           </a>
         ),
       },
-      { key: 'customerName', header: 'Customer', sortable: true },
-      { key: 'warehouseName', header: 'Warehouse' },
+      { key: 'customerName', header: t('sales.orders.columns.customer'), sortable: true },
+      { key: 'warehouseName', header: t('sales.orders.columns.warehouse') },
       {
         key: 'status',
-        header: 'Status',
+        header: t('sales.orders.columns.status'),
         sortable: true,
-        render: (row) => <Badge status={row.status}>{row.status}</Badge>,
+        render: (row) => <Badge status={row.status}>{t(`sales.status.${row.status}`)}</Badge>,
       },
-      { key: 'orderDate', header: 'Order date', sortable: true },
+      { key: 'orderDate', header: t('sales.orders.columns.orderDate'), sortable: true },
       {
         key: 'total',
-        header: 'Total',
+        header: t('sales.orders.columns.total'),
         sortable: true,
         numeric: true,
         render: (row) => row.total,
       },
       {
         key: 'actions',
-        header: 'Actions',
+        header: t('sales.orders.columns.actions'),
         render: (row) => {
           const entries = [
-            { kind: 'item' as const, id: 'view', label: 'View', onSelect: () => navigate(`/sales/${row.id}`) },
-            ...(row.status === 'DRAFT'
-              ? [
-                  { kind: 'item' as const, id: 'edit', label: 'Edit', onSelect: () => navigate(`/sales/${row.id}/edit`) },
-                  { kind: 'item' as const, id: 'confirm', label: 'Confirm', onSelect: () => openConfirmFromRow(row) },
-                ]
+            { kind: 'item' as const, id: 'view', label: t('sales.orders.view'), onSelect: () => navigate(`/sales/${row.id}`) },
+            ...(row.status === 'DRAFT' && canWrite
+              ? [{ kind: 'item' as const, id: 'confirm', label: t('sales.orders.confirm'), onSelect: () => openConfirmFromRow(row) }]
               : []),
-            ...(row.status === 'CONFIRMED'
-              ? [{ kind: 'item' as const, id: 'ship', label: 'Ship', onSelect: () => openShipFromRow(row) }]
+            ...(row.status === 'DRAFT' && canWrite
+              ? [{ kind: 'item' as const, id: 'edit', label: t('sales.orders.edit'), onSelect: () => navigate(`/sales/${row.id}/edit`) }]
               : []),
-            ...(row.status === 'DRAFT' || row.status === 'CONFIRMED'
-              ? [{ kind: 'item' as const, id: 'cancel', label: 'Cancel', onSelect: () => setCancelTarget({ id: row.id, number: row.number, status: row.status }) }]
+            ...(row.status === 'CONFIRMED' && mayShip
+              ? [{ kind: 'item' as const, id: 'ship', label: t('sales.orders.ship'), onSelect: () => openShipFromRow(row) }]
+              : []),
+            ...((row.status === 'DRAFT' || row.status === 'CONFIRMED') && canWrite
+              ? [{ kind: 'item' as const, id: 'cancel', label: t('sales.orders.cancel'), onSelect: () => openCancelFromRow(row) }]
               : []),
           ];
-          return <KebabMenu label={`Actions for sales order ${row.number}`} entries={entries} />;
+          return <KebabMenu label={`${t('sales.orders.columns.actions')} #${row.number}`} entries={entries} />;
         },
       },
     ],
-    [navigate],
+    [navigate, t, canWrite, mayShip],
   );
 
   const apiFailure =
     error && typeof error === 'object' && 'requestId' in error
-      ? (error as Error & { requestId: string })
+      ? (error as Error & { requestId: string; status?: number })
       : undefined;
 
   const hasFilters = search !== '' || status !== '';
@@ -224,7 +248,8 @@ export function OrdersTab() {
     warehouseName: order.warehouseName,
     status: order.status,
     orderDate: order.orderDate,
-    total: formatMoneyGrouped(order.total),
+    total: formatMoneyLocalized(order.total, currency, 2),
+    version: order.version,
   }));
 
   function clearFilters() {
@@ -234,43 +259,45 @@ export function OrdersTab() {
   }
 
   return (
-    <div className="orders-tab" aria-label="Sales orders">
+    <div className="orders-tab" aria-label={t('sales.orders.sectionAria')}>
       {toasts.map((toast) => (
         <Toast key={toast.id} id={toast.id} tone={toast.tone} message={toast.message} onDismiss={dismissToast} />
       ))}
       {isPending ? (
-        <Card title="Sales orders">
-          <Skeleton label="Loading sales orders" />
+        <Card title={t('sales.orders.title')}>
+          <Skeleton label={t('sales.orders.loading')} />
         </Card>
       ) : isError || data === undefined ? (
-        <Card title="Sales orders">
+        <Card title={t('sales.orders.title')}>
           <ErrorState
-            message={error instanceof Error ? error.message : 'The sales orders could not be loaded.'}
-            requestId={apiFailure?.requestId}
-            onRetry={() => setPage(1)}
+            message={error instanceof Error ? error.message : t('sales.orders.loadError')}
+            requestId={apiFailure?.requestId} status={apiFailure?.status}
+            onRetry={() => {
+              void refetch();
+            }}
           />
         </Card>
       ) : rows.length === 0 && !hasFilters ? (
         <EmptyState
-          title="No sales orders yet"
-          description="Create your first sales order to ship stock to a customer."
-          actionLabel="New Sales Order"
+          title={t('sales.orders.empty.title')}
+          description={t('sales.orders.empty.description')}
+          actionLabel={t('sales.orders.empty.actionLabel')}
           onAction={() => navigate('/sales/new')}
         />
       ) : rows.length === 0 ? (
         <EmptyState
-          title="No sales orders match your filters"
-          description="Try adjusting the search or status filter to see orders."
-          actionLabel="Clear filters"
+          title={t('sales.orders.empty.filteredTitle')}
+          description={t('sales.orders.empty.filteredDescription')}
+          actionLabel={t('sales.orders.empty.filteredActionLabel')}
           onAction={clearFilters}
         />
       ) : (
-        <Card title="Sales orders">
+        <Card title={t('sales.orders.title')}>
           <div className="purchase-orders__toolbar">
             <Input
               id="sales-order-search"
-              label="Search"
-              placeholder="SO number, customer or product"
+              label={t('sales.orders.filters.search')}
+              placeholder={t('sales.orders.filters.searchPlaceholder')}
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -279,14 +306,14 @@ export function OrdersTab() {
             />
             <Select
               id="sales-order-status"
-              label="Status"
-              options={STATUSES.map((value) => ({ value, label: value }))}
+              label={t('sales.orders.filters.status')}
+              options={STATUSES.map((value) => ({ value, label: t(`sales.status.${value}`) }))}
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value);
                 setPage(1);
               }}
-              placeholder="All statuses"
+              placeholder={t('sales.orders.filters.allStatuses')}
             />
           </div>
           <DataTable<OrderRow>
@@ -298,12 +325,13 @@ export function OrdersTab() {
             sortColumn={sort}
             sortDirection={direction}
             onSortChange={(column, nextDirection) => {
-              setSort(column);
+              const keys: readonly SalesOrderSortField[] = ['number', 'customer', 'status', 'orderDate', 'total'];
+              if (keys.includes(column as SalesOrderSortField)) setSort(column as SalesOrderSortField);
               setDirection(nextDirection);
               setPage(1);
             }}
             onPageChange={setPage}
-            emptyMessage="No sales orders found."
+            emptyMessage={t('sales.orders.empty.tableMessage')}
           />
         </Card>
       )}
@@ -315,9 +343,9 @@ export function OrdersTab() {
           setConfirmError(undefined);
         }}
         onConfirm={handleConfirm}
-        title={confirmTarget !== null ? `Confirm sales order ${confirmOrderNumber}` : 'Confirm sales order'}
-        description="Confirming reserves stock for every line of this order. A confirmed order can no longer be edited; to change it, cancel it and create a new one."
-        actionLabel="Confirm order"
+        title={confirmTarget !== null ? t('sales.confirm.titleNumbered', { number: confirmOrderNumber }) : t('sales.confirm.title')}
+        description={t('sales.confirm.description')}
+        actionLabel={t('sales.confirm.actionLabel')}
         loading={confirmMutation.isPending}
         error={confirmError}
       />
@@ -328,9 +356,9 @@ export function OrdersTab() {
           setShipError(undefined);
         }}
         onConfirm={handleShipConfirmed}
-        title={shipTarget !== null ? `Ship sales order ${shipOrderNumber}` : 'Ship sales order'}
-        description="Shipping deducts the stock from the warehouse and consumes the reservation, and the shipment becomes permanent: it cannot be edited or deleted."
-        actionLabel="Ship order"
+        title={shipTarget !== null ? t('sales.ship.titleNumbered', { number: shipOrderNumber }) : t('sales.ship.title')}
+        description={t('sales.ship.description')}
+        actionLabel={t('sales.ship.actionLabel')}
         loading={shipMutation.isPending}
         error={shipError}
       />
@@ -338,13 +366,13 @@ export function OrdersTab() {
         open={cancelTarget !== null}
         onClose={() => setCancelTarget(null)}
         onConfirm={handleCancelConfirmed}
-        title={cancelTarget !== null ? `Cancel sales order ${cancelOrderNumber}` : 'Cancel sales order'}
+        title={cancelTarget !== null ? t('sales.cancel.titleNumbered', { number: cancelOrderNumber }) : t('sales.cancel.title')}
         description={
           cancelTarget?.status === 'CONFIRMED'
-            ? 'Cancelling releases the stock this order reserved back to the warehouse, and the cancelled order is permanent: it cannot be reopened. It is kept for the audit trail.'
-            : 'A cancelled order is permanent: it cannot be reopened, and it is kept for the audit trail.'
+            ? t('sales.cancel.descriptionReserved')
+            : t('sales.cancel.description')
         }
-        actionLabel="Cancel order"
+        actionLabel={t('sales.cancel.actionLabel')}
         destructive
         loading={cancelMutation.isPending}
       />

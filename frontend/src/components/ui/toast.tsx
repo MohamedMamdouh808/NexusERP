@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { Icon } from './icon';
 
 export type ToastTone = 'success' | 'failure' | 'informational';
@@ -12,6 +14,7 @@ export interface ToastProps {
 }
 
 export function Toast({ id, tone, message, onDismiss, actionLabel, onAction }: ToastProps) {
+  const { t } = useTranslation();
   const role = tone === 'failure' ? 'alert' : 'status';
 
   return (
@@ -28,7 +31,7 @@ export function Toast({ id, tone, message, onDismiss, actionLabel, onAction }: T
       <button
         type="button"
         className="toast__dismiss"
-        aria-label="Dismiss notification"
+        aria-label={t('ui.toast.dismiss')}
         onClick={() => onDismiss(id)}
       >
         <Icon name="close" />

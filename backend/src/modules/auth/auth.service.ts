@@ -15,7 +15,12 @@ import { AuditService } from '../audit/audit.service';
 import { hash as argon2Hash, verify as argon2Verify } from 'argon2';
 import { AppException } from '../../common/errors/all-exceptions.filter';
 import { ERROR_CODES } from '@nexuserp/shared';
-import { AUDIT_ACTIONS, DEFAULT_UNITS_OF_MEASURE } from '@nexuserp/shared';
+import {
+  AUDIT_ACTIONS,
+  DEFAULT_UNITS_OF_MEASURE,
+  DEFAULT_CURRENCY,
+  SWITCHABLE_MODULE_KEYS,
+} from '@nexuserp/shared';
 
 /**
  * Authentication service. Orchestrates registration, login, logout, current-user
@@ -37,7 +42,12 @@ export class AuthService {
    * The five role templates are materialized into the organization and the
    * Administrator membership links to the Administrator role, all atomically.
    */
-  async register(email: string, password: string) {
+  async register(
+    email: string,
+    password: string,
+    organizationName?: string,
+    currencyCode?: string,
+  ) {
     return this.transaction.runInTransaction(async (tx) => {
       // 1. Create user with Argon2id-hashed password
       const user = await tx.user.create({
@@ -47,9 +57,21 @@ export class AuthService {
         },
       });
 
-      // 2. Create the first organization
+      // 2. Create the first organization with the chosen identity/currency
       const organization = await tx.organization.create({
-        data: { name: `${email}'s Organization` },
+        data: {
+          name: organizationName ?? `${email}'s Organization`,
+          currencyCode: currencyCode ?? DEFAULT_CURRENCY,
+        },
+      });
+
+      // 2b. Every switchable module starts enabled for a new workspace (FR-024).
+      await tx.organizationModule.createMany({
+        data: SWITCHABLE_MODULE_KEYS.map((key) => ({
+          organizationId: organization.id,
+          moduleKey: key,
+          enabled: true,
+        })),
       });
 
       // 3. Materialize the five template roles + permission links for this org
@@ -255,7 +277,10 @@ export class AuthService {
   async me(userId: string, membershipId: string) {
     const membership = await this.prisma.membership.findUnique({
       where: { id: membershipId },
-      include: { organization: true, user: true },
+      include: {
+        organization: { include: { organizationModules: true } },
+        user: true,
+      },
     });
 
     if (!membership || membership.userId !== userId || !membership.isActive) {
@@ -282,6 +307,10 @@ export class AuthService {
       },
       membership: {
         id: membership.id,
+        // The member's display name in THIS organization. A name belongs to a
+        // membership, not to the account, so the dashboard can greet a member
+        // without asking for a permission the member may not hold.
+        name: membership.name,
         roles: membershipRoles.map((mr) => ({
           id: mr.role.id,
           key: mr.role.key,
@@ -295,6 +324,17 @@ export class AuthService {
         // The currency the organization's prices are in. Read-only here: changing
         // it belongs to the organization settings feature.
         currencyCode: membership.organization.currencyCode,
+        // The default due date of an operational invoice: issue date plus this
+        // many days. Read-only here: editing it belongs to the organization
+        // settings feature.
+        defaultPaymentTermsDays: membership.organization.defaultPaymentTermsDays,
+        // The modules this organization has switched on - the interface adapts
+        // to this list without an extra call (FR-027). Always-on modules are not
+        // listed here; they are implicit.
+        enabledModules: membership.organization.organizationModules
+          .filter((module) => module.enabled)
+          .map((module) => module.moduleKey)
+          .sort(),
       },
       permissions,
     };
@@ -386,6 +426,8 @@ export class AuthService {
           // The currency this organization's prices are in, so the interface can
           // show it beside them.
           currencyCode: membership.organization.currencyCode,
+          // The default due date of an operational invoice, read-only.
+          defaultPaymentTermsDays: membership.organization.defaultPaymentTermsDays,
           roles: roles.map((r) => r.role),
         };
       }),

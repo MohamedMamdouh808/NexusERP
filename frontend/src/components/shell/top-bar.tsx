@@ -20,6 +20,8 @@ import type { RefObject } from 'react';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { useTranslation } from 'react-i18next';
+
 import { signOut, switchOrganizationForSession, useSession } from '../../services/auth-session';
 import { roleLabel } from './role-label';
 import { Button, DropdownMenu, Icon } from '../ui';
@@ -45,11 +47,13 @@ export function TopBar({
 }: TopBarProps = {}) {
   const fallbackMenuButtonRef = useRef<HTMLButtonElement>(null);
   const activeMenuButtonRef = menuButtonRef ?? fallbackMenuButtonRef;
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const session = useSession();
   const [switchFailure, setSwitchFailure] = useState<{
     readonly message: string;
     readonly requestId: string;
+    readonly status?: number;
   } | null>(null);
 
   async function handleSignOut() {
@@ -64,7 +68,7 @@ export function TopBar({
     setSwitchFailure(null);
     const outcome = await switchOrganizationForSession(organizationId);
     if (!outcome.ok) {
-      setSwitchFailure({ message: outcome.failure.message, requestId: outcome.failure.requestId });
+      setSwitchFailure({ message: outcome.failure.message, requestId: outcome.failure.requestId, status: outcome.failure.status });
     }
   }
 
@@ -74,7 +78,7 @@ export function TopBar({
         ref={activeMenuButtonRef}
         type="button"
         className="mobile-navigation__trigger"
-        aria-label={mobileNavigationOpen ? 'Close navigation menu' : 'Open navigation menu'}
+        aria-label={mobileNavigationOpen ? t('shell.topBar.closeNavigationMenu') : t('shell.topBar.openNavigationMenu')}
         aria-expanded={mobileNavigationOpen}
         aria-controls="main-navigation"
         onClick={onMenuToggle}
@@ -100,11 +104,11 @@ export function TopBar({
       type="button"
       className="top-bar__command"
       onClick={onOpenCommandPalette}
-      aria-label="Open command palette (Ctrl K)"
-      title="Search and commands (Ctrl K)"
+      aria-label={t('shell.topBar.commandPaletteAria')}
+      title={t('shell.topBar.commandPaletteTitle')}
     >
       <Icon name="search" />
-      <span className="top-bar__command-label">Search…</span>
+      <span className="top-bar__command-label">{t('shell.topBar.search')}</span>
       <kbd>Ctrl K</kbd>
     </button>
   );
@@ -117,7 +121,7 @@ export function TopBar({
         <div className="top-bar__right">
           <div className="top-bar__account">
             <Button variant="secondary" onClick={() => navigate('/login')}>
-              Sign in
+              {t('shell.topBar.signIn')}
             </Button>
           </div>
         </div>
@@ -128,13 +132,16 @@ export function TopBar({
   const { user, organization, organizations, membership } = session;
   const canSwitch = organizations.length > 1;
 
+  // Single-organization members see nothing here: the account menu names the
+  // organization, so a static label would be noise. Multi-organization
+  // members keep the switcher (it is the only way to switch).
   const organizationControl = canSwitch ? (
     <DropdownMenu
-      label="Organization"
+      label={t('shell.topBar.organizationMenuLabel')}
       className="top-bar__organization-menu"
       trigger={
         <>
-          <span className="sr-only">Organization: </span>
+          <span className="sr-only">{t('shell.topBar.organizationAria')}</span>
           <span className="top-bar__organization-name">{organization.name}</span>
           <Icon name="chevronDown" />
         </>
@@ -149,20 +156,15 @@ export function TopBar({
         },
       }))}
     />
-  ) : (
-    <span className="top-bar__organization">
-      <span className="sr-only">Organization: </span>
-      <span className="top-bar__organization-name">{organization.name}</span>
-    </span>
-  );
+  ) : null;
 
   const userControl = (
     <DropdownMenu
-      label="User"
+      label={t('shell.topBar.userMenuLabel')}
       className="top-bar__user-menu"
       trigger={
         <>
-          <span className="sr-only">User: </span>
+          <span className="sr-only">{t('shell.topBar.userAria')}</span>
           <span className="top-bar__avatar" aria-hidden="true">
             {initialsFromEmail(user.email)}
           </span>
@@ -174,11 +176,12 @@ export function TopBar({
         </>
       }
       entries={[
-        { kind: 'item', id: 'profile', label: 'Profile', onSelect: () => navigate('/profile') },
+        { kind: 'header', id: 'organization', label: organization.name },
+        { kind: 'item', id: 'profile', label: t('shell.topBar.profile'), onSelect: () => navigate('/profile') },
         {
           kind: 'item',
           id: 'sign-out',
-          label: 'Sign out',
+          label: t('shell.topBar.signOut'),
           onSelect: () => {
             void handleSignOut();
           },
@@ -196,7 +199,11 @@ export function TopBar({
           {switchFailure !== null && (
             <span className="top-bar__switch-failure" role="alert">
               {switchFailure.message}
-              <code> Reference ID: {switchFailure.requestId}</code>
+              <code>
+                {' '}
+                {t('ui.errorState.referenceLabel')}
+                {switchFailure.requestId} · HTTP {switchFailure.status}
+              </code>
             </span>
           )}
           {organizationControl}

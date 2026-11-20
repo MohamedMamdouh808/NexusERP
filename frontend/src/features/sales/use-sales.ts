@@ -1,40 +1,88 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { sampleCatalogService } from '../../services/sample-catalog-service';
+import {
+  cancelSalesOrder,
+  confirmSalesOrder,
+  createSalesOrder,
+  getSalesOrder,
+  listSalesOrders,
+  listShipments,
+  shipSalesOrder,
+  updateSalesOrder,
+} from '../../services/sales-client';
 import type {
   ConfirmSalesOrderInput,
   CreateSalesOrderInput,
+  CancelSalesOrderInput,
   SalesOrderQuery,
   ShipSalesOrderInput,
   ShipmentQuery,
   UpdateSalesOrderInput,
 } from '../../services/catalog-service';
 
+/** Turns the service's failure envelope into the error the screens show. */
+function toError(failure: {
+  code: string;
+  message: string;
+  requestId: string;
+  status?: number;
+  details?: unknown;
+}): Error {
+  const error = new Error(failure.message);
+  const enriched = error as Error & {
+    code?: string;
+    requestId?: string;
+    status?: number;
+    details?: unknown;
+  };
+  enriched.code = failure.code;
+  enriched.requestId = failure.requestId;
+  enriched.status = failure.status;
+  enriched.details = failure.details;
+  return error;
+}
+
 export function useSalesOrders(query: SalesOrderQuery) {
   return useQuery({
     queryKey: ['salesOrders', query],
-    queryFn: () => sampleCatalogService.listSalesOrders(query),
+    queryFn: async () => {
+      const result = await listSalesOrders(query);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
   });
 }
 
 export function useSalesOrder(id: string) {
   return useQuery({
     queryKey: ['salesOrders', id],
-    queryFn: () => sampleCatalogService.getSalesOrder(id),
+    queryFn: async () => {
+      const result = await getSalesOrder(id);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
   });
 }
 
 export function useShipments(query: ShipmentQuery) {
   return useQuery({
     queryKey: ['shipments', query],
-    queryFn: () => sampleCatalogService.listShipments(query),
+    queryFn: async () => {
+      const result = await listShipments(query);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
   });
 }
 
 export function useCreateSalesOrder() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateSalesOrderInput) => sampleCatalogService.createSalesOrder(input),
+    mutationFn: async (input: CreateSalesOrderInput) => {
+      const result = await createSalesOrder(input);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ['salesOrders'] });
       // The Overview counts orders by status, and a new draft is one.
@@ -46,7 +94,11 @@ export function useCreateSalesOrder() {
 export function useUpdateSalesOrder() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: UpdateSalesOrderInput) => sampleCatalogService.updateSalesOrder(input),
+    mutationFn: async (input: UpdateSalesOrderInput) => {
+      const result = await updateSalesOrder(input);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ['salesOrders'] });
     },
@@ -56,7 +108,11 @@ export function useUpdateSalesOrder() {
 export function useConfirmSalesOrder() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: ConfirmSalesOrderInput) => sampleCatalogService.confirmSalesOrder(input),
+    mutationFn: async (input: ConfirmSalesOrderInput) => {
+      const result = await confirmSalesOrder(input);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
     onSuccess: () => {
       // Confirming reserves stock: the sales order, the Overview's active
       // orders and status breakdown, and Inventory's Reserved and Available
@@ -72,7 +128,11 @@ export function useConfirmSalesOrder() {
 export function useCancelSalesOrder() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => sampleCatalogService.cancelSalesOrder(id),
+    mutationFn: async (input: CancelSalesOrderInput) => {
+      const result = await cancelSalesOrder(input);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
     onSuccess: () => {
       // Cancelling a confirmed order releases its reservations, so Inventory
       // changes too; the Overview's status counts move for every status.
@@ -87,7 +147,11 @@ export function useCancelSalesOrder() {
 export function useShipSalesOrder() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: ShipSalesOrderInput) => sampleCatalogService.shipSalesOrder(input),
+    mutationFn: async (input: ShipSalesOrderInput) => {
+      const result = await shipSalesOrder(input);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
     onSuccess: () => {
       // Shipping deducts stock and posts SHIPMENT movements, so the Inventory
       // screens and the shipments table change with the order.

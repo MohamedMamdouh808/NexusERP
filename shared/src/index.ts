@@ -16,3 +16,7 @@ export * from './permissions/index.js';
 export * from './audit/index.js';
 export * from './contacts/index.js';
 export * from './products/index.js';
+export * from './sales/index.js';
+export * from './invoicing/index.js';
+export * from './modules/index.js';
+export * from './currencies/index.js';

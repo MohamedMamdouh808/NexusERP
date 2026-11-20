@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -15,6 +17,7 @@ export function OrderEditPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const orderId = id ?? '';
+  const { t } = useTranslation();
   const { data: order, isPending, isError, error } = usePurchaseOrder(orderId);
 
   // Redirect non-draft orders with the explanation the detail page shows.
@@ -23,19 +26,18 @@ export function OrderEditPage() {
       navigate(`/purchasing/${order.id}`, {
         replace: true,
         state: {
-          notice:
-            'Only draft purchase orders can be edited. To change this order, cancel it and create a new one.',
+          notice: t('purchasing.edit.notDraft'),
         },
       });
     }
-  }, [order, navigate]);
+  }, [order, navigate, t]);
 
   if (isPending) {
     return (
-      <section className="order-edit-page" aria-label="Edit purchase order">
-        <PageHeader title="Edit Purchase Order" />
-        <Card title="Edit Purchase Order">
-          <Skeleton label="Loading purchase order" />
+      <section className="order-edit-page" aria-label={t('purchasing.edit.sectionAria')}>
+        <PageHeader title={t('purchasing.edit.title')} />
+        <Card title={t('purchasing.edit.title')}>
+          <Skeleton label={t('purchasing.edit.loading')} />
         </Card>
       </section>
     );
@@ -43,11 +45,11 @@ export function OrderEditPage() {
 
   if (isError || order === undefined) {
     return (
-      <section className="order-edit-page" aria-label="Edit purchase order">
-        <PageHeader title="Edit Purchase Order" />
-        <Card title="Edit Purchase Order">
+      <section className="order-edit-page" aria-label={t('purchasing.edit.sectionAria')}>
+        <PageHeader title={t('purchasing.edit.title')} />
+        <Card title={t('purchasing.edit.title')}>
           <ErrorState
-            message={error instanceof Error ? error.message : 'The purchase order could not be loaded.'}
+            message={error instanceof Error ? error.message : t('purchasing.edit.loadError')}
           />
         </Card>
       </section>
@@ -60,20 +62,20 @@ export function OrderEditPage() {
   }
 
   return (
-    <section className="order-edit-page" aria-label="Edit purchase order">
+    <section className="order-edit-page" aria-label={t('purchasing.edit.sectionAria')}>
       <PageHeader
-        title="Edit Purchase Order"
+        title={t('purchasing.edit.title')}
         primaryAction={
           <Button variant="default" onClick={() => navigate(`/purchasing/${order.id}`)}>
-            Cancel
+            {t('common.actions.cancel')}
           </Button>
         }
       />
       <Card
-        title="Edit Purchase Order"
-        description={`Editing draft ${order.number}. Only drafts can be edited; confirm on the detail page.`}
+        title={t('purchasing.edit.title')}
+        description={t('purchasing.edit.description', { number: order.number })}
       >
-        <OrderForm order={order} submitLabel="Save draft" />
+        <OrderForm order={order} submitLabel={t('purchasing.form.saveDraft')} />
       </Card>
     </section>
   );

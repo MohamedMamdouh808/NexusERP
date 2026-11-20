@@ -45,6 +45,34 @@ export interface AvailableNavEntry extends NavEntryFields {
   readonly reason: null;
 }
 
+/**
+ * The locale key of an entry's label, under `shell.sidebar.entries`. The
+ * labels in NAVIGATION stay English (the design system compares them
+ * verbatim); the sidebar, the breadcrumb and the command palette render the
+ * translated copy under these keys.
+ */
+export const NAV_LABEL_KEYS: Record<string, string> = {
+  Overview: 'Overview',
+  'Sales Orders': 'SalesOrders',
+  Inventory: 'Inventory',
+  Reports: 'Reports',
+  Products: 'Products',
+  'Customers & Suppliers': 'Contacts',
+  Purchasing: 'Purchasing',
+  Invoicing: 'Invoicing',
+  'Users & Roles': 'UsersAndRoles',
+  Organization: 'Organization',
+  'Audit Log': 'AuditLog',
+  'System Health': 'SystemHealth',
+};
+
+/** The locale key of a group's name, under `shell.sidebar.groups`. */
+export const GROUP_LABEL_KEYS: Record<string, string> = {
+  General: 'General',
+  Management: 'Management',
+  Settings: 'Settings',
+};
+
 /** An entry for a module this release does not build. */
 export interface UnavailableNavEntry extends NavEntryFields {
   readonly state: 'Soon';

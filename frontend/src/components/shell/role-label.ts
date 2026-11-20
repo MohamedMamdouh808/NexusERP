@@ -10,16 +10,19 @@
  * "no role", not throw.
  */
 
+import { i18nInstance } from '../../i18n';
 import type { MembershipRole } from '../../services/auth-client';
 
-const ROLE_LABELS: Record<string, string> = {
-  administrator: 'Administrator',
-  member: 'Member',
+const ROLE_LABEL_KEYS: Record<string, string> = {
+  administrator: 'shell.roles.administrator',
+  member: 'shell.roles.member',
 };
 
 export function roleLabel(roles: readonly MembershipRole[] | undefined | null): string {
   const key = roles?.[0]?.key;
   if (key === undefined || key === '') return '—';
-  const known = ROLE_LABELS[key];
-  return known ?? key.charAt(0).toUpperCase() + key.slice(1);
+  const known = ROLE_LABEL_KEYS[key];
+  return known !== undefined
+    ? i18nInstance.t(known)
+    : key.charAt(0).toUpperCase() + key.slice(1);
 }

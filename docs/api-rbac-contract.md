@@ -179,6 +179,42 @@ Response 200: role projection.
 
 Response 200: `{ "deleted": true }`.
 
+## Organization settings and modules endpoints (P0-F002)
+
+### GET /api/v1/organizations/current
+Any active member. Returns the organization name, currency code, default payment
+terms, version, `currencyLocked`, and the five switchable module states. Tenant
+scope always comes from the session; no client-supplied organization id is read.
+
+### PUT /api/v1/organizations/current
+Requires `settings.manage`. Body: trimmed `name` (1–100), `currencyCode` (one of
+USD, EUR, GBP, EGP, SAR, AED, KWD, QAR, JOD), `defaultPaymentTermsDays` (0–365),
+`version`. A stale version is refused `409 STALE_VERSION`; a currency change once
+any sales order, purchase order or invoice exists is refused `409 CURRENCY_LOCKED`.
+Audit (before/after) commits in the same transaction. Existing invoice due dates
+are unchanged.
+
+### GET /api/v1/organizations/current/modules
+Any active member. Lists the five switchable module rows plus the four always-on
+keys (locked).
+
+### PUT /api/v1/organizations/current/modules/:key
+Requires `settings.manage`. Body: `enabled`, `version`. Dependency violations
+are refused `409 MODULE_DEPENDENCY` (naming the responsible module), open documents
+`409 MODULE_IN_USE` (with counts), stale versions `409 STALE_VERSION`. Unknown or
+always-on keys return 404. A toggle never deletes data and audits before/after in
+the same transaction.
+
+### GET /api/v1/auth/me (extension)
+Now also returns `organization.enabledModules`, `organization.currencyCode` and
+`organization.defaultPaymentTermsDays`, so the shell adapts without extra calls.
+
+### Shared module guard
+Every endpoint of Inventory, Purchasing, Sales, Invoicing and Reports — reads
+included — declares the module gate. A disabled module returns 403
+`MODULE_DISABLED` regardless of the member's permissions; re-enabling restores
+access to existing data.
+
 ## Audit listing endpoint (`audit.read`)
 
 ### GET /api/v1/audit-logs

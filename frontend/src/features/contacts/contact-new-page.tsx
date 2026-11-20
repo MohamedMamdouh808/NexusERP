@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CONTACT_PERMISSIONS } from '@nexuserp/shared';
@@ -34,6 +36,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function ContactNewPage() {
   const navigate = useNavigate();
   const session = useSession();
+  const { t } = useTranslation();
   const canWrite = hasPermission(session, CONTACT_PERMISSIONS.write);
   const createMutation = useCreateContact();
   const [form, setForm] = useState<FormState>({
@@ -54,10 +57,10 @@ export function ContactNewPage() {
 
   function validate(): boolean {
     const next: FormErrors = {};
-    if (!form.name.trim()) next.name = 'Name is required.';
-    if (!form.isCustomer && !form.isSupplier) next.role = 'Select at least one role.';
+    if (!form.name.trim()) next.name = t('contacts.form.nameRequired');
+    if (!form.isCustomer && !form.isSupplier) next.role = t('contacts.form.roleRequired');
     if (form.email.trim() && !EMAIL_PATTERN.test(form.email.trim())) {
-      next.email = 'Enter a valid email address.';
+      next.email = t('contacts.form.emailInvalid');
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -105,12 +108,12 @@ export function ContactNewPage() {
 
   if (!canWrite) {
     return (
-      <section className="contact-new-page" aria-label="New contact">
-        <PageHeader title="New Contact" />
-        <Card title="New Contact">
-          <ErrorState message="You do not have permission to create contacts." />
+      <section className="contact-new-page" aria-label={t('contacts.form.newTitle')}>
+        <PageHeader title={t('contacts.form.newTitle')} />
+        <Card title={t('contacts.form.newTitle')}>
+          <ErrorState message={t('contacts.form.forbiddenCreate')} />
           <Button variant="default" onClick={() => navigate('/contacts')}>
-            Back to contacts
+            {t('contacts.form.backToList')}
           </Button>
         </Card>
       </section>
@@ -118,31 +121,32 @@ export function ContactNewPage() {
   }
 
   return (
-    <section className="contact-new-page" aria-label="New contact">
+    <section className="contact-new-page" aria-label={t('contacts.form.newTitle')}>
       <PageHeader
-        title="New Contact"
-        description="Add a customer or a supplier. The code is assigned by the service."
+        title={t('contacts.form.newTitle')}
+        description={t('contacts.form.descriptionNew')}
         primaryAction={
           <Button variant="default" onClick={() => navigate('/contacts')}>
-            Cancel
+            {t('common.actions.cancel')}
           </Button>
         }
       />
-      <Card title="New Contact">
+      <Card title={t('contacts.form.newTitle')}>
         {serverError && (
           <div role="alert" aria-live="assertive" className="form-error contact-form__server-error">
             <p>{serverError.message}</p>
             <p className="contact-form__reference">
-              Reference ID: <code>{serverError.requestId}</code>
+              {t('ui.errorState.referenceLabel')}
+              <code>{serverError.requestId}</code>
             </p>
           </div>
         )}
         <form onSubmit={handleSubmit} className="contact-new-page__form" noValidate={true}>
           <fieldset className="contact-form__section">
-            <legend>Details</legend>
+            <legend>{t('contacts.form.details')}</legend>
             <Input
               id="name"
-              label="Name"
+              label={t('contacts.fields.name')}
               error={errors.name}
               value={form.name}
               onChange={(e) => update({ name: e.target.value })}
@@ -151,7 +155,7 @@ export function ContactNewPage() {
             <div className="contact-form__row">
               <Input
                 id="email"
-                label="Email"
+                label={t('contacts.fields.email')}
                 type="email"
                 error={errors.email}
                 value={form.email}
@@ -159,7 +163,7 @@ export function ContactNewPage() {
               />
               <Input
                 id="phone"
-                label="Phone"
+                label={t('contacts.fields.phone')}
                 type="tel"
                 value={form.phone}
                 onChange={(e) => update({ phone: e.target.value })}
@@ -168,17 +172,17 @@ export function ContactNewPage() {
           </fieldset>
 
           <fieldset className="contact-form__section">
-            <legend>Role</legend>
+            <legend>{t('contacts.form.role')}</legend>
             <div className="contact-form__roles">
               <Checkbox
                 id="isCustomer"
-                label="Customer"
+                label={t('contacts.form.isCustomer')}
                 checked={form.isCustomer}
                 onChange={(e) => update({ isCustomer: e.target.checked })}
               />
               <Checkbox
                 id="isSupplier"
-                label="Supplier"
+                label={t('contacts.form.isSupplier')}
                 checked={form.isSupplier}
                 onChange={(e) => update({ isSupplier: e.target.checked })}
               />
@@ -191,29 +195,29 @@ export function ContactNewPage() {
           </fieldset>
 
           <fieldset className="contact-form__section">
-            <legend>Address</legend>
+            <legend>{t('contacts.form.address')}</legend>
             <Input
               id="addressLine1"
-              label="Address line 1"
+              label={t('contacts.fields.addressLine1')}
               value={form.addressLine1}
               onChange={(e) => update({ addressLine1: e.target.value })}
             />
             <Input
               id="addressLine2"
-              label="Address line 2"
+              label={t('contacts.fields.addressLine2')}
               value={form.addressLine2}
               onChange={(e) => update({ addressLine2: e.target.value })}
             />
             <div className="contact-form__row">
               <Input
                 id="city"
-                label="City"
+                label={t('contacts.fields.city')}
                 value={form.city}
                 onChange={(e) => update({ city: e.target.value })}
               />
               <Input
                 id="region"
-                label="Region"
+                label={t('contacts.fields.region')}
                 value={form.region}
                 onChange={(e) => update({ region: e.target.value })}
               />
@@ -221,13 +225,13 @@ export function ContactNewPage() {
             <div className="contact-form__row">
               <Input
                 id="postalCode"
-                label="Postal code"
+                label={t('contacts.fields.postalCode')}
                 value={form.postalCode}
                 onChange={(e) => update({ postalCode: e.target.value })}
               />
               <Input
                 id="country"
-                label="Country"
+                label={t('contacts.fields.country')}
                 value={form.country}
                 onChange={(e) => update({ country: e.target.value })}
               />
@@ -241,10 +245,10 @@ export function ContactNewPage() {
               disabled={createMutation.isPending}
               loading={createMutation.isPending}
             >
-              {createMutation.isPending ? 'Creating…' : 'Create Contact'}
+              {createMutation.isPending ? t('contacts.form.creating') : t('contacts.form.create')}
             </Button>
             <Button variant="default" type="button" onClick={() => navigate('/contacts')}>
-              Cancel
+              {t('common.actions.cancel')}
             </Button>
           </div>
         </form>

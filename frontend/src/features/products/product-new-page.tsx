@@ -1,6 +1,8 @@
+import { useTranslation } from 'react-i18next';
+
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PRODUCT_PERMISSIONS, PRODUCT_REORDER_LEVEL_LABEL } from '@nexuserp/shared';
+import { PRODUCT_PERMISSIONS } from '@nexuserp/shared';
 
 import { PageHeader } from '../../components/shell/page-header';
 import { Button, Card, ErrorState, Input, Select } from '../../components/ui';
@@ -56,25 +58,10 @@ const EMPTY: FormState = {
   lowStockThreshold: '',
 };
 
-/**
- * A price the interface accepts locally: digits with at most four decimals.
- * A leading minus is accepted by the pattern so the refusal says what is wrong
- * ("must not be negative") rather than "not a decimal".
- */
-function priceError(value: string, decimals: number, label: string): string | undefined {
-  const trimmed = value.trim();
-  if (!new RegExp(`^-?\\d+(\\.\\d{1,${decimals}})?$`).test(trimmed)) {
-    return `${label} must be a decimal with at most ${decimals} decimal places.`;
-  }
-  if (trimmed.startsWith('-')) {
-    return `${label} must not be negative.`;
-  }
-  return undefined;
-}
-
 export function ProductNewPage() {
   const navigate = useNavigate();
   const session = useSession();
+  const { t } = useTranslation();
   const canWrite = hasPermission(session, PRODUCT_PERMISSIONS.write);
 
   const categories = useCategories();
@@ -114,17 +101,43 @@ export function ProductNewPage() {
 
   function validate(): boolean {
     const next: FormErrors = {};
-    if (form.name.trim().length === 0) next.name = 'Name is required.';
-    if (form.sku.trim().length === 0) next.sku = 'SKU is required.';
-    if (form.categoryId === '') next.categoryId = 'Choose a category.';
-    if (form.unitId === '') next.unitId = 'Choose a unit of measure.';
-    const purchasePriceError = priceError(form.purchasePrice, 4, 'Purchase price');
-    if (purchasePriceError !== undefined) next.purchasePrice = purchasePriceError;
-    const sellingPriceError = priceError(form.sellingPrice, 4, 'Selling price');
-    if (sellingPriceError !== undefined) next.sellingPrice = sellingPriceError;
-    if (form.lowStockThreshold.trim().length > 0) {
-      const reorderError = priceError(form.lowStockThreshold, 3, PRODUCT_REORDER_LEVEL_LABEL);
-      if (reorderError !== undefined) next.lowStockThreshold = reorderError;
+    const decimalPattern = (decimals: number) => new RegExp(`^\\d+(\\.\\d{1,${decimals}})?$`);
+    const minusPattern = (decimals: number) => new RegExp(`^-\\d+(\\.\\d{1,${decimals}})?$`);
+    const priceMessage = (value: string, decimals: number, decimalsKey: string, nonNegKey: string) =>
+      !decimalPattern(decimals).test(value)
+        ? minusPattern(decimals).test(value)
+          ? t(nonNegKey)
+          : t(decimalsKey)
+        : undefined;
+    if (form.name.trim().length === 0) next.name = t('products.form.nameRequired');
+    if (form.sku.trim().length === 0) next.sku = t('products.form.skuRequired');
+    if (form.categoryId === '') next.categoryId = t('products.form.categoryRequired');
+    if (form.unitId === '') next.unitId = t('products.form.unitRequired');
+
+    const purchaseMessage = priceMessage(
+      form.purchasePrice.trim(),
+      4,
+      'products.form.purchasePriceDecimals',
+      'products.form.purchasePriceNonNegative',
+    );
+    if (purchaseMessage !== undefined) next.purchasePrice = purchaseMessage;
+
+    const sellingMessage = priceMessage(
+      form.sellingPrice.trim(),
+      4,
+      'products.form.sellingPriceDecimals',
+      'products.form.sellingPriceNonNegative',
+    );
+    if (sellingMessage !== undefined) next.sellingPrice = sellingMessage;
+
+    const reorder = form.lowStockThreshold.trim();
+    if (reorder.length > 0) {
+      const label = t('products.fields.reorderLevel');
+      if (!decimalPattern(3).test(reorder)) {
+        next.lowStockThreshold = minusPattern(3).test(reorder)
+          ? t('products.form.reorderLevelNonNegative', { label })
+          : t('products.form.reorderLevelDecimals', { label });
+      }
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -174,12 +187,12 @@ export function ProductNewPage() {
 
   if (!canWrite) {
     return (
-      <section className="product-new-page" aria-label="New product">
-        <PageHeader title="New Product" />
-        <Card title="New Product">
-          <ErrorState message="You do not have permission to create products." />
+      <section className="product-new-page" aria-label={t('products.form.newTitle')}>
+        <PageHeader title={t('products.form.newTitle')} />
+        <Card title={t('products.form.newTitle')}>
+          <ErrorState message={t('products.form.forbiddenCreate')} />
           <Button variant="default" onClick={() => navigate('/products')}>
-            Back to products
+            {t('products.form.backToList')}
           </Button>
         </Card>
       </section>
@@ -187,31 +200,32 @@ export function ProductNewPage() {
   }
 
   return (
-    <section className="product-new-page" aria-label="New product">
+    <section className="product-new-page" aria-label={t('products.form.newTitle')}>
       <PageHeader
-        title="New Product"
-        description="The code is assigned by the service; the SKU identifies the product in your documents."
+        title={t('products.form.newTitle')}
+        description={t('products.form.newDescription')}
         primaryAction={
           <Button variant="default" onClick={() => navigate('/products')}>
-            Cancel
+            {t('common.actions.cancel')}
           </Button>
         }
       />
-      <Card title="New Product">
+      <Card title={t('products.form.newTitle')}>
         {serverError && (
           <div role="alert" aria-live="assertive" className="form-error contact-form__server-error">
             <p>{serverError.message}</p>
             <p className="contact-form__reference">
-              Reference ID: <code>{serverError.requestId}</code>
+              {t('ui.errorState.referenceLabel')}
+              <code>{serverError.requestId}</code>
             </p>
           </div>
         )}
         <form onSubmit={handleSubmit} className="product-new-page__form" noValidate={true}>
           <fieldset className="contact-form__section">
-            <legend>Details</legend>
+            <legend>{t('products.form.details')}</legend>
             <Input
               id="name"
-              label="Name"
+              label={t('products.fields.name')}
               value={form.name}
               error={errors.name}
               onChange={(event) => update({ name: event.target.value })}
@@ -219,13 +233,14 @@ export function ProductNewPage() {
             />
             {duplicateName && (
               <p className="form-help-text" role="status">
-                Another product is named “{duplicateName.name}” (SKU {duplicateName.sku}).{' '}
-                <Link to={`/products/${duplicateName.id}`}>Open it</Link> if that is the same item.
+                {t('products.form.duplicateNameNotice', { name: duplicateName.name, sku: duplicateName.sku })}
+                <Link to={`/products/${duplicateName.id}`}>{t('products.form.duplicateNameLink')}</Link>
+                {t('products.form.duplicateNameSuffix')}
               </p>
             )}
             <Input
               id="sku"
-              label="SKU"
+              label={t('products.fields.sku')}
               value={form.sku}
               error={errors.sku}
               onChange={(event) => update({ sku: event.target.value })}
@@ -234,10 +249,10 @@ export function ProductNewPage() {
           </fieldset>
 
           <fieldset className="contact-form__section">
-            <legend>Classification</legend>
+            <legend>{t('products.form.classification')}</legend>
             <Select
               id="categoryId"
-              label="Category"
+              label={t('products.fields.category')}
               value={form.categoryId}
               error={errors.categoryId}
               options={(categories.data ?? []).map((category) => ({
@@ -245,12 +260,12 @@ export function ProductNewPage() {
                 label: category.name,
               }))}
               onChange={(event) => update({ categoryId: event.target.value })}
-              placeholder="Choose a category"
+              placeholder={t('products.form.categoryPlaceholder')}
             />
             <div className="product-new-page__inline-create">
               <Input
                 id="new-category"
-                label="Or add a category"
+                label={t('products.form.orAddCategory')}
                 value={newCategory}
                 onChange={(event) => setNewCategory(event.target.value)}
               />
@@ -266,12 +281,12 @@ export function ProductNewPage() {
                   })
                 }
               >
-                Add category
+                {t('products.form.addCategory')}
               </Button>
             </div>
             <Select
               id="unitId"
-              label="Unit of measure"
+              label={t('products.fields.unit')}
               value={form.unitId}
               error={errors.unitId}
               options={(units.data ?? []).map((unit) => ({
@@ -279,18 +294,18 @@ export function ProductNewPage() {
                 label: `${unit.name} (${unit.abbreviation})`,
               }))}
               onChange={(event) => update({ unitId: event.target.value })}
-              placeholder="Choose a unit of measure"
+              placeholder={t('products.form.unitPlaceholder')}
             />
             <div className="product-new-page__inline-create">
               <Input
                 id="new-unit-name"
-                label="Or add a unit"
+                label={t('products.form.orAddUnit')}
                 value={newUnit.name}
                 onChange={(event) => setNewUnit({ ...newUnit, name: event.target.value })}
               />
               <Input
                 id="new-unit-abbreviation"
-                label="Abbreviation"
+                label={t('products.form.abbreviation')}
                 value={newUnit.abbreviation}
                 onChange={(event) => setNewUnit({ ...newUnit, abbreviation: event.target.value })}
               />
@@ -313,24 +328,24 @@ export function ProductNewPage() {
                   )
                 }
               >
-                Add unit
+                {t('products.form.addUnit')}
               </Button>
             </div>
           </fieldset>
 
           <fieldset className="contact-form__section">
-            <legend>Prices</legend>
+            <legend>{t('products.form.prices')}</legend>
             <div className="contact-form__row">
               <Input
                 id="purchasePrice"
-                label="Purchase price"
+                label={t('products.fields.purchasePrice')}
                 value={form.purchasePrice}
                 error={errors.purchasePrice}
                 onChange={(event) => update({ purchasePrice: event.target.value })}
               />
               <Input
                 id="sellingPrice"
-                label="Selling price"
+                label={t('products.fields.sellingPrice')}
                 value={form.sellingPrice}
                 error={errors.sellingPrice}
                 onChange={(event) => update({ sellingPrice: event.target.value })}
@@ -338,7 +353,7 @@ export function ProductNewPage() {
             </div>
             <Input
               id="lowStockThreshold"
-              label={PRODUCT_REORDER_LEVEL_LABEL}
+              label={t('products.fields.reorderLevel')}
               value={form.lowStockThreshold}
               error={errors.lowStockThreshold}
               onChange={(event) => update({ lowStockThreshold: event.target.value })}
@@ -352,10 +367,10 @@ export function ProductNewPage() {
               disabled={createProduct.isPending}
               loading={createProduct.isPending}
             >
-              {createProduct.isPending ? 'Creating…' : 'Create Product'}
+              {createProduct.isPending ? t('products.form.creating') : t('products.form.create')}
             </Button>
             <Button variant="default" type="button" onClick={() => navigate('/products')}>
-              Cancel
+              {t('common.actions.cancel')}
             </Button>
           </div>
         </form>

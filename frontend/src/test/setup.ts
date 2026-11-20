@@ -2,6 +2,9 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 
+// The localization module initializes at import; every test sees the English
+// default, and a test that switches the language switches it back itself.
+import '../i18n';
 import { resetSession } from './session';
 
 /**

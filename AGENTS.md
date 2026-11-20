@@ -1,5 +1,5 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-specs/008-products-end-to-end/plan.md
+specs/018-org-settings-modules/plan.md
 <!-- SPECKIT END -->

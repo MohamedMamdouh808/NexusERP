@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { HealthController } from './health/health.controller';
 import { HealthService } from './health/health.service';
+import { IdempotencyService } from './idempotency/idempotency.service';
 import { PrismaService } from './prisma/prisma.service';
 import { TransactionService } from './transaction/transaction.service';
 
@@ -20,7 +21,7 @@ import { TransactionService } from './transaction/transaction.service';
 @Global()
 @Module({
   controllers: [HealthController],
-  providers: [PrismaService, TransactionService, HealthService],
-  exports: [PrismaService, TransactionService, HealthService],
+  providers: [PrismaService, TransactionService, IdempotencyService, HealthService],
+  exports: [PrismaService, TransactionService, IdempotencyService, HealthService],
 })
 export class PlatformModule {}

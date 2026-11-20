@@ -134,6 +134,15 @@ model User {
   memberships   Membership[]
   sessions      Session[]
   auditLogs     AuditLog[]
+  stockMovements StockMovement[]
+  purchaseOrders PurchaseOrder[]
+  goodsReceipts  GoodsReceipt[]
+  salesOrders    SalesOrder[]
+  shipments      Shipment[]
+  invoicesCreated Invoice[]       @relation("invoice_created_by")
+  invoicesVoided  Invoice[]       @relation("invoice_voided_by")
+  paymentsRecorded Payment[]
+  paymentReversals PaymentReversal[]
 
   @@map("users")
 }
@@ -148,6 +157,11 @@ model Organization {
   /// settings feature, which also owns the rule that it locks once an order or
   /// an invoice exists.
   currencyCode String  @default("USD") @map("currency_code") @db.VarChar(3)
+  /// The default due date of an operational invoice is issue date plus this many days.
+  /// Read-only here; editing ships with the Organization settings feature.
+  defaultPaymentTermsDays Int @default(30) @map("default_payment_terms_days")
+  /// Incremented on every successful settings update; a stale version is refused.
+  version                 Int      @default(1)
   createdAt   DateTime @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @db.Timestamptz(6)
 
@@ -160,8 +174,46 @@ model Organization {
   products     Product[]
   productCategories ProductCategory[]
   unitsOfMeasure   UnitOfMeasure[]
+  stockBalances    StockBalance[]
+  stockMovements   StockMovement[]
+  idempotencyKeys  IdempotencyKey[]
+  purchaseOrders   PurchaseOrder[]
+  purchaseOrderLines PurchaseOrderLine[]
+  goodsReceipts    GoodsReceipt[]
+  goodsReceiptLines GoodsReceiptLine[]
+  salesOrders      SalesOrder[]
+  salesOrderLines  SalesOrderLine[]
+  stockReservations StockReservation[]
+  shipments        Shipment[]
+  shipmentLines    ShipmentLine[]
+  invoices         Invoice[]
+  invoiceLines     InvoiceLine[]
+  payments         Payment[]
+  paymentAllocations PaymentAllocation[]
+  paymentReversals PaymentReversal[]
+  organizationModules OrganizationModule[]
 
   @@map("organizations")
+}
+
+/// One row per organization and module key holding the module's availability:
+/// enabled state, version and timestamps. Switchable modules are inventory,
+/// purchasing, sales, invoicing and reports; contacts, products, settings and
+/// audit are permanently available and have no row here.
+model OrganizationModule {
+  organizationId String   @map("organization_id") @db.Uuid
+  moduleKey      String   @map("module_key") @db.VarChar(32)
+  enabled        Boolean  @default(true) @map("enabled")
+  /// Incremented on every successful toggle; a stale version is refused.
+  version        Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, moduleKey], map: "organization_modules_pkey")
+  @@index([organizationId], map: "organization_modules_organization_id_idx")
+  @@map("organization_modules")
 }
 
 /// Links a user to an organization with one or more roles. Determines the user's active tenant
@@ -170,6 +222,8 @@ model Membership {
   id              String   @id @default(uuid()) @db.Uuid
   userId          String   @db.Uuid
   organizationId  String   @db.Uuid
+  name            String?  @db.VarChar(100)
+  version         Int      @default(1)
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now()) @db.Timestamptz(6)
 
@@ -318,17 +372,119 @@ model LoginAttempt {
 
 /// A storage location belonging to an organization. The default warehouse is created
 /// during registration.
+///
+/// The name is the warehouse's identity: there is no code, and the name is unique
+/// within the organization without regard to capitalisation (a functional unique
+/// index on (organization_id, lower(name)), added by migration because Prisma
+/// cannot express it). A deactivated warehouse holds no stock and takes no
+/// adjustments; the version makes concurrent writes safe.
 model Warehouse {
   id            String   @id @default(uuid()) @db.Uuid
-  organizationId String  @db.Uuid
+  organizationId String  @map("organization_id") @db.Uuid
   name          String   @db.VarChar(128)
-  isDefault     Boolean  @default(false)
-  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  isDefault     Boolean  @default(false) @map("is_default")
+  /// A deactivated warehouse is kept (its history matters) but is not offered for
+  /// new stock.
+  isActive      Boolean  @default(true) @map("is_active")
+  /// Incremented on every successful write; a write that presents a stale version
+  /// is refused (STALE_VERSION).
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  stockBalances  StockBalance[]
+  stockMovements StockMovement[]
+  purchaseOrders PurchaseOrder[]
+  salesOrders    SalesOrder[]
+  stockReservations StockReservation[]
+
+  @@unique([organizationId, id], map: "warehouses_organization_id_id_key")
   @@index([organizationId])
   @@map("warehouses")
+}
+
+/// The quantity state of one product in one warehouse of one organization.
+///
+/// A MISSING row means zero on hand and zero reserved; the row is created by the
+/// first movement for that combination. Available is on_hand minus reserved and
+/// is never stored.
+model StockBalance {
+  organizationId String   @map("organization_id") @db.Uuid
+  warehouseId    String   @map("warehouse_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  /// Exact decimal with three places. Never negative.
+  onHand         Decimal  @default(0) @map("on_hand") @db.Decimal(14, 3)
+  /// Exact decimal with three places. Never negative, never above on_hand.
+  reserved       Decimal  @default(0) @db.Decimal(14, 3)
+  version        Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  warehouse    Warehouse    @relation(fields: [organizationId, warehouseId], references: [organizationId, id], onDelete: Restrict)
+  product      Product      @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, warehouseId, productId], map: "stock_balances_org_warehouse_product_key")
+  @@index([organizationId, productId], map: "stock_balances_org_product_idx")
+  @@index([organizationId, warehouseId], map: "stock_balances_org_warehouse_idx")
+  @@map("stock_balances")
+}
+
+/// One immutable stock change. Append-only, enforced by database triggers.
+///
+/// The on-hand quantity of a balance is always the sum of its movements.
+model StockMovement {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  warehouseId    String   @map("warehouse_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  /// RECEIPT, SHIPMENT or ADJUSTMENT.
+  type           String   @db.VarChar(16)
+  /// Signed quantity change; never zero.
+  quantityDelta  Decimal  @map("quantity_delta") @db.Decimal(14, 3)
+  /// DAMAGE, LOSS, FOUND, COUNT_CORRECTION or OTHER.
+  reason         String?  @db.VarChar(32)
+  note           String?  @db.VarChar(500)
+  /// ADJUSTMENT, RECEIPT or SHIPMENT - what produced this movement.
+  sourceType     String   @map("source_type") @db.VarChar(32)
+  sourceId       String?  @map("source_id") @db.Uuid
+  sourceNumber   String?  @map("source_number") @db.VarChar(32)
+  userId         String?  @map("user_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  warehouse    Warehouse    @relation(fields: [organizationId, warehouseId], references: [organizationId, id], onDelete: Restrict)
+  product      Product      @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt], map: "stock_movements_org_created_idx")
+  @@index([organizationId, productId], map: "stock_movements_org_product_idx")
+  @@index([organizationId, warehouseId], map: "stock_movements_org_warehouse_idx")
+  @@map("stock_movements")
+}
+
+/// The outcome of one posting attempt, keyed by the organization, the endpoint
+/// and the client-generated key. Written in the same transaction as the business
+/// change, so a rolled-back attempt stores nothing.
+model IdempotencyKey {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  endpoint       String   @db.VarChar(128)
+  key            String   @db.VarChar(255)
+  /// SHA-256 of the canonically ordered request body.
+  requestHash    String   @map("request_hash") @db.VarChar(64)
+  responseStatus Int?     @map("response_status")
+  responseBody   Json?    @map("response_body")
+  expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, endpoint, key], map: "idempotency_keys_org_endpoint_key")
+  @@index([expiresAt], map: "idempotency_keys_expires_idx")
+  @@map("idempotency_keys")
 }
 
 /// A numbering sequence for documents within an organization. Default sequences are
@@ -343,6 +499,7 @@ model DocumentSequence {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
+  @@unique([organizationId, name], map: "document_sequences_organization_id_name_key")
   @@map("document_sequences")
 }
 
@@ -374,6 +531,10 @@ model Contact {
   @@index([organizationId, isArchived], map: "contacts_org_archived_idx")
   @@index([organizationId, isCustomer], map: "contacts_org_customer_idx")
   @@index([organizationId, isSupplier], map: "contacts_org_supplier_idx")
+  purchaseOrders PurchaseOrder[]
+  salesOrders    SalesOrder[]
+  invoices       Invoice[]
+  payments       Payment[]
   @@map("contacts")
 }
 
@@ -436,10 +597,459 @@ model Product {
   category     ProductCategory @relation(fields: [organizationId, categoryId], references: [organizationId, id], onDelete: Restrict)
   unit         UnitOfMeasure   @relation(fields: [organizationId, unitId], references: [organizationId, id], onDelete: Restrict)
 
+  stockBalances  StockBalance[]
+  stockMovements StockMovement[]
+  purchaseOrderLines PurchaseOrderLine[]
+  goodsReceiptLines  GoodsReceiptLine[]
+  salesOrderLines    SalesOrderLine[]
+  stockReservations  StockReservation[]
+  shipmentLines      ShipmentLine[]
+  invoiceLines       InvoiceLine[]
+
   @@unique([organizationId, id], map: "products_organization_id_id_key")
   @@index([organizationId, isArchived], map: "products_org_archived_idx")
   @@index([organizationId, categoryId], map: "products_org_category_idx")
   @@index([organizationId, name], map: "products_org_name_idx")
+  @@index([organizationId, unitId], map: "products_org_unit_idx")
   @@map("products")
+}
+
+/// The organization's commitment to buy from a supplier.
+///
+/// A draft may be edited; a confirmed order may not. The received quantities
+/// live on the lines, never here, so the status and the quantities can never
+/// disagree.
+model PurchaseOrder {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  /// PO- followed by six digits; unique within the organization.
+  number         String   @db.VarChar(32)
+  supplierId     String   @map("supplier_id") @db.Uuid
+  warehouseId    String   @map("warehouse_id") @db.Uuid
+  /// DRAFT, CONFIRMED, PARTIALLY_RECEIVED, RECEIVED or CANCELLED.
+  status         String   @default("DRAFT") @db.VarChar(24)
+  orderDate      DateTime @map("order_date") @db.Date
+  expectedDate   DateTime? @map("expected_date") @db.Date
+  notes          String   @default("") @db.VarChar(1000)
+  /// The sum of the already-rounded line totals.
+  total          Decimal  @default(0) @db.Decimal(14, 2)
+  /// Incremented on every successful write; a stale version is refused.
+  version        Int      @default(1)
+  createdById    String   @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  supplier     Contact            @relation(fields: [organizationId, supplierId], references: [organizationId, id], onDelete: Restrict)
+  warehouse    Warehouse          @relation(fields: [organizationId, warehouseId], references: [organizationId, id], onDelete: Restrict)
+  createdBy    User               @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  lines   PurchaseOrderLine[]
+  receipts GoodsReceipt[]
+
+  @@unique([organizationId, number], map: "purchase_orders_organization_id_number_key")
+  @@unique([organizationId, id], map: "purchase_orders_organization_id_id_key")
+  @@index([organizationId, status, orderDate], map: "purchase_orders_org_status_date_idx")
+  @@index([organizationId, supplierId], map: "purchase_orders_org_supplier_idx")
+  @@index([organizationId, warehouseId], map: "purchase_orders_org_warehouse_idx")
+  @@map("purchase_orders")
+}
+
+/// One product on a purchase order.
+///
+/// One product appears at most once per order. The unit of measure is captured
+/// when the line is entered, so a later product change never rewrites the
+/// document or its receipt history.
+model PurchaseOrderLine {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  purchaseOrderId  String   @map("purchase_order_id") @db.Uuid
+  productId        String   @map("product_id") @db.Uuid
+  /// Exact decimal with three places; greater than zero.
+  quantityOrdered  Decimal  @map("quantity_ordered") @db.Decimal(14, 3)
+  /// Exact decimal with three places; never above the ordered quantity.
+  quantityReceived Decimal  @default(0) @map("quantity_received") @db.Decimal(14, 3)
+  /// Exact decimal with four places; never negative.
+  unitCost         Decimal  @map("unit_cost") @db.Decimal(14, 4)
+  /// The product's unit-of-measure abbreviation, captured when the line was entered.
+  unitOfMeasure    String   @map("unit_of_measure") @db.VarChar(16)
+  /// Exact decimal with two places; the rounded quantity x unit cost.
+  lineTotal        Decimal  @map("line_total") @db.Decimal(14, 2)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization  Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  purchaseOrder PurchaseOrder   @relation(fields: [organizationId, purchaseOrderId], references: [organizationId, id], onDelete: Cascade)
+  product       Product         @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+
+  receiptLines GoodsReceiptLine[]
+
+  @@unique([organizationId, purchaseOrderId, productId], map: "purchase_order_lines_org_order_product_key")
+  @@unique([organizationId, id], map: "purchase_order_lines_organization_id_id_key")
+  @@index([organizationId, purchaseOrderId], map: "purchase_order_lines_org_order_idx")
+  @@map("purchase_order_lines")
+}
+
+/// A permanent record that goods arrived against a purchase order.
+///
+/// Append-only: the database rejects UPDATE, DELETE and TRUNCATE. The supplier
+/// and the warehouse are read from the order and are not duplicated here.
+model GoodsReceipt {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  /// GR- followed by six digits; unique within the organization.
+  number           String   @db.VarChar(32)
+  purchaseOrderId  String   @map("purchase_order_id") @db.Uuid
+  receivedById     String   @map("received_by") @db.Uuid
+  receivedAt       DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization  Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  purchaseOrder PurchaseOrder   @relation(fields: [organizationId, purchaseOrderId], references: [organizationId, id], onDelete: Restrict)
+  receivedBy    User            @relation(fields: [receivedById], references: [id], onDelete: Restrict)
+
+  lines GoodsReceiptLine[]
+
+  @@unique([organizationId, number], map: "goods_receipts_organization_id_number_key")
+  @@unique([organizationId, id], map: "goods_receipts_organization_id_id_key")
+  @@index([organizationId, receivedAt], map: "goods_receipts_org_received_idx")
+  @@index([organizationId, purchaseOrderId], map: "goods_receipts_org_order_idx")
+  @@map("goods_receipts")
+}
+
+/// The quantity of one purchase-order line received in one receipt.
+///
+/// Append-only, like the receipt itself. The unit cost and the unit of measure
+/// are copied from the order line, so the receipt history stays reproducible.
+model GoodsReceiptLine {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
+  goodsReceiptId     String   @map("goods_receipt_id") @db.Uuid
+  purchaseOrderLineId String  @map("purchase_order_line_id") @db.Uuid
+  productId          String   @map("product_id") @db.Uuid
+  /// Exact decimal with three places; greater than zero.
+  quantity           Decimal  @db.Decimal(14, 3)
+  /// Exact decimal with four places; copied from the order line.
+  unitCost           Decimal  @map("unit_cost") @db.Decimal(14, 4)
+  /// The unit-of-measure abbreviation, copied from the order line.
+  unitOfMeasure      String   @map("unit_of_measure") @db.VarChar(16)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  goodsReceipt     GoodsReceipt       @relation(fields: [organizationId, goodsReceiptId], references: [organizationId, id], onDelete: Restrict)
+  purchaseOrderLine PurchaseOrderLine @relation(fields: [organizationId, purchaseOrderLineId], references: [organizationId, id], onDelete: Restrict)
+  product          Product            @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, goodsReceiptId, purchaseOrderLineId], map: "goods_receipt_lines_org_receipt_line_key")
+  @@index([organizationId, goodsReceiptId], map: "goods_receipt_lines_org_receipt_idx")
+  @@index([organizationId, purchaseOrderLineId], map: "goods_receipt_lines_org_order_line_idx")
+  @@map("goods_receipt_lines")
+}
+
+/// The organization's commitment to sell to a customer.
+///
+/// A draft may be edited; a confirmed order may not. Confirmation reserves stock
+/// for every line or for none; shipment deducts stock and consumes reservations.
+/// The line quantities live on the lines, never here, so the status and the
+/// quantities can never disagree.
+model SalesOrder {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  /// SO- followed by six digits; unique within the organization.
+  number         String   @db.VarChar(32)
+  customerId     String   @map("customer_id") @db.Uuid
+  warehouseId    String   @map("warehouse_id") @db.Uuid
+  /// DRAFT, CONFIRMED, SHIPPED or CANCELLED.
+  status         String   @default("DRAFT") @db.VarChar(24)
+  orderDate      DateTime @map("order_date") @db.Date
+  notes          String   @default("") @db.VarChar(1000)
+  /// The sum of the already-rounded line totals.
+  total          Decimal  @default(0) @db.Decimal(14, 2)
+  /// Incremented on every successful write; a stale version is refused.
+  version        Int      @default(1)
+  createdById    String   @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer     Contact        @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  warehouse    Warehouse      @relation(fields: [organizationId, warehouseId], references: [organizationId, id], onDelete: Restrict)
+  createdBy    User           @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  lines    SalesOrderLine[]
+  shipments Shipment[]
+  invoices Invoice[]
+
+  @@unique([organizationId, number], map: "sales_orders_organization_id_number_key")
+  @@unique([organizationId, id], map: "sales_orders_organization_id_id_key")
+  @@index([organizationId, status, orderDate], map: "sales_orders_org_status_date_idx")
+  @@index([organizationId, customerId], map: "sales_orders_org_customer_idx")
+  @@index([organizationId, warehouseId], map: "sales_orders_org_warehouse_idx")
+  @@map("sales_orders")
+}
+
+/// One product on a sales order.
+///
+/// One product appears at most once per order. The unit price defaults to the
+/// product's selling price when the line is entered and remains editable.
+model SalesOrderLine {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  salesOrderId     String   @map("sales_order_id") @db.Uuid
+  productId        String   @map("product_id") @db.Uuid
+  /// Exact decimal with three places; greater than zero.
+  quantity         Decimal  @map("quantity") @db.Decimal(14, 3)
+  /// Exact decimal with four places; never negative; defaults to the product's selling price.
+  unitPrice        Decimal  @map("unit_price") @db.Decimal(14, 4)
+  /// Exact decimal with two places; the rounded quantity x unit price.
+  lineTotal        Decimal  @map("line_total") @db.Decimal(14, 2)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  salesOrder    SalesOrder     @relation(fields: [organizationId, salesOrderId], references: [organizationId, id], onDelete: Cascade)
+  product       Product        @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+
+  reservations StockReservation[]
+  shipmentLines ShipmentLine[]
+
+  @@unique([organizationId, salesOrderId, productId], map: "sales_order_lines_org_order_product_key")
+  @@unique([organizationId, id], map: "sales_order_lines_organization_id_id_key")
+  @@index([organizationId, salesOrderId], map: "sales_order_lines_org_order_idx")
+  @@map("sales_order_lines")
+}
+
+/// A hold placed on stock when a sales order is confirmed.
+///
+/// ACTIVE while the order is confirmed; CONSUMED when shipped; RELEASED when cancelled.
+model StockReservation {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
+  salesOrderLineId   String   @map("sales_order_line_id") @db.Uuid
+  warehouseId        String   @map("warehouse_id") @db.Uuid
+  productId          String   @map("product_id") @db.Uuid
+  /// Exact decimal with three places; greater than zero.
+  quantity           Decimal  @map("quantity") @db.Decimal(14, 3)
+  /// ACTIVE, CONSUMED or RELEASED.
+  status             String   @db.VarChar(24)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  salesOrderLine   SalesOrderLine    @relation(fields: [organizationId, salesOrderLineId], references: [organizationId, id], onDelete: Restrict)
+  warehouse        Warehouse         @relation(fields: [organizationId, warehouseId], references: [organizationId, id], onDelete: Restrict)
+  product            Product           @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+
+  @@index([organizationId, salesOrderLineId], map: "stock_reservations_org_order_line_idx")
+  @@index([organizationId, warehouseId, productId], map: "stock_reservations_org_warehouse_product_idx")
+  @@index([organizationId, status], map: "stock_reservations_org_status_idx")
+  @@map("stock_reservations")
+}
+
+/// A permanent record that a confirmed sales order went out.
+///
+/// Append-only: the database rejects UPDATE, DELETE and TRUNCATE. The customer
+/// and the warehouse are read from the order and are not duplicated here.
+/// In v1 one shipment ships the whole order.
+model Shipment {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  /// SH- followed by six digits; unique within the organization.
+  number          String   @db.VarChar(32)
+  salesOrderId    String   @map("sales_order_id") @db.Uuid
+  shippedById     String   @map("shipped_by") @db.Uuid
+  shippedAt       DateTime @default(now()) @map("shipped_at") @db.Timestamptz(6)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  salesOrder   SalesOrder   @relation(fields: [organizationId, salesOrderId], references: [organizationId, id], onDelete: Restrict)
+  shippedBy    User         @relation(fields: [shippedById], references: [id], onDelete: Restrict)
+
+  lines ShipmentLine[]
+
+  @@unique([organizationId, number], map: "shipments_organization_id_number_key")
+  @@unique([organizationId, id], map: "shipments_organization_id_id_key")
+  @@index([organizationId, shippedAt], map: "shipments_org_shipped_idx")
+  @@index([organizationId, salesOrderId], map: "shipments_org_order_idx")
+  @@map("shipments")
+}
+
+/// The quantity of one sales-order line shipped in one shipment.
+///
+/// Append-only, like the shipment itself. Carries the quantity reserved for its order line.
+model ShipmentLine {
+  id                  String   @id @default(uuid()) @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  shipmentId          String   @map("shipment_id") @db.Uuid
+  salesOrderLineId    String   @map("sales_order_line_id") @db.Uuid
+  productId           String   @map("product_id") @db.Uuid
+  /// Exact decimal with three places; greater than zero.
+  quantity            Decimal  @map("quantity") @db.Decimal(14, 3)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization  Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  shipment      Shipment         @relation(fields: [organizationId, shipmentId], references: [organizationId, id], onDelete: Restrict)
+  salesOrderLine SalesOrderLine @relation(fields: [organizationId, salesOrderLineId], references: [organizationId, id], onDelete: Restrict)
+  product         Product        @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, shipmentId, salesOrderLineId], map: "shipment_lines_org_shipment_line_key")
+  @@index([organizationId, shipmentId], map: "shipment_lines_org_shipment_idx")
+  @@index([organizationId, salesOrderLineId], map: "shipment_lines_org_order_line_idx")
+  @@map("shipment_lines")
+}
+
+/// The organization's operational invoice for a shipped sales order.
+///
+/// These are operational invoices: no tax fields, no tax-compliance claim, and every
+/// invoice is labelled "Operational invoice - not a tax invoice" in the API payload and
+/// the interface. A draft may be edited (due date only); once issued, the header is
+/// immutable except for the paid-status transitions and void. The number is assigned
+/// at issue from the organization's shared sequence. One non-void invoice per order -
+/// enforced by a partial unique index in the migration (`where status <> 'VOID'`).
+/// The `unique (organization_id, number) where number is not null` partial unique and
+/// the immutability trigger are also migration-level and not expressible here.
+model Invoice {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  /// NULL on DRAFT; INV- followed by six digits once issued; unique per organization.
+  number         String?   @db.VarChar(32)
+  salesOrderId   String    @map("sales_order_id") @db.Uuid
+  customerId     String    @map("customer_id") @db.Uuid
+  /// DRAFT, ISSUED, PARTIALLY_PAID, PAID or VOID.
+  status         String    @default("DRAFT") @db.VarChar(24)
+  issueDate      DateTime? @map("issue_date") @db.Date
+  dueDate        DateTime? @map("due_date") @db.Date
+  /// The sum of the already-rounded line totals.
+  total          Decimal   @default(0) @db.Decimal(14, 2)
+  voidReason     String?   @map("void_reason") @db.VarChar(1000)
+  voidedAt       DateTime? @map("voided_at") @db.Timestamptz(6)
+  voidedById     String?   @map("voided_by") @db.Uuid
+  /// Incremented on every successful write; a stale version is refused.
+  version        Int       @default(1)
+  createdById    String    @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  salesOrder   SalesOrder   @relation(fields: [organizationId, salesOrderId], references: [organizationId, id], onDelete: Restrict)
+  customer     Contact      @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  createdBy    User         @relation("invoice_created_by", fields: [createdById], references: [id], onDelete: Restrict)
+  voidedBy     User?        @relation("invoice_voided_by", fields: [voidedById], references: [id], onDelete: Restrict)
+
+  lines       InvoiceLine[]
+  allocations PaymentAllocation[]
+
+  @@unique([organizationId, id], map: "invoices_organization_id_id_key")
+  @@index([organizationId, customerId, createdAt(sort: Desc)], map: "invoices_org_customer_created_idx")
+  @@index([organizationId, status, dueDate], map: "invoices_org_status_due_idx")
+  @@index([organizationId, dueDate], map: "invoices_org_due_idx")
+  @@map("invoices")
+}
+
+/// One product line on an operational invoice.
+///
+/// Insert-only: a trigger rejects UPDATE, DELETE and TRUNCATE regardless of invoice
+/// status. `line_total` is round(quantity x unit_price, 2), half away from zero, which
+/// matches half-up for the non-negative values held here; the server computes it.
+model InvoiceLine {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  invoiceId      String   @map("invoice_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  /// Exact decimal with three places; greater than zero.
+  quantity       Decimal  @db.Decimal(14, 3)
+  unitPrice      Decimal  @map("unit_price") @db.Decimal(14, 4)
+  lineTotal      Decimal  @map("line_total") @db.Decimal(14, 2)
+  /// Position of the line inside the invoice, copied from the order's line order.
+  sequence       Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  invoice      Invoice      @relation(fields: [organizationId, invoiceId], references: [organizationId, id], onDelete: Cascade)
+  product      Product      @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, invoiceId, productId], map: "invoice_lines_org_invoice_product_key")
+  @@unique([organizationId, id], map: "invoice_lines_organization_id_id_key")
+  @@unique([organizationId, invoiceId, sequence], map: "invoice_lines_org_invoice_sequence_key")
+  @@index([organizationId, invoiceId], map: "invoice_lines_org_invoice_idx")
+  @@map("invoice_lines")
+}
+
+/// The organization recording money received from a customer.
+///
+/// Append-only: BEFORE UPDATE/DELETE triggers raise and TRUNCATE is revoked, in one
+/// migration step together with the allocations and reversals. The status is never
+/// stored - it is derived from the presence of `payment_reversals`. `number` is
+/// PAY- followed by six digits, assigned at creation from the shared sequence.
+model Payment {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  /// PAY- followed by six digits; unique within the organization.
+  number         String   @db.VarChar(32)
+  customerId     String   @map("customer_id") @db.Uuid
+  amount         Decimal  @db.Decimal(14, 2)
+  paymentDate    DateTime @map("payment_date") @db.Date
+  /// CASH, BANK_TRANSFER, CARD or OTHER.
+  method         String   @db.VarChar(24)
+  reference      String?  @db.VarChar(255)
+  recordedById   String   @map("recorded_by") @db.Uuid
+  recordedAt     DateTime @default(now()) @map("recorded_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  customer     Contact      @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict)
+  recordedBy   User         @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+
+  allocations PaymentAllocation[]
+  reversal    PaymentReversal?
+
+  @@unique([organizationId, number], map: "payments_organization_id_number_key")
+  @@unique([organizationId, id], map: "payments_organization_id_id_key")
+  @@index([organizationId, customerId, paymentDate(sort: Desc)], map: "payments_org_customer_date_idx")
+  @@index([organizationId, paymentDate], map: "payments_org_date_idx")
+  @@map("payments")
+}
+
+/// The share of a payment applied to one invoice.
+///
+/// Append-only like the payment. Balances are recomputed under ascending-id invoice
+/// locks at record time; the allocations are never adjusted afterwards.
+model PaymentAllocation {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  paymentId      String   @map("payment_id") @db.Uuid
+  invoiceId      String   @map("invoice_id") @db.Uuid
+  amount         Decimal  @db.Decimal(14, 2)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  payment      Payment      @relation(fields: [organizationId, paymentId], references: [organizationId, id], onDelete: Restrict)
+  invoice      Invoice      @relation(fields: [organizationId, invoiceId], references: [organizationId, id], onDelete: Restrict)
+
+  @@unique([organizationId, paymentId, invoiceId], map: "payment_allocations_org_payment_invoice_key")
+  @@index([organizationId, invoiceId], map: "payment_allocations_org_invoice_idx")
+  @@index([organizationId, paymentId], map: "payment_allocations_org_payment_idx")
+  @@map("payment_allocations")
+}
+
+/// The compensating record voiding a payment's effect.
+///
+/// Append-only. The payment row itself is never changed - a reversal row is the only
+/// sign that a payment no longer counts towards balances. One reversal per payment.
+model PaymentReversal {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  paymentId      String   @map("payment_id") @db.Uuid
+  reason         String   @db.VarChar(1000)
+  reversedById   String   @map("reversed_by") @db.Uuid
+  reversedAt     DateTime @default(now()) @map("reversed_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  payment      Payment      @relation(fields: [organizationId, paymentId], references: [organizationId, id], onDelete: Restrict)
+  reversedBy   User         @relation(fields: [reversedById], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, paymentId], map: "payment_reversals_org_payment_key")
+  @@index([organizationId, paymentId], map: "payment_reversals_org_payment_idx")
+  @@map("payment_reversals")
 }
 

@@ -1,10 +1,12 @@
+import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 
 import { Icon } from '../ui/icon';
 import type { NavGroupName } from './navigation';
-import { NAVIGATION } from './navigation';
-import { sampleCatalogService } from '../../services/sample-catalog-service';
+import { GROUP_LABEL_KEYS, NAVIGATION, NAV_LABEL_KEYS } from './navigation';
+import { useSession } from '../../services/auth-session';
+import { moduleForPath, isModuleEnabled } from './module-availability';
+import { useCachedAttentionCount } from '../../features/overview/use-dashboard';
 
 /**
  * The persistent left sidebar (T025, FR-006 to FR-009).
@@ -27,26 +29,38 @@ function groupLabelId(name: NavGroupName): string {
 }
 
 export function Sidebar({ className }: { readonly className?: string } = {}) {
-  const modules = useQuery({ queryKey: ['modules'], queryFn: () => sampleCatalogService.listModules() });
+  const { t } = useTranslation();
+  const session = useSession();
+  const attentionCount = useCachedAttentionCount();
+
+  const groupLabel = (name: NavGroupName) =>
+    t(`shell.sidebar.groups.${GROUP_LABEL_KEYS[name]}`);
+  const entryLabel = (label: string) =>
+    NAV_LABEL_KEYS[label] !== undefined ? t(`shell.sidebar.entries.${NAV_LABEL_KEYS[label]}`) : label;
+
   return (
-    <nav id="main-navigation" className={['app-shell__sidebar', className].filter(Boolean).join(' ')} aria-label="Main">
+    <nav id="main-navigation" className={['app-shell__sidebar', className].filter(Boolean).join(' ')} aria-label={t('shell.sidebar.mainNav')}>
       <ul className="sidebar-nav">
         {NAVIGATION.map((group) => (
           <li key={group.name} className="sidebar-nav__group">
             <h2 className="sidebar-nav__group-label" id={groupLabelId(group.name)}>
-              {group.name}
+              {groupLabel(group.name)}
             </h2>
 
             <ul className="sidebar-nav__group-list" aria-labelledby={groupLabelId(group.name)}>
               {group.entries.map((entry) => {
-                const moduleKey = entry.label === 'Inventory' ? 'inventory' : entry.label === 'Purchasing' ? 'purchasing' : entry.label === 'Sales Orders' ? 'sales' : entry.label === 'Invoicing' ? 'invoicing' : null;
-                const disabledBySettings = moduleKey !== null && modules.data?.find((module) => module.key === moduleKey)?.enabled === false;
+                const moduleKey = moduleForPath(entry.path ?? '');
+                const disabledBySettings = moduleKey !== null && !isModuleEnabled(session, moduleKey);
+                const translatedLabel = entryLabel(entry.label);
                 return entry.state === 'available' && !disabledBySettings ? (
-                  <li key={entry.label}>
-                    <NavLink to={entry.path} end className="sidebar-nav__link" title={entry.label}>
+                  <li key={entry.label} className="sidebar-nav__attention">
+                    <NavLink to={entry.path} end className="sidebar-nav__link" title={translatedLabel}>
                       <Icon name={entry.icon} />
-                      <span className="sidebar-nav__label">{entry.label}</span>
+                      <span className="sidebar-nav__label">{translatedLabel}</span>
                     </NavLink>
+                    {entry.label === 'Overview' && attentionCount > 0 && (
+                      <span className="sidebar-nav__badge" role="img" aria-label={`${translatedLabel}: ${attentionCount}`}>{attentionCount}</span>
+                    )}
                   </li>
                 ) : (
                   <li key={entry.label}>
@@ -54,12 +68,12 @@ export function Sidebar({ className }: { readonly className?: string } = {}) {
                       className="sidebar-nav__link"
                       data-state={disabledBySettings ? 'Unavailable' : 'Soon'}
                       aria-disabled="true"
-                      title={disabledBySettings ? 'Turned off in Settings' : entry.reason ?? undefined}
+                      title={disabledBySettings ? t('shell.sidebar.turnedOff') : entry.reason ?? undefined}
                     >
                       <Icon name={entry.icon} />
-                      <span className="sidebar-nav__label">{entry.label}</span>
-                      <span className="sidebar-nav__soon">{disabledBySettings ? 'Unavailable' : 'Soon'}</span>
-                      <span className="sr-only"> - {disabledBySettings ? 'Turned off in Settings' : entry.reason}</span>
+                      <span className="sidebar-nav__label">{translatedLabel}</span>
+                      <span className="sidebar-nav__soon">{disabledBySettings ? t('shell.sidebar.unavailable') : t('shell.sidebar.soon')}</span>
+                      <span className="sr-only"> - {disabledBySettings ? t('shell.sidebar.turnedOff') : entry.reason}</span>
                     </span>
                   </li>
                 );

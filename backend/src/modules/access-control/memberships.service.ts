@@ -276,31 +276,132 @@ export class MembershipsService {
   }
 
   /**
-   * Lists the active organization's memberships with their roles.
+   * Lists the active organization's memberships with their roles, with
+   * server-side search, filtering, sorting, and paging.
    */
-  async list(organizationId: string) {
-    const memberships = await this.prisma.membership.findMany({
-      where: { organizationId },
-      include: {
-        user: { select: { id: true, email: true } },
-        roles: { include: { role: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async list(
+    organizationId: string,
+    params: {
+      search?: string;
+      role?: string;
+      status?: 'ACTIVE' | 'DEACTIVATED';
+      sort?: 'name' | 'email' | 'status' | 'createdAt';
+      direction?: 'asc' | 'desc';
+      page?: number;
+      pageSize?: number;
+    } = {},
+  ) {
+    const page = Math.max(1, params.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
+    const sort = params.sort ?? 'createdAt';
+    const direction = params.direction ?? 'desc';
+
+    const where: Record<string, unknown> = { organizationId };
+    if (params.status === 'ACTIVE') where.isActive = true;
+    if (params.status === 'DEACTIVATED') where.isActive = false;
+    if (params.role) {
+      where.roles = { some: { roleId: params.role } };
+    }
+
+    // Escape ILIKE wildcards so search terms are treated literally.
+    const escaped = params.search
+      ? params.search.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+      : '';
+    if (escaped) {
+      where.OR = [
+        { user: { email: { contains: escaped, mode: 'insensitive' } } },
+        { name: { contains: escaped, mode: 'insensitive' } },
+      ];
+    }
+
+    const orderBy =
+      sort === 'email'
+        ? { user: { email: direction } }
+        : sort === 'status'
+          ? { isActive: direction }
+          : sort === 'name'
+            ? { name: direction }
+            : { createdAt: direction };
+
+    const [memberships, total] = await this.prisma.$transaction([
+      this.prisma.membership.findMany({
+        where,
+        include: {
+          user: { select: { id: true, email: true, mustChangePassword: true } },
+          roles: { include: { role: true } },
+        },
+        orderBy,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.membership.count({ where }),
+    ]);
 
     return {
-      memberships: memberships.map((m) => ({
+      items: memberships.map((m) => ({
         id: m.id,
-        user: m.user,
+        userId: m.user.id,
+        email: m.user.email,
+        name: m.name,
+        displayName: m.name ?? m.user.email,
         isActive: m.isActive,
+        status: m.isActive ? 'ACTIVE' : 'DEACTIVATED',
         roles: m.roles.map((mr) => ({
           id: mr.role.id,
           key: mr.role.key,
           name: mr.role.name,
         })),
+        passwordChangeRequired: m.user.mustChangePassword,
         createdAt: m.createdAt,
+        version: m.version,
       })),
+      total,
+      page,
+      pageSize,
     };
+  }
+
+  /**
+   * Updates a membership's display name with before/after audit and version
+   * bump. Tenant-scoped: another organization's membership → 404.
+   */
+  async updateName(params: {
+    membershipId: string;
+    organizationId: string;
+    name: string;
+    version: number;
+    actingUserId: string;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const membership = await tx.membership.findUnique({
+        where: { id: params.membershipId },
+        select: { id: true, organizationId: true, name: true, version: true },
+      });
+      if (!membership || membership.organizationId !== params.organizationId) {
+        throw new AppException(ERROR_CODES.NOT_FOUND, [], 'Membership not found.');
+      }
+      if (membership.version !== params.version) {
+        throw new AppException(ERROR_CODES.STALE_VERSION, [{ field: 'version', code: 'STALE_VERSION', message: `This member has changed since you opened it (it is now version ${membership.version}). Reload it and try again.` }], 'Stale version.');
+      }
+      const before = { name: membership.name };
+      const updated = await tx.membership.update({
+        where: { id: params.membershipId, version: params.version },
+        data: { name: params.name, version: { increment: 1 } },
+        select: { id: true, name: true, version: true },
+      });
+      await tx.auditLog.create({
+        data: {
+          organization: { connect: { id: params.organizationId } },
+          user: { connect: { id: params.actingUserId } },
+          action: AUDIT_ACTIONS.membersNameChanged,
+          recordType: 'membership',
+          recordId: params.membershipId,
+          before,
+          after: { name: params.name },
+        },
+      });
+      return { membership: updated };
+    });
   }
 
   /**

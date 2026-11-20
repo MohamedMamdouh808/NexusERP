@@ -1,49 +1,111 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-import { sampleCatalogService } from '../../services/sample-catalog-service';
+import * as inventoryClient from '../../services/inventory-client';
 import type {
   CreateWarehouseInput,
-  MovementQuery,
+  ListStockBalancesParams,
+  ListStockMovementsParams,
   PostAdjustmentInput,
-  StockBalanceQuery,
   UpdateWarehouseInput,
-} from '../../services/catalog-service';
+  WarehouseStateInput,
+} from '../../services/inventory-client';
 
+export type {
+  AdjustmentReason,
+  CreateWarehouseInput,
+  InventoryWarehouse,
+  ListStockBalancesParams,
+  ListStockMovementsParams,
+  MovementType,
+  PostAdjustmentInput,
+  StockBalanceListResponse,
+  StockBalanceRow,
+  StockMovementListResponse,
+  StockMovementRow,
+  UpdateWarehouseInput,
+  WarehouseStateInput,
+} from '../../services/inventory-client';
+
+/** Turns the service's failure envelope into the error the screens show. */
+function toError(failure: { code: string; message: string; requestId: string; status?: number; details?: unknown }): Error {
+  const error = new Error(failure.message);
+  const enriched = error as Error & { code?: string; requestId?: string; status?: number; details?: unknown };
+  enriched.code = failure.code;
+  enriched.requestId = failure.requestId;
+  enriched.status = failure.status;
+  enriched.details = failure.details;
+  return enriched;
+}
+
+/** The organization's warehouses. */
 export function useWarehouses() {
   return useQuery({
-    queryKey: ['warehouses'],
-    queryFn: () => sampleCatalogService.listWarehouses(),
+    queryKey: ['inventory', 'warehouses'],
+    queryFn: async () => {
+      const result = await inventoryClient.listWarehouses();
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
   });
 }
 
-export function useStockBalances(query: StockBalanceQuery) {
+/** One page of balances, in whichever of the three selections the params name. */
+export function useStockBalances(params: ListStockBalancesParams) {
   return useQuery({
-    queryKey: ['stockBalances', query],
-    queryFn: () => sampleCatalogService.listStockBalances(query),
+    queryKey: ['inventory', 'stockBalances', params],
+    queryFn: async () => {
+      const result = await inventoryClient.listStockBalances(params);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
   });
 }
 
-export function useMovements(query: MovementQuery) {
+/**
+ * How many archived products still hold stock, for the hint.
+ *
+ * A one-row page is enough: the total counts the whole selection. The hint asks
+ * for it whenever the archived filter is off, so leftover stock is never
+ * silently invisible.
+ */
+export function useArchivedWithStockCount(enabled: boolean) {
   return useQuery({
-    queryKey: ['movements', query],
-    queryFn: () => sampleCatalogService.listMovements(query),
+    queryKey: ['inventory', 'archivedWithStockCount'],
+    queryFn: async () => {
+      const result = await inventoryClient.listStockBalances({
+        status: 'archivedWithStock',
+        page: 1,
+        pageSize: 1,
+      });
+      if (!result.ok) throw toError(result.failure);
+      return result.data.total;
+    },
+    enabled,
   });
 }
 
-export function useLowStockCount() {
+/** One page of the movement ledger. */
+export function useMovements(params: ListStockMovementsParams) {
   return useQuery({
-    queryKey: ['lowStockCount'],
-    queryFn: () => sampleCatalogService.getLowStockCount(),
+    queryKey: ['inventory', 'movements', params],
+    queryFn: async () => {
+      const result = await inventoryClient.listStockMovements(params);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
   });
 }
 
 export function useCreateWarehouse() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateWarehouseInput) => sampleCatalogService.createWarehouse(input),
+    mutationFn: async (input: CreateWarehouseInput) => {
+      const result = await inventoryClient.createWarehouse(input);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
     onSuccess: () => {
-      client.invalidateQueries({ queryKey: ['warehouses'] });
-      client.invalidateQueries({ queryKey: ['stockBalances'] });
+      client.invalidateQueries({ queryKey: ['inventory', 'warehouses'] });
     },
   });
 }
@@ -51,10 +113,13 @@ export function useCreateWarehouse() {
 export function useUpdateWarehouse() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: UpdateWarehouseInput) => sampleCatalogService.updateWarehouse(input),
+    mutationFn: async (input: UpdateWarehouseInput) => {
+      const result = await inventoryClient.updateWarehouse(input);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
     onSuccess: () => {
-      client.invalidateQueries({ queryKey: ['warehouses'] });
-      client.invalidateQueries({ queryKey: ['stockBalances'] });
+      client.invalidateQueries({ queryKey: ['inventory', 'warehouses'] });
     },
   });
 }
@@ -62,23 +127,53 @@ export function useUpdateWarehouse() {
 export function useDeactivateWarehouse() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => sampleCatalogService.deactivateWarehouse(id),
+    mutationFn: async (input: WarehouseStateInput) => {
+      const result = await inventoryClient.deactivateWarehouse(input);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
     onSuccess: () => {
-      client.invalidateQueries({ queryKey: ['warehouses'] });
-      client.invalidateQueries({ queryKey: ['stockBalances'] });
-      client.invalidateQueries({ queryKey: ['movements'] });
+      client.invalidateQueries({ queryKey: ['inventory', 'warehouses'] });
+      client.invalidateQueries({ queryKey: ['inventory', 'stockBalances'] });
+      client.invalidateQueries({ queryKey: ['inventory', 'movements'] });
     },
   });
 }
 
+export function useReactivateWarehouse() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: WarehouseStateInput) => {
+      const result = await inventoryClient.reactivateWarehouse(input);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ['inventory', 'warehouses'] });
+      client.invalidateQueries({ queryKey: ['inventory', 'movements'] });
+    },
+  });
+}
+
+/**
+ * Posts an adjustment.
+ *
+ * The idempotency key travels WITH the input: the dialog generated it when it
+ * opened and passes the same key again on a retry, so a retry after a lost
+ * answer replays the stored result instead of posting twice.
+ */
 export function usePostAdjustment() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: PostAdjustmentInput) =>
-      sampleCatalogService.postAdjustment(input),
+    mutationFn: async (input: PostAdjustmentInput) => {
+      const result = await inventoryClient.postAdjustment(input);
+      if (!result.ok) throw toError(result.failure);
+      return result.data;
+    },
     onSuccess: () => {
-      client.invalidateQueries({ queryKey: ['stockBalances'] });
-      client.invalidateQueries({ queryKey: ['movements'] });
+      client.invalidateQueries({ queryKey: ['inventory', 'stockBalances'] });
+      client.invalidateQueries({ queryKey: ['inventory', 'movements'] });
+      client.invalidateQueries({ queryKey: ['inventory', 'archivedWithStockCount'] });
     },
   });
 }

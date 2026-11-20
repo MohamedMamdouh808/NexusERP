@@ -79,6 +79,14 @@ describe('Authentication API (integration)', () => {
         // discrepancies; deleting a missing row should not mask it.
       }
     }
+    // Register seeds the default units of measure inside the organization's
+    // own transaction, and units_of_measure -> organizations is ON DELETE
+    // RESTRICT: without this the organization delete is refused and the
+    // pre-test snapshot never balances.
+    await prisma.unitOfMeasure.deleteMany({
+      where: { organizationId: { in: createdOrganizationIds } },
+    });
+
     for (const id of createdOrganizationIds) {
       try {
         await prisma.organization.delete({ where: { id } });
@@ -123,6 +131,76 @@ describe('Authentication API (integration)', () => {
 
       createdUserIds.push(body.user.id);
       createdOrganizationIds.push(body.organization.id);
+    });
+
+    it('registers with a typed organization name and serves it on /auth/me', async () => {
+      const email = `register-org-${Date.now()}@tests.nexuserp.local`;
+      const organizationName = 'Acme Logistics 009';
+
+      const register = await request(app.getHttpServer())
+        .post('/api/v1/auth/register')
+        .send({ email, password: 'TestPassword123', organizationName });
+
+      expect(register.status).toBe(201);
+      expect(register.body.organization).toMatchObject({
+        id: expect.any(String),
+        name: organizationName,
+      });
+
+      const login = await request(app.getHttpServer())
+        .post('/api/v1/auth/login')
+        .send({ email, password: 'TestPassword123' });
+      expect(login.status).toBe(200);
+      const rawCookie = login.headers['set-cookie'] as unknown as string[];
+      const sessionCookie = (rawCookie ?? [])
+        .map((cookie) => String(cookie))
+        .join('; ');
+
+      const me = await request(app.getHttpServer())
+        .get('/api/v1/auth/me')
+        .set('Cookie', sessionCookie);
+
+      expect(me.status).toBe(200);
+      expect(me.body.organization).toMatchObject({ name: organizationName });
+
+      createdUserIds.push(register.body.user.id);
+      createdOrganizationIds.push(register.body.organization.id);
+    });
+
+    it('rejects a whitespace-only organization name and creates nothing', async () => {
+      const email = `register-blank-${Date.now()}@tests.nexuserp.local`;
+      const before = await snapshotRowCounts();
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/auth/register')
+        .send({ email, password: 'TestPassword123', organizationName: '   ' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.details ?? []).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ field: 'organizationName' }),
+        ]),
+      );
+
+      const after = await snapshotRowCounts();
+      for (const table of Object.keys(after)) {
+        if (table === 'audit_logs') continue;
+        expect(after[table]).toBe(before[table]);
+      }
+    });
+
+    it('keeps the placeholder organization name when organizationName is omitted', async () => {
+      const email = `register-placeholder-${Date.now()}@tests.nexuserp.local`;
+
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/auth/register')
+        .send({ email, password: 'TestPassword123' });
+
+      expect(response.status).toBe(201);
+      expect(response.body.organization).toMatchObject({ name: `${email}'s Organization` });
+
+      createdUserIds.push(response.body.user.id);
+      createdOrganizationIds.push(response.body.organization.id);
     });
 
     it('rejects a missing email', async () => {

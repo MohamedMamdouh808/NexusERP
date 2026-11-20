@@ -333,7 +333,7 @@ describe('Products Integration: End-to-End Test Suite', () => {
         .set('Cookie', adminCookie)
         .send(productPayload({ sku, name }))
         .expect(201);
-      return res.body;
+      return res.body as { id: string };
     }
 
     it('searches the SKU and the name, and treats a wildcard as literal text', async () => {
@@ -416,7 +416,7 @@ describe('Products Integration: End-to-End Test Suite', () => {
         .get('/api/v1/products?sortBy=sku&sortOrder=asc')
         .set('Cookie', adminCookie)
         .expect(200);
-      expect(sorted.body.items.map((p: { sku: string }) => p.sku)).toEqual([
+      expect((sorted.body as { items: Array<{ sku: string }> }).items.map((p) => p.sku)).toEqual([
         'SKU-1001',
         'SKU-2002',
         'SKU-3003',
@@ -426,7 +426,7 @@ describe('Products Integration: End-to-End Test Suite', () => {
         .get('/api/v1/products?sortBy=sku&sortOrder=desc')
         .set('Cookie', adminCookie)
         .expect(200);
-      expect(descending.body.items.map((p: { sku: string }) => p.sku)).toEqual([
+      expect((descending.body as { items: Array<{ sku: string }> }).items.map((p) => p.sku)).toEqual([
         'SKU-3003',
         'SKU-2002',
         'SKU-1001',
@@ -615,7 +615,7 @@ describe('Products Integration: End-to-End Test Suite', () => {
         .get('/api/v1/products')
         .set('Cookie', adminCookie)
         .expect(200);
-      expect(list.body.items.some((p: { id: string }) => p.id === created.body.id)).toBe(false);
+      expect((list.body as { items: Array<{ id: string }> }).items.some((p) => p.id === created.body.id)).toBe(false);
 
       const stillThere = await request(app.getHttpServer())
         .get(`/api/v1/products/${created.body.id}`)
@@ -645,10 +645,11 @@ describe('Products Integration: End-to-End Test Suite', () => {
         {
           token: PRODUCTS_USAGE_HOOK,
           useValue: {
-            isInUse: async () => ({
-              inUse: true,
-              reason: 'This product is referenced by an open purchase order.',
-            }),
+            isInUse: () =>
+              Promise.resolve({
+                inUse: true,
+                reason: 'This product is referenced by an open purchase order.',
+              }),
           },
         },
       ]);
@@ -752,7 +753,7 @@ describe('Products Integration: End-to-End Test Suite', () => {
         .get('/api/v1/product-categories')
         .set('Cookie', adminCookie)
         .expect(200);
-      expect(categories.body.some((c: { name: string }) => c.name === 'Apparel')).toBe(true);
+      expect((categories.body as Array<{ name: string }>).some((c) => c.name === 'Apparel')).toBe(true);
 
       const created = await request(app.getHttpServer())
         .post('/api/v1/product-categories')
@@ -765,7 +766,7 @@ describe('Products Integration: End-to-End Test Suite', () => {
         .get('/api/v1/units-of-measure')
         .set('Cookie', adminCookie)
         .expect(200);
-      expect(units.body.some((u: { name: string }) => u.name === 'piece')).toBe(true);
+      expect((units.body as Array<{ name: string }>).some((u) => u.name === 'piece')).toBe(true);
 
       const unit = await request(app.getHttpServer())
         .post('/api/v1/units-of-measure')
@@ -817,7 +818,7 @@ describe('Products Integration: End-to-End Test Suite', () => {
         .set('Cookie', cookie)
         .expect(200);
 
-      const names = units.body.map((u: { name: string }) => u.name).sort();
+      const names = (units.body as Array<{ name: string }>).map((u) => u.name).sort();
       expect(names).toEqual(['box', 'pair', 'roll', 'unit']);
 
       const created = await request(app.getHttpServer())
@@ -837,7 +838,7 @@ describe('Products Integration: End-to-End Test Suite', () => {
         .get('/api/v1/product-categories')
         .set('Cookie', otherOrgCookie)
         .expect(200);
-      expect(res.body.some((c: { name: string }) => c.name === 'Apparel')).toBe(false);
+      expect((res.body as Array<{ name: string }>).some((c) => c.name === 'Apparel')).toBe(false);
 
       const salesRole = await prisma.role.findFirst({
         where: { organizationId: adminOrgId, key: 'sales' },
@@ -929,14 +930,14 @@ describe('Products Integration: End-to-End Test Suite', () => {
         .get('/api/v1/product-categories')
         .set('Cookie', otherOrgCookie)
         .expect(200);
-      expect(categories.body.some((c: { name: string }) => c.name === 'Apparel')).toBe(false);
+      expect((categories.body as Array<{ name: string }>).some((c) => c.name === 'Apparel')).toBe(false);
 
       // Units: the list shows none of ours.
       const units = await request(app.getHttpServer())
         .get('/api/v1/units-of-measure')
         .set('Cookie', otherOrgCookie)
         .expect(200);
-      expect(units.body.some((u: { name: string }) => u.name === 'piece')).toBe(false);
+      expect((units.body as Array<{ name: string }>).some((u) => u.name === 'piece')).toBe(false);
 
       // Create: the other organization's product is created in ITS OWN
       // organization, never in ours; its audit entry belongs to it.

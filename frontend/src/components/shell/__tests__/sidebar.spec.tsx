@@ -1,5 +1,7 @@
-import { screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
 import { renderWithProviders } from '../../../test/render';
@@ -23,7 +25,7 @@ function mainNav(): HTMLElement {
 }
 
 function renderSidebar(path = '/'): void {
-  renderWithProviders(<Sidebar />, { initialEntries: [path] });
+  renderWithProviders(<Sidebar />, { initialEntries: [path], session: 'signed-in' });
 }
 
 describe('Sidebar structure (T020, FR-006)', () => {
@@ -66,6 +68,26 @@ describe('Sidebar structure (T020, FR-006)', () => {
       expect(group.entries.length, `${group.name} must hold at least one entry`).toBeGreaterThan(0);
       expect(within(mainNav()).getByRole('list', { name: group.name })).toBeInTheDocument();
     }
+  });
+});
+
+describe('Sidebar attention badge', () => {
+  it('badges Overview with the count cached by the dashboard, without fetching', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(['dashboard', 'overdue-invoices'], { total: 3 });
+    queryClient.setQueryData(['dashboard', 'confirmed-sales-orders'], { total: 2 });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/']}>
+          <Sidebar />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(document.querySelector('.sidebar-nav__badge')).toHaveTextContent('5');
+    // The badge is a sibling, so the link's accessible name stays exact.
+    expect(within(mainNav()).getByRole('link', { name: 'Overview' })).toBeInTheDocument();
   });
 });
 

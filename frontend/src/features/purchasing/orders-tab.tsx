@@ -1,3 +1,6 @@
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -16,11 +19,10 @@ import {
 } from '../../components/ui';
 import type { Column, ToastTone } from '../../components/ui';
 import { compactQuantity } from '../../lib/quantity';
-import { addQuantities } from '../../lib/quantity';
-import { formatMoneyGrouped } from '../../lib/format';
+import { formatMoneyLocalized, useOrganizationCurrency } from '../../lib/i18n-format';
 import { useCancelPurchaseOrder, useConfirmPurchaseOrder, usePurchaseOrders } from './use-purchasing';
 import { ReceiveGoodsDialog } from './receive-goods-dialog';
-import type { PurchaseOrder, PurchaseOrderStatus } from '../../services/catalog-service';
+import type { OrderProgress, PurchaseOrderSortField, PurchaseOrderStatus } from '../../services/catalog-service';
 
 const STATUSES: readonly PurchaseOrderStatus[] = [
   'DRAFT',
@@ -37,41 +39,59 @@ type OrderRow = {
   warehouseName: string;
   status: PurchaseOrderStatus;
   orderDate: string;
-  receivedText: string;
+  progress: OrderProgress;
   total: string;
+  version: number;
 };
 
-/** "40 of 100 units" for the Received column, from the order's own lines. */
-function receivedText(order: PurchaseOrder): string {
-  if (order.lines.length === 0) return '—';
-  const ordered = addQuantities(...order.lines.map((line) => line.quantity));
-  const received = addQuantities(...order.lines.map((line) => line.received));
-  return `${compactQuantity(received)} of ${compactQuantity(ordered)} units`;
+/**
+ * The progress cell, rendered from the server's own summary. The interface
+ * never re-adds line quantities: the service computes the figures and the
+ * screen shows them verbatim. A draft carries no progress at all.
+ */
+function progressText(progress: OrderProgress, t: TFunction): string {
+  switch (progress.kind) {
+    case 'QUANTITY':
+      return t('purchasing.orders.progressQuantity', {
+        received: compactQuantity(progress.receivedTotal),
+        ordered: compactQuantity(progress.orderedTotal),
+        unit: progress.unitOfMeasure,
+      });
+    case 'LINES':
+      return t('purchasing.orders.progressLines', {
+        received: progress.fullyReceivedLineCount,
+        total: progress.lineCount,
+      });
+    case 'NONE':
+      return '—';
+  }
 }
 
 export function OrdersTab() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const currency = useOrganizationCurrency();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>('');
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
-  const [sort, setSort] = useState('number');
+  const [sort, setSort] = useState<PurchaseOrderSortField>('number');
   const [direction, setDirection] = useState<'asc' | 'desc'>('asc');
 
   // Local toasts: the shell has no toast provider, so pages render Toast rows (see the gallery pattern).
   const [toasts, setToasts] = useState<{ id: string; tone: ToastTone; message: string }[]>([]);
-  const [confirmTarget, setConfirmTarget] = useState<{ id: string; number: string } | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<{ id: string; number: string } | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; number: string; version: number } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; number: string; version: number } | null>(null);
   const [receiveOrderId, setReceiveOrderId] = useState<string | null>(null);
   const [receiveKey, setReceiveKey] = useState('');
 
-  const { data, isPending, isError, error } = usePurchaseOrders({
+  const { data, isPending, isError, error, refetch } = usePurchaseOrders({
     search,
     status: (status as PurchaseOrderStatus) || undefined,
     page,
     pageSize,
-    sort,
-    direction,
+    sortBy: sort,
+    sortOrder: direction,
   });
   const confirmMutation = useConfirmPurchaseOrder();
   const cancelMutation = useCancelPurchaseOrder();
@@ -96,28 +116,28 @@ export function OrdersTab() {
 
   function handleConfirm() {
     if (confirmTarget === null) return;
-    confirmMutation.mutate(confirmTarget.id, {
+    confirmMutation.mutate({ id: confirmTarget.id, version: confirmTarget.version }, {
       onSuccess: (result) => {
         setConfirmTarget(null);
-        pushToast('success', `Purchase order ${result.number} confirmed.`);
+        pushToast('success', t('purchasing.detail.confirmedToast', { number: result.number }));
       },
       onError: (mutationError) => {
         setConfirmTarget(null);
-        pushToast('failure', mutationError instanceof Error ? mutationError.message : 'The order could not be confirmed.');
+        pushToast('failure', mutationError instanceof Error ? mutationError.message : t('purchasing.detail.confirmFailed'));
       },
     });
   }
 
   function handleCancelConfirmed() {
     if (cancelTarget === null) return;
-    cancelMutation.mutate(cancelTarget.id, {
+    cancelMutation.mutate({ id: cancelTarget.id, version: cancelTarget.version }, {
       onSuccess: (result) => {
         setCancelTarget(null);
-        pushToast('success', `Purchase order ${result.number} cancelled.`);
+        pushToast('success', t('purchasing.detail.cancelledToast', { number: result.number }));
       },
       onError: (mutationError) => {
         setCancelTarget(null);
-        pushToast('failure', mutationError instanceof Error ? mutationError.message : 'The order could not be cancelled.');
+        pushToast('failure', mutationError instanceof Error ? mutationError.message : t('purchasing.detail.cancelFailed'));
       },
     });
   }
@@ -126,7 +146,7 @@ export function OrdersTab() {
     () => [
       {
         key: 'number',
-        header: 'PO number',
+        header: t('purchasing.orders.columns.poNumber'),
         sortable: true,
         render: (row) => (
           <a href={`/purchasing/${row.id}`} className="inventory-product-link">
@@ -134,52 +154,56 @@ export function OrdersTab() {
           </a>
         ),
       },
-      { key: 'supplierName', header: 'Supplier', sortable: true },
-      { key: 'warehouseName', header: 'Warehouse' },
+      { key: 'supplier', header: t('purchasing.orders.columns.supplier'), sortable: true, render: (row) => row.supplierName },
+      { key: 'warehouseName', header: t('purchasing.orders.columns.warehouse') },
       {
         key: 'status',
-        header: 'Status',
+        header: t('purchasing.orders.columns.status'),
         sortable: true,
-        render: (row) => <Badge status={row.status}>{row.status}</Badge>,
+        render: (row) => <Badge status={row.status}>{t(`purchasing.status.${row.status}`)}</Badge>,
       },
-      { key: 'orderDate', header: 'Order date', sortable: true },
-      { key: 'receivedText', header: 'Received' },
+      { key: 'orderDate', header: t('purchasing.orders.columns.orderDate'), sortable: true },
+      {
+        key: 'progress',
+        header: t('purchasing.orders.columns.received'),
+        render: (row) => progressText(row.progress, t),
+      },
       {
         key: 'total',
-        header: 'Total',
+        header: t('purchasing.orders.columns.total'),
         sortable: true,
         numeric: true,
-        render: (row) => row.total,
+        render: (row) => formatMoneyLocalized(row.total, currency, 2),
       },
       {
         key: 'actions',
-        header: 'Actions',
+        header: t('purchasing.orders.columns.actions'),
         render: (row) => {
           const entries = [
-            { kind: 'item' as const, id: 'view', label: 'View', onSelect: () => navigate(`/purchasing/${row.id}`) },
+            { kind: 'item' as const, id: 'view', label: t('purchasing.orders.view'), onSelect: () => navigate(`/purchasing/${row.id}`) },
             ...(row.status === 'DRAFT'
               ? [
-                  { kind: 'item' as const, id: 'edit', label: 'Edit', onSelect: () => navigate(`/purchasing/${row.id}/edit`) },
-                  { kind: 'item' as const, id: 'confirm', label: 'Confirm', onSelect: () => setConfirmTarget({ id: row.id, number: row.number }) },
+                  { kind: 'item' as const, id: 'edit', label: t('purchasing.orders.edit'), onSelect: () => navigate(`/purchasing/${row.id}/edit`) },
+                  { kind: 'item' as const, id: 'confirm', label: t('purchasing.orders.confirm'), onSelect: () => setConfirmTarget({ id: row.id, number: row.number, version: row.version }) },
                 ]
               : []),
             ...(row.status === 'CONFIRMED' || row.status === 'PARTIALLY_RECEIVED'
-              ? [{ kind: 'item' as const, id: 'receive', label: 'Receive goods', onSelect: () => openReceive(row.id) }]
+              ? [{ kind: 'item' as const, id: 'receive', label: t('purchasing.orders.receive'), onSelect: () => openReceive(row.id) }]
               : []),
             ...(row.status === 'DRAFT' || row.status === 'CONFIRMED' || row.status === 'PARTIALLY_RECEIVED'
-              ? [{ kind: 'item' as const, id: 'cancel', label: 'Cancel', onSelect: () => setCancelTarget({ id: row.id, number: row.number }) }]
+              ? [{ kind: 'item' as const, id: 'cancel', label: t('purchasing.orders.cancel'), onSelect: () => setCancelTarget({ id: row.id, number: row.number, version: row.version }) }]
               : []),
           ];
-          return <KebabMenu label={`Actions for purchase order ${row.number}`} entries={entries} />;
+          return <KebabMenu label={`${t('purchasing.orders.columns.actions')} #${row.number}`} entries={entries} />;
         },
       },
     ],
-    [navigate],
+    [navigate, t],
   );
 
   const apiFailure =
     error && typeof error === 'object' && 'requestId' in error
-      ? (error as Error & { requestId: string })
+      ? (error as Error & { requestId: string; status?: number })
       : undefined;
 
   const hasFilters = search !== '' || status !== '';
@@ -190,8 +214,9 @@ export function OrdersTab() {
     warehouseName: order.warehouseName,
     status: order.status,
     orderDate: order.orderDate,
-    receivedText: receivedText(order),
-    total: formatMoneyGrouped(order.total),
+    progress: order.progress,
+    total: order.total,
+    version: order.version,
   }));
 
   function clearFilters() {
@@ -201,43 +226,45 @@ export function OrdersTab() {
   }
 
   return (
-    <div className="orders-tab" aria-label="Purchase orders">
+    <div className="orders-tab" aria-label={t('purchasing.orders.sectionAria')}>
       {toasts.map((toast) => (
         <Toast key={toast.id} id={toast.id} tone={toast.tone} message={toast.message} onDismiss={dismissToast} />
       ))}
       {isPending ? (
-        <Card title="Purchase orders">
-          <Skeleton label="Loading purchase orders" />
+        <Card title={t('purchasing.orders.title')}>
+          <Skeleton label={t('purchasing.orders.loading')} />
         </Card>
       ) : isError || data === undefined ? (
-        <Card title="Purchase orders">
+        <Card title={t('purchasing.orders.title')}>
           <ErrorState
-            message={error instanceof Error ? error.message : 'The purchase orders could not be loaded.'}
-            requestId={apiFailure?.requestId}
-            onRetry={() => setPage(1)}
+            message={error instanceof Error ? error.message : t('purchasing.orders.loadError')}
+            requestId={apiFailure?.requestId} status={apiFailure?.status}
+            onRetry={() => {
+              void refetch();
+            }}
           />
         </Card>
       ) : rows.length === 0 && !hasFilters ? (
         <EmptyState
-          title="No purchase orders yet"
-          description="Create your first purchase order to buy stock from a supplier."
-          actionLabel="New Purchase Order"
+          title={t('purchasing.orders.empty.title')}
+          description={t('purchasing.orders.empty.description')}
+          actionLabel={t('purchasing.orders.empty.actionLabel')}
           onAction={() => navigate('/purchasing/new')}
         />
       ) : rows.length === 0 ? (
         <EmptyState
-          title="No purchase orders match your filters"
-          description="Try adjusting the search or status filter to see orders."
-          actionLabel="Clear filters"
+          title={t('purchasing.orders.empty.filteredTitle')}
+          description={t('purchasing.orders.empty.filteredDescription')}
+          actionLabel={t('purchasing.orders.empty.filteredActionLabel')}
           onAction={clearFilters}
         />
       ) : (
-        <Card title="Purchase orders">
+        <Card title={t('purchasing.orders.title')}>
           <div className="purchase-orders__toolbar">
             <Input
               id="order-search"
-              label="Search"
-              placeholder="PO number, supplier or product"
+              label={t('purchasing.orders.filters.search')}
+              placeholder={t('purchasing.orders.filters.searchPlaceholder')}
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -246,14 +273,14 @@ export function OrdersTab() {
             />
             <Select
               id="order-status"
-              label="Status"
-              options={STATUSES.map((value) => ({ value, label: value }))}
+              label={t('purchasing.orders.filters.status')}
+              options={STATUSES.map((value) => ({ value, label: t(`purchasing.status.${value}`) }))}
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value);
                 setPage(1);
               }}
-              placeholder="All statuses"
+              placeholder={t('purchasing.orders.filters.allStatuses')}
             />
           </div>
           <DataTable<OrderRow>
@@ -265,12 +292,13 @@ export function OrdersTab() {
             sortColumn={sort}
             sortDirection={direction}
             onSortChange={(column, nextDirection) => {
-              setSort(column);
+              // The sortable column keys ARE the service's sort keys.
+              setSort(column as PurchaseOrderSortField);
               setDirection(nextDirection);
               setPage(1);
             }}
             onPageChange={setPage}
-            emptyMessage="No purchase orders found."
+            emptyMessage={t('purchasing.orders.empty.tableMessage')}
           />
         </Card>
       )}
@@ -279,18 +307,18 @@ export function OrdersTab() {
         open={confirmTarget !== null}
         onClose={() => setConfirmTarget(null)}
         onConfirm={handleConfirm}
-        title="Confirm purchase order"
-        description="Confirming locks this order. A confirmed order can no longer be edited; to change it, cancel it and create a new one."
-        actionLabel="Confirm order"
+        title={t('purchasing.confirm.title')}
+        description={t('purchasing.confirm.description')}
+        actionLabel={t('purchasing.confirm.actionLabel')}
         loading={confirmMutation.isPending}
       />
       <ConfirmDialog
         open={cancelTarget !== null}
         onClose={() => setCancelTarget(null)}
         onConfirm={handleCancelConfirmed}
-        title="Cancel purchase order"
-        description="A cancelled order is permanent: it can no longer receive goods and cannot be reopened, and it is kept for the audit trail. An order with receipts cannot be cancelled."
-        actionLabel="Cancel order"
+        title={t('purchasing.cancel.title')}
+        description={t('purchasing.cancel.description')}
+        actionLabel={t('purchasing.cancel.actionLabel')}
         destructive
         loading={cancelMutation.isPending}
       />
@@ -300,7 +328,7 @@ export function OrdersTab() {
           orderId={receiveOrderId}
           idempotencyKey={receiveKey}
           onClose={() => setReceiveOrderId(null)}
-          onPosted={(grNumber) => pushToast('success', `Goods receipt ${grNumber} posted.`)}
+          onPosted={(grNumber) => pushToast('success', t('purchasing.detail.receiptPostedToast', { number: grNumber }))}
         />
       )}
     </div>

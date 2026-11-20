@@ -13,11 +13,12 @@ import type {
 export type { CreateProductInput, Product, ProductCategory, UnitOfMeasure, UpdateProductInput };
 
 /** Turns the service's failure envelope into the error the screens show. */
-function toError(failure: { code: string; message: string; requestId: string; details?: unknown }): Error {
+function toError(failure: { code: string; message: string; requestId: string; status?: number; details?: unknown }): Error {
   const error = new Error(failure.message);
-  const enriched = error as Error & { code?: string; requestId?: string; details?: unknown };
+  const enriched = error as Error & { code?: string; requestId?: string; status?: number; details?: unknown };
   enriched.code = failure.code;
   enriched.requestId = failure.requestId;
+  enriched.status = failure.status;
   enriched.details = failure.details;
   return enriched;
 }

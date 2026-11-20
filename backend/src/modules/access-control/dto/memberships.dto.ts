@@ -7,7 +7,12 @@ import { z } from 'zod';
 export const createMemberSchema = z
   .object({
     email: z.string().email('Invalid email address.'),
-    name: z.string().min(1, 'Name is required.').max(128, 'Name is too long.'),
+    name: z
+      .string()
+      .trim()
+      .min(1, 'Name is required.')
+      .max(100, 'Name must be at most 100 characters.')
+      .refine((v) => !/[\x00-\x1f\x7f]/.test(v), 'Name must not contain control characters.'),
     password: z
       .string()
       .min(12, 'Password must be at least 12 characters long.')
@@ -22,6 +27,23 @@ export const createMemberSchema = z
   .strict();
 
 export type CreateMemberDto = z.infer<typeof createMemberSchema>;
+
+/**
+ * Update a member's display name.
+ */
+export const updateMemberNameSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, 'Name is required.')
+      .max(100, 'Name must be at most 100 characters.')
+      .refine((v) => !/[\x00-\x1f\x7f]/.test(v), 'Name must not contain control characters.'),
+    version: z.number().int().positive(),
+  })
+  .strict();
+
+export type UpdateMemberNameDto = z.infer<typeof updateMemberNameSchema>;
 
 /**
  * Replace roles request body.

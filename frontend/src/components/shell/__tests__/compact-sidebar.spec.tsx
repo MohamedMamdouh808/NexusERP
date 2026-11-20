@@ -6,7 +6,7 @@ import { renderWithProviders } from '../../../test/render';
 
 describe('Compact sidebar tablet responsiveness (T067, FR-011, FR-044)', () => {
   it('renders all navigation entries preserving accessible names and availability attributes in compact form', () => {
-    renderWithProviders(<Sidebar />);
+    renderWithProviders(<Sidebar />, { session: 'signed-in' });
 
     // Each entry in NAVIGATION must have an accessible name and correct state/aria attributes
     for (const group of NAVIGATION) {
@@ -26,7 +26,7 @@ describe('Compact sidebar tablet responsiveness (T067, FR-011, FR-044)', () => {
   });
 
   it('keeps current destination identifiable via aria-current="page"', () => {
-    renderWithProviders(<Sidebar />);
+    renderWithProviders(<Sidebar />, { session: 'signed-in' });
 
     const activeLink = screen.getByRole('link', { current: 'page' });
     expect(activeLink).toHaveTextContent(/Overview/i);

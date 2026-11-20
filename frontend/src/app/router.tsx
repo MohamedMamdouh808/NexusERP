@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import type { RouteObject } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { AppShell } from '../components/shell/app-shell';
 import { Breadcrumb } from '../components/shell/breadcrumb';
@@ -11,7 +12,7 @@ import { LoginPage } from '../features/auth/login-page';
 import { RegisterPage } from '../features/auth/register-page';
 import { ProfilePage } from '../features/profile/profile-page';
 import { HealthPanel } from '../features/health/health-panel';
-import { OverviewPage } from '../features/overview/overview-page';
+import { OverviewPage } from '../features/overview/dashboard-page';
 import { ProductsPage } from '../features/products/products-page';
 import { ProductNewPage } from '../features/products/product-new-page';
 import { ProductEditPage } from '../features/products/product-edit-page';
@@ -38,6 +39,11 @@ import { UsersPage } from '../features/administration/users-page';
 import { RoleDetailPage } from '../features/administration/role-detail-page';
 import { AuditLogPage } from '../features/administration/audit-log-page';
 import { ReportsPage } from '../features/reports/reports-page';
+import { StockOnHandPage } from '../features/reports/stock-on-hand-page';
+import { StockMovementsPage } from '../features/reports/stock-movements-page';
+import { OutstandingInvoicesPage } from '../features/reports/outstanding-invoices-page';
+import { DocumentStatusesPage } from '../features/reports/document-statuses-page';
+import { StockReconciliationPage } from '../features/reports/stock-reconciliation-page';
 
 const DevGallery = import.meta.env.DEV
   ? lazy(() => import('../dev/gallery/gallery-route').then((m) => ({ default: m.GalleryRoute })))
@@ -60,6 +66,17 @@ function shell(children: ReactNode): ReactNode {
   );
 }
 
+/** The /health page: a translated header over the panel. */
+function HealthRoute() {
+  const { t } = useTranslation();
+  return (
+    <>
+      <PageHeader title={t('health.title')} />
+      <HealthPanel />
+    </>
+  );
+}
+
 /**
  * The route table, exported so a test can assert that every navigation
  * destination actually resolves rather than merely existing in a list (T078).
@@ -68,7 +85,7 @@ export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
   { path: '/', element: shell(<OverviewPage />) },
-  { path: '/health', element: shell(<><PageHeader title="System health" /><HealthPanel /></>) },
+  { path: '/health', element: shell(<HealthRoute />) },
   ...(DevGallery
     ? [
         {
@@ -115,6 +132,11 @@ export const routes: RouteObject[] = [
   { path: '/users/roles/:id', element: shell(<RoleDetailPage />) },
   { path: '/audit-log', element: shell(<AuditLogPage />) },
   { path: '/reports', element: shell(<ReportsPage />) },
+  { path: '/reports/stock-on-hand', element: shell(<StockOnHandPage />) },
+  { path: '/reports/stock-movements', element: shell(<StockMovementsPage />) },
+  { path: '/reports/outstanding-invoices', element: shell(<OutstandingInvoicesPage />) },
+  { path: '/reports/document-statuses', element: shell(<DocumentStatusesPage />) },
+  { path: '/reports/stock-reconciliation', element: shell(<StockReconciliationPage />) },
   { path: '/profile', element: shell(<ProfilePage />) },
   { path: '*', element: <Navigate to="/" replace /> },
 ];

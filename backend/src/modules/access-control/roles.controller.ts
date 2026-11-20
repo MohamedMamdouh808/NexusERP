@@ -14,6 +14,8 @@ import {
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 import { roleSchema, type RoleDto } from './dto/roles.dto';
+import { AppException } from '../../common/errors/all-exceptions.filter';
+import { ERROR_CODES } from '@nexuserp/shared';
 import { RolesService } from './roles.service';
 import { AccessControlService } from './access-control.service';
 import { SessionGuard, SessionRequest } from '../../modules/auth/guards/session.guard';
@@ -47,6 +49,17 @@ export class RolesController {
   @RequirePermission('roles.manage')
   async listPermissions() {
     return this.service.listPermissions();
+  }
+
+  /** Get a single role with its permissions and member count. */
+  @Get(':id')
+  @RequirePermission('roles.manage')
+  async getRole(@Param('id') roleId: string) {
+    const result = await this.service.getRole(requireOrganizationId(), roleId);
+    if (!result) {
+      throw new AppException(ERROR_CODES.NOT_FOUND, [], 'Role not found.');
+    }
+    return result;
   }
 
   /** Create a custom role. Open catalogue, subject to no-escalation (FR-031). */

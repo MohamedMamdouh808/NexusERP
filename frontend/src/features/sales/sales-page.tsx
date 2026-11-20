@@ -1,49 +1,52 @@
-import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { PageHeader } from '../../components/shell/page-header';
-import { SampleDataBanner } from '../../components/ui/sample-data-banner';
 import { Button, Card, TabStrip } from '../../components/ui';
 import type { TabDefinition } from '../../components/ui';
+import { hasPermission, useSession } from '../../services/auth-session';
+import { SALES_PERMISSIONS } from '@nexuserp/shared';
 import { OrdersTab } from './orders-tab';
 import { ShipmentsTab } from './shipments-tab';
-
-const TABS: readonly TabDefinition[] = [
-  { key: 'orders', label: 'Sales orders', path: '/sales' },
-  { key: 'shipments', label: 'Shipments', path: '/sales/shipments' },
-];
 
 export function SalesPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState(() => {
-    // Deep link: derive the initial tab from the pathname the user landed on.
-    const tab = TABS.find((t) => location.pathname === t.path || location.pathname.startsWith(t.path + '/'));
-    return tab?.key ?? 'orders';
-  });
+  const { t } = useTranslation();
+  const session = useSession();
+  const canWrite = hasPermission(session, SALES_PERMISSIONS.write);
+  const tabs: readonly TabDefinition[] = [
+    { key: 'orders', label: t('sales.page.tabs.orders'), path: '/sales' },
+    { key: 'shipments', label: t('sales.page.tabs.shipments'), path: '/sales/shipments' },
+  ];
+  // The URL is the single source of truth for the active tab. Deriving it on
+  // every render keeps deep links such as /sales/shipments from matching the
+  // shorter /sales path and falling back to the orders tab.
+  const activeTab = tabs.find((tab) => location.pathname === tab.path)?.key ?? 'orders';
 
   function selectTab(key: string) {
-    setActiveTab(key);
-    const tab = TABS.find((t) => t.key === key);
+    const tab = tabs.find((item) => item.key === key);
     if (tab !== undefined) {
       navigate(tab.path);
     }
   }
 
   return (
-    <section className="purchasing-page" aria-label="Sales">
+    <section className="sales-page" aria-label={t('sales.page.sectionAria')}>
       <PageHeader
-        title="Sales"
-        description="Sales orders and shipments across both sample warehouses."
+        title={t('sales.page.title')}
+        description={t('sales.page.description')}
         primaryAction={
-          <Button variant="primary" onClick={() => navigate('/sales/new')}>
-            New Sales Order
-          </Button>
+          canWrite ? (
+            <Button variant="primary" onClick={() => navigate('/sales/new')}>
+              {t('sales.create.title')}
+            </Button>
+          ) : undefined
         }
       />
-      <SampleDataBanner moduleKey="sales" />
-      <Card title="Sales" className="purchasing-card">
-        <TabStrip tabs={TABS} activeKey={activeTab} onSelect={selectTab} />
+      <Card className="sales-card">
+        <TabStrip tabs={tabs} activeKey={activeTab} onSelect={selectTab} />
         {activeTab === 'orders' && <OrdersTab />}
         {activeTab === 'shipments' && <ShipmentsTab />}
       </Card>

@@ -1,32 +1,68 @@
-import { useQuery } from '@tanstack/react-query';
-import { SampleDataBanner } from '../../components/ui/sample-data-banner';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import { PageHeader } from '../../components/shell/page-header';
-import { Badge, Card, DataTable, ErrorState, Skeleton } from '../../components/ui';
-import type { Column } from '../../components/ui';
-import { formatMoneyGrouped } from '../../lib/format';
-import { compareQuantities, sumMoney } from '../../lib/quantity';
-import { sampleCatalogService } from '../../services/sample-catalog-service';
-import type { Invoice, StockBalance } from '../../services/catalog-service';
-import { useDashboard } from '../overview/use-dashboard';
+import { useSession } from '../../services/auth-session';
+import { isModuleEnabled } from '../../components/shell/module-availability';
+import { REPORT_SECTION_MODULES } from './reports-section-modules';
+import { Button } from '../../components/ui';
+import { KpiCard } from './kpi-card';
+import { DateRangeSelector, type DateRange } from './date-range-selector';
+import { SalesOverviewCard } from './sales-overview-card';
+import { SalesByCategoryCard } from './sales-by-category-card';
+import { RecentReportsTable } from './recent-reports-table';
+import { TopProductsTable } from './top-products-table';
 
 export function ReportsPage() {
-  const dashboard = useDashboard('this-month');
-  const invoices = useQuery({ queryKey: ['reports', 'invoices'], queryFn: () => sampleCatalogService.listInvoices({ page: 1, pageSize: 100, sort: 'dueDate', direction: 'asc' }) });
-  const stock = useQuery({ queryKey: ['reports', 'stock'], queryFn: () => sampleCatalogService.listStockBalances({ page: 1, pageSize: 100, sort: 'productName', direction: 'asc' }) });
-  const invoiceRows = invoices.data?.items ?? [];
-  const overdue = invoiceRows.filter((invoice) => invoice.balance !== '0.00' && invoice.dueDate < new Date().toISOString().slice(0, 10));
-  const overdueBalance = sumMoney(...overdue.map((invoice) => invoice.balance));
-  const lowStock = (stock.data?.items ?? []).filter((item) => item.reorderLevel !== null && compareQuantities(item.available, item.reorderLevel) <= 0);
-  const stockColumns: Column<StockBalance>[] = [{ key: 'productSku', header: 'SKU' }, { key: 'productName', header: 'Product' }, { key: 'warehouseName', header: 'Warehouse' }, { key: 'available', header: 'Available', numeric: true }, { key: 'reorderLevel', header: 'Reorder level', numeric: true }];
-  const invoiceColumns: Column<Invoice>[] = [{ key: 'number', header: 'Invoice' }, { key: 'customerName', header: 'Customer' }, { key: 'dueDate', header: 'Due date' }, { key: 'balance', header: 'Balance', numeric: true, render: (invoice) => formatMoneyGrouped(invoice.balance) }];
-  const loading = dashboard.isPending || invoices.isPending || stock.isPending;
-  const failed = dashboard.isError || invoices.isError || stock.isError;
-  return <section className="reports-page"><PageHeader title="Reports" description="Sales, inventory, and accounts receivable summaries."/><SampleDataBanner moduleKey="reports" />
-    {failed ? <ErrorState message="Reports could not be loaded." onRetry={() => { void dashboard.refetch(); void invoices.refetch(); void stock.refetch(); }}/> : loading ? <Card title="Reports"><Skeleton label="Loading reports"/></Card> : <>
-      <div className="report-kpis"><Card title="Sales this month"><strong>{formatMoneyGrouped(dashboard.data!.sales.value)}</strong></Card><Card title="Active sales orders"><strong>{dashboard.data!.activeOrders.value}</strong><span>Confirmed orders not yet shipped</span></Card><Card title="Low stock items"><strong>{lowStock.length}</strong><span>At or below reorder level</span></Card><Card title="Outstanding invoices"><strong>{formatMoneyGrouped(dashboard.data!.outstandingInvoices.value)}</strong><span>{formatMoneyGrouped(overdueBalance)} overdue</span></Card></div>
-      <Card title="Sales order status"><div className="report-status-list">{dashboard.data!.ordersByStatus.map((entry) => <div key={entry.status}><Badge status={entry.status}>{entry.status}</Badge><strong>{entry.count}</strong></div>)}</div></Card>
-      <Card title="Stock at reorder level" description={`${lowStock.length} product and warehouse balances need attention.`}><DataTable<StockBalance> columns={stockColumns} data={lowStock} total={lowStock.length} page={1} pageSize={100}/></Card>
-      <Card title="Open invoice balances" description={`${invoiceRows.filter((invoice) => ['ISSUED','PARTIALLY_PAID'].includes(invoice.status)).length} invoices have an outstanding balance.`}><DataTable<Invoice> columns={invoiceColumns} data={invoiceRows.filter((invoice) => ['ISSUED','PARTIALLY_PAID'].includes(invoice.status))} total={invoiceRows.filter((invoice) => ['ISSUED','PARTIALLY_PAID'].includes(invoice.status)).length} page={1} pageSize={100}/></Card>
-    </>}
-  </section>;
+  const { t } = useTranslation();
+  const session = useSession();
+  const visible = (section: string) =>
+    isModuleEnabled(session, REPORT_SECTION_MODULES[section] ?? 'products');
+  const [range, setRange] = useState<DateRange>(() => {
+    const now = new Date();
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const toIso = (d: Date) => d.toISOString().slice(0, 10);
+    return { start: toIso(start), end: toIso(now), preset: 'this-month' };
+  });
+  const exportId = 'reports-export-note';
+
+  return (
+    <section className="reports-page" aria-label={t('reports.title')}>
+      <PageHeader
+        title={t('reports.title')}
+        description={t('reports.page.description')}
+        primaryAction={(
+          <Button
+            variant="primary"
+            disabled
+            title={t('reports.page.exportUnavailable')}
+            aria-describedby={exportId}
+          >
+            {t('reports.page.exportReport')}
+          </Button>
+        )}
+      />
+      <div className="reports-toolbar">
+        <DateRangeSelector value={range} onChange={setRange} />
+      </div>
+      <p id={exportId} className="reports-export-note">{t('reports.page.exportUnavailable')}</p>
+
+      <div className="reports-kpis" aria-label={t('reports.title')}>
+        {visible('totalSales') && <KpiCard title={t('reports.page.kpis.totalSales')} />}
+        {visible('totalOrders') && <KpiCard title={t('reports.page.kpis.totalOrders')} />}
+        {visible('totalProducts') && <KpiCard title={t('reports.page.kpis.totalProducts')} />}
+        {visible('outstandingInvoices') && <KpiCard title={t('reports.page.kpis.outstandingInvoices')} />}
+      </div>
+
+      <div className="reports-charts">
+        {visible('salesOverview') && <SalesOverviewCard />}
+        {visible('salesByCategory') && <SalesByCategoryCard />}
+      </div>
+
+      <div className="reports-tables">
+        <RecentReportsTable />
+        {visible('topProducts') && <TopProductsTable />}
+      </div>
+    </section>
+  );
 }

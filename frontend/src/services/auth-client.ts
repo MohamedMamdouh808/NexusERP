@@ -77,12 +77,22 @@ export interface MeResult {
     readonly id: string;
     readonly roles: readonly MembershipRole[];
     readonly isActive: boolean;
+    /**
+     * The member's display name in THIS organization. A name belongs to a
+     * membership, not to the account, so the dashboard can greet a member
+     * without asking for a permission the member may not hold.
+     */
+    readonly name?: string | null;
   };
   readonly organization: {
     readonly id: string;
     readonly name: string;
     /** The ISO 4217 code the organization's prices are in. Read-only. */
     readonly currencyCode: string;
+    /** The default due date of an operational invoice: issue date plus this many days. Read-only. */
+    readonly defaultPaymentTermsDays: number;
+    /** The switchable modules this organization has switched on (FR-027). */
+    readonly enabledModules: readonly string[];
   };
   /**
    * The caller's effective permissions.
@@ -100,6 +110,10 @@ export interface Organization {
   readonly name: string;
   /** The ISO 4217 code this organization's prices are in. Read-only. */
   readonly currencyCode: string;
+  /** The default due date of an operational invoice, in days. Read-only. */
+  readonly defaultPaymentTermsDays: number;
+  /** The switchable modules this organization has switched on (FR-027). */
+  readonly enabledModules: readonly string[];
   readonly roles: readonly MembershipRole[];
 }
 
@@ -107,11 +121,21 @@ export interface Organization {
 export async function register(
   email: string,
   password: string,
+  organizationName?: string,
+  currencyCode?: string,
 ): Promise<ApiResult<RegisterResult>> {
+  const body: { email: string; password: string; organizationName?: string; currencyCode?: string } = { email, password };
+  const trimmed = organizationName?.trim();
+  if (trimmed !== undefined && trimmed !== '') {
+    body.organizationName = trimmed;
+  }
+  if (currencyCode !== undefined && currencyCode !== '') {
+    body.currencyCode = currencyCode;
+  }
   return requestJson(`${API_BASE}/auth/register`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(body),
   });
 }
 

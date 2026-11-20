@@ -149,8 +149,8 @@ export class ProductsService {
     const pageSize = Math.min(100, Math.max(1, Number(dto.pageSize ?? 25) || 25));
     const skip = (page - 1) * pageSize;
 
-    const sortBy = SORTABLE_COLUMNS.includes(dto.sortBy as SortableColumn)
-      ? (dto.sortBy as SortableColumn)
+    const sortBy = SORTABLE_COLUMNS.includes(dto.sortBy)
+      ? dto.sortBy
       : 'name';
     const sortOrder = dto.sortOrder === 'desc' ? 'desc' : 'asc';
 
@@ -520,6 +520,200 @@ export class ProductsService {
     });
   }
 
+  /**
+   * Asserts that the given products may be ordered, and returns what the
+   * caller needs to write the order lines.
+   *
+   * Every product must exist in THIS organization and must not be archived.
+   * The rows are locked with FOR SHARE in ascending identifier order, so an
+   * archive waits for the order to commit instead of slipping between the
+   * check and the write, and two order writers take the same locks in the same
+   * order.
+   *
+   * The unit-of-measure ABBREVIATION travels with the summary: the order line
+   * captures it, so a later change of the product's unit cannot rewrite the
+   * document or its receipt history.
+   */
+  async assertSelectableForOrder(
+    tx: TransactionClient,
+    organizationId: string,
+    productIds: readonly string[],
+  ): Promise<
+    {
+      id: string;
+      sku: string;
+      name: string;
+      purchasePrice: string;
+      unitOfMeasure: string;
+    }[]
+  > {
+    if (productIds.length === 0) return [];
+
+    const rows = await tx.$queryRaw<
+      {
+        id: string;
+        sku: string;
+        name: string;
+        is_archived: boolean;
+        purchase_price: Prisma.Decimal;
+        unit_of_measure: string;
+      }[]
+    >(Prisma.sql`
+      SELECT p."id", p."sku", p."name", p."is_archived", p."purchase_price", u."abbreviation" AS "unit_of_measure"
+      FROM "products" p
+      JOIN "units_of_measure" u
+        ON u."organization_id" = p."organization_id"
+       AND u."id" = p."unit_id"
+      WHERE p."organization_id" = ${organizationId}::uuid
+        AND p."id" IN (${Prisma.join(productIds.map((id) => Prisma.sql`${id}::uuid`))})
+      ORDER BY p."id"
+      FOR SHARE OF p
+    `);
+
+    const found = new Map(rows.map((row) => [row.id, row]));
+    const summaries = [] as {
+      id: string;
+      sku: string;
+      name: string;
+      purchasePrice: string;
+      unitOfMeasure: string;
+    }[];
+
+    for (const productId of productIds) {
+      const product = found.get(productId);
+      if (product === undefined) {
+        throw new NotFoundException('Product not found.');
+      }
+      if (product.is_archived) {
+        throw new AppException(
+          ERROR_CODES.PRODUCT_ARCHIVED,
+          [
+            {
+              field: 'productId',
+              code: 'PRODUCT_ARCHIVED',
+              message: 'This product is archived and cannot be ordered.',
+            },
+          ],
+          'This product is archived and cannot be ordered.',
+        );
+      }
+      summaries.push({
+        id: product.id,
+        sku: product.sku,
+        name: product.name,
+        purchasePrice: product.purchase_price.toFixed(4),
+        unitOfMeasure: product.unit_of_measure,
+      });
+    }
+
+    return summaries;
+  }
+
+  /**
+   * Asserts that the given products may be sold, and returns their selling
+   * prices. The rows are locked with FOR SHARE in ascending identifier order,
+   * so two concurrent confirmations cannot deadlock. Refuses an archived
+   * product.
+   */
+  async assertSelectableForSale(
+    tx: TransactionClient,
+    organizationId: string,
+    productIds: readonly string[],
+  ): Promise<{ id: string; sku: string; name: string; sellingPrice: string }[]> {
+    if (productIds.length === 0) return [];
+
+    const rows = await tx.$queryRaw<
+      {
+        id: string;
+        sku: string;
+        name: string;
+        is_archived: boolean;
+        selling_price: Prisma.Decimal;
+      }[]
+    >(Prisma.sql`
+      SELECT p."id", p."sku", p."name", p."is_archived", p."selling_price"
+      FROM "products" p
+      WHERE p."organization_id" = ${organizationId}::uuid
+        AND p."id" IN (${Prisma.join(productIds.map((id) => Prisma.sql`${id}::uuid`))})
+        ORDER BY p."id"
+        FOR SHARE OF p
+    `);
+
+    const found = new Map(rows.map((row) => [row.id, row]));
+    const summaries = [] as { id: string; sku: string; name: string; sellingPrice: string }[];
+
+    for (const productId of productIds) {
+      const product = found.get(productId);
+      if (product === undefined) {
+        throw new NotFoundException('Product not found.');
+      }
+      if (product.is_archived) {
+        throw new AppException(
+          ERROR_CODES.PRODUCT_ARCHIVED,
+          [
+            {
+              field: 'productId',
+              code: 'PRODUCT_ARCHIVED',
+              message: 'This product is archived and cannot be sold.',
+            },
+          ],
+          'This product is archived and cannot be sold.',
+        );
+      }
+      summaries.push({
+        id: product.id,
+        sku: product.sku,
+        name: product.name,
+        sellingPrice: product.selling_price.toFixed(4),
+      });
+    }
+
+    return summaries;
+  }
+
+  /**
+   * The names of the given products.
+   *
+   * Another module needs the SKU and the name of a product to show them next
+   * to one of its own records. It asks the module that owns the products
+   * rather than reading the table (Constitution Principle VI).
+   */
+  async findNames(organizationId: string, ids: readonly string[]) {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return [];
+    return this.prisma.product.findMany({
+      where: { organizationId, id: { in: unique } },
+      select: { id: true, sku: true, name: true },
+    });
+  }
+
+  /**
+   * The products whose name or SKU matches a search term.
+   *
+   * The list endpoints of the other modules search by product without reading
+   * the products table themselves: they ask here and filter by the ids this
+   * returns.
+   */
+  async findMatchingProductIds(
+    organizationId: string,
+    term: string,
+    limit = 500,
+  ): Promise<string[]> {
+    const escaped = escapeSqlWildcards(term.trim());
+    const rows = await this.prisma.product.findMany({
+      where: {
+        organizationId,
+        OR: [
+          { name: { contains: escaped, mode: 'insensitive' } },
+          { sku: { contains: escaped, mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true },
+      take: limit,
+    });
+    return rows.map((row) => row.id);
+  }
+
   /** The category and the unit must belong to the caller's organization. */
   private async assertCategoryAndUnit(
     tx: TransactionClient,
@@ -625,4 +819,3 @@ function escapeSqlWildcards(input: string): string {
 
 /** The columns a product list may be sorted by. */
 const SORTABLE_COLUMNS = ['name', 'sku', 'createdAt'] as const;
-type SortableColumn = (typeof SORTABLE_COLUMNS)[number];

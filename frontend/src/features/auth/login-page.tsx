@@ -22,6 +22,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import { Button, Input } from '../../components/ui';
 import { isRateLimited } from '../../lib/api-client';
@@ -41,13 +42,11 @@ interface FormErrors {
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** The generic wrong-credential message. Nothing the service says rewords it. */
-const GENERIC_CREDENTIALS_ERROR = 'The email address or password is not correct.';
-
-function validate(form: FormState): FormErrors {
+function validate(form: FormState, t: (key: string) => string): FormErrors {
   const errors: { email?: string; password?: string } = {};
-  if (form.email.trim().length === 0) errors.email = 'Email is required.';
-  else if (!EMAIL_PATTERN.test(form.email.trim())) errors.email = 'Enter a valid email address.';
-  if (form.password.length === 0) errors.password = 'Password is required.';
+  if (form.email.trim().length === 0) errors.email = t('auth.login.emailRequired');
+  else if (!EMAIL_PATTERN.test(form.email.trim())) errors.email = t('auth.login.emailInvalid');
+  if (form.password.length === 0) errors.password = t('auth.login.passwordRequired');
   return errors;
 }
 
@@ -60,6 +59,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const session = useSession();
+  const { t } = useTranslation();
   const [form, setForm] = useState<FormState>({ email: '', password: '' });
   const [touched, setTouched] = useState<Partial<Record<keyof FormState, boolean>>>({});
   const [errors, setErrors] = useState<FormErrors>({});
@@ -88,7 +88,7 @@ export function LoginPage() {
 
   function blur(field: keyof FormState) {
     setTouched((prev) => ({ ...prev, [field]: true }));
-    setErrors(validate(form));
+    setErrors(validate(form, t));
   }
 
   function showRateLimit(wait: number) {
@@ -108,7 +108,7 @@ export function LoginPage() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    const validation = validate(form);
+    const validation = validate(form, t);
     setErrors(validation);
     setTouched({ email: true, password: true });
     if (Object.keys(validation).length > 0) return;
@@ -155,13 +155,13 @@ export function LoginPage() {
           <span aria-hidden="true">NexusERP</span>
         </div>
         <div className="card auth-screen__card">
-          <h1 className="auth-screen__title">Sign in</h1>
-          <p className="auth-screen__lede">Use the email address and password for your account.</p>
+          <h1 className="auth-screen__title">{t('auth.login.title')}</h1>
+          <p className="auth-screen__lede">{t('auth.login.lede')}</p>
           <form onSubmit={onSubmit} noValidate={true}>
             <div className="auth-screen__fields">
               <Input
                 id="login-email"
-                label="Email"
+                label={t('auth.login.email')}
                 type="email"
                 autoComplete="email"
                 required={true}
@@ -172,7 +172,7 @@ export function LoginPage() {
               />
               <Input
                 id="login-password"
-                label="Password"
+                label={t('auth.login.password')}
                 type="password"
                 autoComplete="current-password"
                 required={true}
@@ -187,18 +187,19 @@ export function LoginPage() {
                 <p>
                   {isRateLimited(failure)
                     ? secondsLeft !== null
-                      ? `Too many attempts. Try again in ${secondsLeft} second${secondsLeft === 1 ? '' : 's'}.`
-                      : 'Too many attempts. Try again later.'
-                    : GENERIC_CREDENTIALS_ERROR}
+                      ? t('auth.login.rateLimitedIn', { count: secondsLeft })
+                      : t('auth.login.rateLimited')
+                    : t('auth.login.credentials')}
                 </p>
                 <p className="auth-screen__error-request-id">
-                  Reference ID: <code>{failure.requestId}</code>
+                  {t('ui.errorState.referenceLabel')}
+                  <code>{failure.requestId}</code> · HTTP {failure.status}
                 </p>
               </div>
             )}
             {secondsLeft !== null && (
               <output aria-live="polite" className="sr-only" htmlFor={countdownId}>
-                Retry in {secondsLeft} seconds
+                {t('auth.login.retryInSeconds', { count: secondsLeft ?? 0 })}
               </output>
             )}
             <div className="auth-screen__actions">
@@ -208,10 +209,11 @@ export function LoginPage() {
                 loading={pending}
                 disabled={pending || secondsLeft !== null}
               >
-                {pending ? 'Signing in…' : 'Sign in'}
+                {pending ? t('auth.login.submitPending') : t('auth.login.submit')}
               </Button>
               <p className="auth-screen__alt">
-                New here? <Link to="/register">Create an account</Link>
+                {t('auth.login.newHere')}
+                <Link to="/register">{t('auth.login.createAccount')}</Link>
               </p>
             </div>
           </form>

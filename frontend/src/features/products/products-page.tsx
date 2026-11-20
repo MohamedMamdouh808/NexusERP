@@ -1,9 +1,12 @@
+import { useTranslation } from 'react-i18next';
+
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PRODUCT_PERMISSIONS, PRODUCT_LIST_DEFAULTS } from '@nexuserp/shared';
 import type { ProductSortField, ProductSortOrder, ProductStatusFilter } from '@nexuserp/shared';
 
 import { PageHeader } from '../../components/shell/page-header';
+import { formatMoneyLocalized } from '../../lib/i18n-format';
 import {
   Badge,
   Button,
@@ -22,13 +25,17 @@ import { useCategories, useProducts, useUnits } from './use-products';
 import type { Product } from '../../services/products-client';
 
 /**
- * Shows a recorded amount with the organization's currency.
+ * Shows a recorded price with the organization's currency.
  *
- * The amount is shown exactly as it was stored: no conversion, and no
- * arithmetic on money. The currency code is the organization's own.
+ * The value is shown exactly as it was stored - no conversion, never an
+ * arithmetic step on money - with the organization's own ISO 4217 code beside
+ * it, in the formatting the selected language uses (digit grouping adapts;
+ * the currency does not).
  */
 function withCurrency(amount: string, currencyCode: string | null): string {
-  return currencyCode === null ? amount : `${amount} ${currencyCode}`;
+  return currencyCode === null
+    ? amount
+    : formatMoneyLocalized(amount, currencyCode, 4);
 }
 
 /**
@@ -43,6 +50,7 @@ export function ProductsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const session = useSession();
+  const { t } = useTranslation();
   const canWrite = hasPermission(session, PRODUCT_PERMISSIONS.write);
 
   const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
@@ -89,35 +97,35 @@ export function ProductsPage() {
 
   const columns: Column<Product>[] = useMemo(
     () => [
-      { key: 'sku', header: 'SKU', sortable: true },
+      { key: 'sku', header: t('products.list.columns.sku'), sortable: true },
       {
         key: 'name',
-        header: 'Name',
+        header: t('products.list.columns.name'),
         sortable: true,
         render: (row) => <Link to={`/products/${row.id}`}>{row.name}</Link>,
       },
-      { key: 'categoryId', header: 'Category', render: (row) => categoryNames.get(row.categoryId) ?? '—' },
-      { key: 'unitId', header: 'Unit', render: (row) => unitNames.get(row.unitId) ?? '—' },
-      { key: 'purchasePrice', header: 'Purchase price', numeric: true, render: (row) => withCurrency(row.purchasePrice, currencyCode) },
-      { key: 'sellingPrice', header: 'Selling price', numeric: true, render: (row) => withCurrency(row.sellingPrice, currencyCode) },
+      { key: 'categoryId', header: t('products.list.columns.category'), render: (row) => categoryNames.get(row.categoryId) ?? '—' },
+      { key: 'unitId', header: t('products.list.columns.unit'), render: (row) => unitNames.get(row.unitId) ?? '—' },
+      { key: 'purchasePrice', header: t('products.list.columns.purchasePrice'), numeric: true, render: (row) => withCurrency(row.purchasePrice, currencyCode) },
+      { key: 'sellingPrice', header: t('products.list.columns.sellingPrice'), numeric: true, render: (row) => withCurrency(row.sellingPrice, currencyCode) },
       {
         key: 'isArchived',
-        header: 'Status',
+        header: t('products.list.columns.status'),
         render: (row) => (
           <Badge tone={row.isArchived ? 'destructive' : 'success'}>
-            {row.isArchived ? 'Archived' : 'Active'}
+            {row.isArchived ? t('common.status.archived') : t('common.status.active')}
           </Badge>
         ),
       },
       {
         key: 'actions',
-        header: 'Actions',
+        header: t('products.list.columns.actions'),
         render: (row) => {
           const entries = [
             {
               kind: 'item' as const,
               id: 'view',
-              label: 'View',
+              label: t('common.actions.view'),
               onSelect: () => navigate(`/products/${row.id}`),
             },
             ...(canWrite
@@ -125,33 +133,33 @@ export function ProductsPage() {
                   {
                     kind: 'item' as const,
                     id: 'edit',
-                    label: 'Edit',
+                    label: t('common.actions.edit'),
                     onSelect: () => navigate(`/products/${row.id}/edit`),
                   },
                 ]
               : []),
           ];
-          return <KebabMenu label={`Actions for ${row.name}`} entries={entries} />;
+          return <KebabMenu label={t('products.list.actionsFor', { name: row.name })} entries={entries} />;
         },
       },
     ],
-    [canWrite, navigate, categoryNames, unitNames, currencyCode],
+    [canWrite, navigate, categoryNames, unitNames, currencyCode, t],
   );
 
   const apiFailure =
     error && typeof error === 'object' && 'requestId' in error
-      ? (error as Error & { requestId: string })
+      ? (error as Error & { requestId: string; status?: number })
       : undefined;
 
   return (
-    <section className="products-page" aria-label="Products catalogue">
+    <section className="products-page" aria-label={t('products.list.sectionAria')}>
       <PageHeader
-        title="Products"
-        description="The organization's catalogue of customers' and suppliers' items."
+        title={t('products.list.title')}
+        description={t('products.list.description')}
         primaryAction={
           canWrite ? (
             <Button variant="primary" onClick={() => navigate('/products/new')}>
-              New Product
+              {t('products.list.newProduct')}
             </Button>
           ) : undefined
         }
@@ -161,8 +169,8 @@ export function ProductsPage() {
       <div className="products-page__toolbar">
         <Input
           id="product-search"
-          label="Search"
-          placeholder="SKU or name"
+          label={t('products.list.filters.search')}
+          placeholder={t('products.list.filters.searchPlaceholder')}
           value={search}
           onChange={(event) => {
             setSearch(event.target.value);
@@ -171,7 +179,7 @@ export function ProductsPage() {
         />
         <Select
           id="product-category"
-          label="Category"
+          label={t('products.list.filters.category')}
           options={(categories.data ?? []).map((category) => ({
             value: category.id,
             label: category.name,
@@ -181,33 +189,33 @@ export function ProductsPage() {
             setCategoryId(event.target.value);
             setPage(1);
           }}
-          placeholder="All categories"
+          placeholder={t('products.list.filters.allCategories')}
         />
         <Select
           id="product-status"
-          label="Status"
+          label={t('products.list.filters.status')}
           options={[
-            { value: 'active', label: 'Active' },
-            { value: 'archived', label: 'Archived' },
-            { value: 'all', label: 'All statuses' },
+            { value: 'active', label: t('common.status.active') },
+            { value: 'archived', label: t('common.status.archived') },
+            { value: 'all', label: t('products.list.filters.allStatuses') },
           ]}
           value={status}
           onChange={(event) => {
             setStatus(event.target.value as ProductStatusFilter);
             setPage(1);
           }}
-          placeholder="All statuses"
+          placeholder={t('products.list.filters.allStatuses')}
         />
       </div>
       {isPending ? (
-        <Card title="Products">
-          <Skeleton label="Loading products" />
+        <Card title={t('products.list.title')}>
+          <Skeleton label={t('products.list.loading')} />
         </Card>
       ) : isError || data === undefined ? (
-        <Card title="Products">
+        <Card title={t('products.list.title')}>
           <ErrorState
-            message={error instanceof Error ? error.message : 'The products could not be loaded.'}
-            requestId={apiFailure?.requestId}
+            message={error instanceof Error ? error.message : t('products.list.loadError')}
+            requestId={apiFailure?.requestId} status={apiFailure?.status}
             onRetry={() => {
               void refetch();
             }}
@@ -215,13 +223,13 @@ export function ProductsPage() {
         </Card>
       ) : products.length === 0 ? (
         <EmptyState
-          title="No products match your filters"
+          title={t('products.list.empty.title')}
           description={
             status === 'active'
-              ? 'Try another search, another category, or show the archived products.'
-              : 'Try adjusting the search or the category filter.'
+              ? t('products.list.empty.descriptionActive')
+              : t('products.list.empty.descriptionFiltered')
           }
-          actionLabel={status === 'active' ? 'Show archived' : 'Clear filters'}
+          actionLabel={status === 'active' ? t('common.form.showArchived') : t('common.form.clearFilters')}
           onAction={() => {
             if (status === 'active') {
               setStatus('archived');
@@ -234,7 +242,7 @@ export function ProductsPage() {
           }}
         />
       ) : (
-        <Card title="Products">
+        <Card title={t('products.list.title')}>
           <DataTable
             columns={columns}
             data={products}
@@ -245,8 +253,8 @@ export function ProductsPage() {
             sortDirection={sortOrder}
             onSortChange={applySort}
             onPageChange={setPage}
-            emptyMessage="No products found."
-            ariaLabel="Products catalogue"
+            emptyMessage={t('products.list.empty.tableMessage')}
+            ariaLabel={t('products.list.sectionAria')}
           />
         </Card>
       )}

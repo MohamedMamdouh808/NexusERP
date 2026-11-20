@@ -42,7 +42,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
     <div className="form-control">
       <label htmlFor={id} className="form-label">
         {label}
-        {required && <span className="form-label__required" aria-hidden="true">*</span>}
+        {required && <> <span className="form-label__required" aria-hidden="true">*</span></>}
       </label>
       <select
         id={id}

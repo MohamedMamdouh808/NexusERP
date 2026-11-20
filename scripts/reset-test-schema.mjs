@@ -83,6 +83,24 @@ try {
   );
   console.log(`[reset-test-schema] dropped and recreated schema ${TEST_SCHEMA}; ${tables[0].c} tables (expect 0).`);
 
+  // Mirror the Supabase default privileges that `public` carries, so tables
+  // created by the migrations inherit the same application-role grants
+  // (service_role in particular). Without this the isolated schema would not
+  // exercise the role-revoke checks the invariants rely on, and a missing
+  // revoke would stay invisible until it reached production. Guarded by role
+  // existence so a plain PostgreSQL database without these roles still works.
+  await prisma.$executeRawUnsafe(`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres')
+         AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+        EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA ${TEST_SCHEMA} GRANT ALL ON TABLES TO service_role';
+        EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA ${TEST_SCHEMA} GRANT ALL ON SEQUENCES TO service_role';
+        EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA ${TEST_SCHEMA} GRANT ALL ON FUNCTIONS TO service_role';
+      END IF;
+    END $$;
+  `);
+
   if (!process.argv.includes('--migrate')) {
     console.log('[reset-test-schema] next: node scripts/with-test-schema-env.mjs npx prisma migrate deploy');
     process.exit(0);

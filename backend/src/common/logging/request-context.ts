@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { UnauthorizedException } from '@nestjs/common';
+import type { ModuleState } from '@nexuserp/shared';
 
 /**
  * The per-request context: one identifier that ties a user's report to the exact
@@ -27,6 +28,12 @@ export interface RequestContext {
   readonly userId: string | null;
   /** Emitted as null until organizations ship. See `userId` for why the field exists. */
   readonly organizationId: string | null;
+  /**
+   * The calling organization's module availability, loaded once per request by
+   * `ModuleStateService` and cached here for the lifetime of the request so the
+   * shared module guard reads module state exactly once (FR-020).
+   */
+  readonly moduleStates?: readonly ModuleState[];
 }
 
 const storage = new AsyncLocalStorage<MutableRequestContext>();
@@ -43,6 +50,7 @@ interface MutableRequestContext {
   requestId: string;
   userId: string | null;
   organizationId: string | null;
+  moduleStates?: readonly ModuleState[];
 }
 
 /**
@@ -57,6 +65,7 @@ export function runWithRequestContext<T>(context: RequestContext, work: () => T)
       requestId: context.requestId,
       userId: context.userId,
       organizationId: context.organizationId,
+      ...(context.moduleStates !== undefined ? { moduleStates: context.moduleStates } : {}),
     },
     work,
   );
@@ -100,6 +109,7 @@ export function extendRequestContext(patch: Partial<Omit<RequestContext, 'reques
   if (!current) return;
   if (patch.userId !== undefined) current.userId = patch.userId;
   if (patch.organizationId !== undefined) current.organizationId = patch.organizationId;
+  if (patch.moduleStates !== undefined) current.moduleStates = patch.moduleStates;
 }
 
 /**

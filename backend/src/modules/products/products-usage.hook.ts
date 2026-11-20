@@ -34,7 +34,7 @@ export class DefaultProductsUsageHook implements ProductsUsageHook {
    * The purchasing, sales and inventory features replace this provider with
    * one that checks their open documents and reserved stock.
    */
-  async isInUse(_organizationId: string, _productId: string): Promise<ProductUsageResult> {
-    return { inUse: false };
+  isInUse(_organizationId: string, _productId: string): Promise<ProductUsageResult> {
+    return Promise.resolve({ inUse: false });
   }
 }

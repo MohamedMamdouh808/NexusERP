@@ -428,6 +428,149 @@ export class ContactsService {
   }
 
   /**
+   * The names of the given contacts.
+   *
+   * Another module needs the name of a contact to show it next to one of its
+   * own records. It asks the module that owns the contacts rather than
+   * reading the table (Constitution Principle VI).
+   */
+  async findNames(organizationId: string, ids: readonly string[]) {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return [];
+    return this.prisma.contact.findMany({
+      where: { organizationId, id: { in: unique } },
+      select: { id: true, name: true },
+    });
+  }
+
+  /**
+   * The contacts whose name matches a search term.
+   *
+   * The list endpoints of the other modules search by contact without reading
+   * the contacts table themselves: they ask here and filter by the ids this
+   * returns.
+   */
+  async findMatchingSupplierIds(
+    organizationId: string,
+    term: string,
+    limit = 500,
+  ): Promise<string[]> {
+    const escaped = escapeSqlWildcards(term.trim());
+    const rows = await this.prisma.contact.findMany({
+      where: {
+        organizationId,
+        OR: [{ name: { contains: escaped, mode: 'insensitive' } }],
+      },
+      select: { id: true },
+      take: limit,
+    });
+    return rows.map((row) => row.id);
+  }
+
+  /**
+   * Asserts that a contact may be the supplier of a purchase order.
+   *
+   * The contact must exist in THIS organization, must not be archived and must
+   * carry the supplier role.
+   *
+   * The row is locked with FOR SHARE while the order is written. Without the
+   * lock, a supplier could be archived between this check and the order's
+   * commit, and the order would end up pointing at an archived supplier; with
+   * it, the archive waits for the order to commit and then sees the order in
+   * the usage check.
+   */
+  async assertSupplierSelectableForOrder(
+    tx: TransactionClient,
+    organizationId: string,
+    contactId: string,
+  ): Promise<{ id: string; name: string; code: string }> {
+    const rows = await tx.$queryRaw<
+      { id: string; name: string; code: string; is_archived: boolean; is_supplier: boolean }[]
+    >(Prisma.sql`
+      SELECT "id", "name", "code", "is_archived", "is_supplier"
+      FROM "contacts"
+      WHERE "organization_id" = ${organizationId}::uuid
+        AND "id" = ${contactId}::uuid
+      FOR SHARE
+    `);
+
+    const contact = rows[0];
+    if (contact === undefined) {
+      throw new NotFoundException('Supplier not found.');
+    }
+    if (contact.is_archived) {
+      throw new AppException(
+        ERROR_CODES.VALIDATION_ERROR,
+        [
+          {
+            field: 'supplierId',
+            code: 'CONTACT_ARCHIVED',
+            message: 'This supplier is archived and cannot be used on an order.',
+          },
+        ],
+        'This supplier is archived and cannot be used on an order.',
+      );
+    }
+    if (!contact.is_supplier) {
+      throw new AppException(
+        ERROR_CODES.VALIDATION_ERROR,
+        [
+          {
+            field: 'supplierId',
+            code: 'NOT_A_SUPPLIER',
+            message: 'This contact is not a supplier.',
+          },
+        ],
+        'This contact is not a supplier.',
+      );
+    }
+
+    return { id: contact.id, name: contact.name, code: contact.code };
+  }
+
+  /**
+   * Asserts that a contact may be the customer of a sales order.
+   *
+   * Takes a shared row lock so two concurrent orders cannot race a contact
+   * archive. Refuses an archived contact or one without the customer role.
+   */
+  async assertCustomerSelectableForOrder(
+    tx: TransactionClient,
+    organizationId: string,
+    contactId: string,
+  ): Promise<{ id: string; name: string; code: string }> {
+    const rows = await tx.$queryRaw<
+      { id: string; name: string; code: string; is_archived: boolean; is_customer: boolean }[]
+    >(Prisma.sql`
+      SELECT "id", "name", "code", "is_archived", "is_customer"
+      FROM "contacts"
+      WHERE "organization_id" = ${organizationId}::uuid
+        AND "id" = ${contactId}::uuid
+        FOR SHARE
+    `);
+
+    const contact = rows[0];
+    if (contact === undefined) {
+      throw new NotFoundException('Customer not found.');
+    }
+    if (contact.is_archived || !contact.is_customer) {
+      throw new AppException(
+        ERROR_CODES.CUSTOMER_NOT_ACTIVE,
+        [
+          {
+            field: 'customerId',
+            code: 'CUSTOMER_NOT_ACTIVE',
+            message: 'This customer is archived or does not have the customer role.',
+          },
+        ],
+        'This customer is archived or does not have the customer role.',
+      );
+    }
+
+    return { id: contact.id, name: contact.name, code: contact.code };
+  }
+
+  /**
    * Helper to allocate and format document sequence codes atomically.
    */
   private async allocateSequenceCode(

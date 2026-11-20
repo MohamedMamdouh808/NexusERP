@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { sampleCatalogService } from '../../services/sample-catalog-service';
+import { useTranslation } from 'react-i18next';
 
 import { Sidebar } from './sidebar';
 import { TopBar } from './top-bar';
 import { CommandPalette } from '../ui/command-palette';
+import { useSession } from '../../services/auth-session';
+import { moduleForPath, isModuleEnabled } from './module-availability';
 
 /**
  * The authenticated application shell (T086).
@@ -22,10 +23,11 @@ import { CommandPalette } from '../ui/command-palette';
 export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const modules = useQuery({ queryKey: ['modules'], queryFn: () => sampleCatalogService.listModules() });
+  const session = useSession();
   const gTimer = useRef<number | null>(null);
   useEffect(() => {
     const shortcuts: Record<string, string> = {
@@ -69,7 +71,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (gTimer.current !== null) window.clearTimeout(gTimer.current);
     };
   }, [navigate]);
-  const gatedModule = location.pathname.startsWith('/inventory') ? 'inventory' : location.pathname.startsWith('/purchasing') ? 'purchasing' : location.pathname.startsWith('/sales') ? 'sales' : location.pathname.startsWith('/invoicing') ? 'invoicing' : null;
+  const gatedModule = moduleForPath(location.pathname);
   useEffect(() => {
     setMobileNavigationOpen(false);
   }, [location.pathname]);
@@ -92,14 +94,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [mobileNavigationOpen]);
 
-  if (gatedModule && modules.data?.find((module) => module.key === gatedModule)?.enabled === false) {
-    return <Navigate to="/settings/organization" replace state={{ notice: 'Turned off in Settings' }} />;
+  if (gatedModule !== null && !isModuleEnabled(session, gatedModule)) {
+    return <Navigate to="/settings/organization" replace state={{ notice: t('shell.sidebar.turnedOff') }} />;
   }
 
   return (
     <div className="app-shell">
       <a className="sr-only" href="#main-content">
-        Skip to main content
+        {t('shell.skipToMain')}
       </a>
       <TopBar
         menuButtonRef={menuButtonRef}
@@ -114,7 +116,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <button
           type="button"
           className="mobile-navigation__overlay"
-          aria-label="Close navigation drawer"
+          aria-label={t('shell.topBar.closeNavigationDrawer')}
           onClick={() => setMobileNavigationOpen(false)}
         />
       )}

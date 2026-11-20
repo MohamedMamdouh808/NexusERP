@@ -42,6 +42,33 @@ describe('DropdownMenu states (T043, FR-029, FR-050)', () => {
     expect(screen.getByText('Feature unavailable in preview')).toBeInTheDocument();
   });
 
+  it('renders a header entry as non-interactive: no menuitem role, no focus, no activation', async () => {
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <DropdownMenu
+        trigger="Options"
+        label="Actions"
+        entries={[
+          { kind: 'header', id: 'header', label: "mohamed234@gmail.com's Organization" },
+          { kind: 'item' as const, id: '1', label: 'Edit', onSelect },
+        ]}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Options' }));
+
+    // No menuitem role on the header row.
+    expect(screen.queryByRole('menuitem', { name: /Organization/i })).not.toBeInTheDocument();
+
+    // Keyboard focus skips the header and lands on the first actionable entry.
+    expect(screen.getByRole('menuitem', { name: 'Edit' })).toHaveFocus();
+
+    // Clicking the header does nothing (no onSelect, menu stays open).
+    await user.click(screen.getByText("mohamed234@gmail.com's Organization"));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
   it('closes on Escape and returns focus to the trigger', async () => {
     const user = userEvent.setup();
     render(<DropdownMenu trigger="Options" label="Actions" entries={entries} />);

@@ -46,6 +46,7 @@ This document describes the database conventions established for NexusERP.
 
 - Posted tables (`stock_movements`, `audit_logs`, shipments, issued invoices, payments, allocations) are created append-only. The application database role is granted INSERT and SELECT only; UPDATE and DELETE are revoked at the database level, not merely omitted from the ORM. A logged `UPDATE` or `DELETE` on a posted row is a failed transaction.
 - The revoke is expressed in a migration, so it is version-controlled and applied everywhere the schema is applied, rather than being a manual production step someone can forget.
+- The canonical recipe for a new append-only table (triggers for UPDATE, DELETE and TRUNCATE plus the role revokes) lives in `database/templates/append-only-table.sql`; copy it into a new migration and add the table to `APPEND_ONLY_TABLES` in `scripts/verify-db-invariants.mjs`.
 
 ### Transaction Boundary Convention
 

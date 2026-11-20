@@ -26,7 +26,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     <div className="form-control">
       <label htmlFor={id} className="form-label">
         {label}
-        {required && <span className="form-label__required" aria-hidden="true">*</span>}
+        {required && <> <span className="form-label__required" aria-hidden="true">*</span></>}
       </label>
       <input
         id={id}

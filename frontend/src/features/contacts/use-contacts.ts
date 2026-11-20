@@ -5,10 +5,11 @@ import type { Contact, CreateContactInput, UpdateContactInput, ListContactsParam
 
 export type { Contact, CreateContactInput, UpdateContactInput };
 
-function toError(failure: { code: string; message: string; requestId: string }): Error {
+function toError(failure: { code: string; message: string; requestId: string; status?: number }): Error {
   const err = new Error(failure.message);
-  (err as Error & { code?: string; requestId?: string }).code = failure.code;
-  (err as Error & { code?: string; requestId?: string }).requestId = failure.requestId;
+  (err as Error & { code?: string; requestId?: string; status?: number }).code = failure.code;
+  (err as Error & { code?: string; requestId?: string; status?: number }).requestId = failure.requestId;
+  (err as Error & { status?: number }).status = failure.status;
   return err;
 }
 

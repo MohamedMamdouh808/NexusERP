@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -15,6 +17,7 @@ export function OrderEditPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const orderId = id ?? '';
+  const { t } = useTranslation();
   const { data: order, isPending, isError, error } = useSalesOrder(orderId);
 
   // Redirect non-draft orders with the explanation the detail page shows.
@@ -23,19 +26,18 @@ export function OrderEditPage() {
       navigate(`/sales/${order.id}`, {
         replace: true,
         state: {
-          notice:
-            'Only draft sales orders can be edited. To change this order, cancel it and create a new one.',
+          notice: t('sales.edit.notDraft'),
         },
       });
     }
-  }, [order, navigate]);
+  }, [order, navigate, t]);
 
   if (isPending) {
     return (
-      <section className="order-edit-page" aria-label="Edit sales order">
-        <PageHeader title="Edit Sales Order" />
-        <Card title="Edit Sales Order">
-          <Skeleton label="Loading sales order" />
+      <section className="order-edit-page" aria-label={t('sales.edit.sectionAria')}>
+        <PageHeader title={t('sales.edit.title')} />
+        <Card title={t('sales.edit.title')}>
+          <Skeleton label={t('sales.edit.loading')} />
         </Card>
       </section>
     );
@@ -43,11 +45,11 @@ export function OrderEditPage() {
 
   if (isError || order === undefined) {
     return (
-      <section className="order-edit-page" aria-label="Edit sales order">
-        <PageHeader title="Edit Sales Order" />
-        <Card title="Edit Sales Order">
+      <section className="order-edit-page" aria-label={t('sales.edit.sectionAria')}>
+        <PageHeader title={t('sales.edit.title')} />
+        <Card title={t('sales.edit.title')}>
           <ErrorState
-            message={error instanceof Error ? error.message : 'The sales order could not be loaded.'}
+            message={error instanceof Error ? error.message : t('sales.edit.loadError')}
           />
         </Card>
       </section>
@@ -60,20 +62,20 @@ export function OrderEditPage() {
   }
 
   return (
-    <section className="order-edit-page" aria-label="Edit sales order">
+    <section className="order-edit-page" aria-label={t('sales.edit.sectionAria')}>
       <PageHeader
-        title="Edit Sales Order"
+        title={t('sales.edit.title')}
         primaryAction={
           <Button variant="default" onClick={() => navigate(`/sales/${order.id}`)}>
-            Cancel
+            {t('common.actions.cancel')}
           </Button>
         }
       />
       <Card
-        title="Edit Sales Order"
-        description={`Editing draft ${order.number}. Only drafts can be edited; confirm on the detail page.`}
+        title={t('sales.edit.title')}
+        description={t('sales.edit.description', { number: order.number })}
       >
-        <OrderForm order={order} submitLabel="Save draft" />
+        <OrderForm order={order} submitLabel={t('sales.form.saveDraft')} />
       </Card>
     </section>
   );

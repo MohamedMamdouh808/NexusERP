@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from './button';
 import { Input } from './input';
 import { Select } from './select';
 import type { SelectOption } from './select';
-import { formatMoneyGrouped } from '../../lib/format';
+import { formatMoneyLocalized, useOrganizationCurrency } from '../../lib/i18n-format';
 
 /**
  * The line items editor every order document shares (Purchasing, Sales).
@@ -53,10 +54,9 @@ export interface LineItemsEditorProps {
   /**
    * An extra read-only cell rendered beside each line, for example the live
    * stock availability a sales document shows. The row gains one column when
-   * set, on every row including the header.
+   * set.
    */
   readonly renderNote?: (index: number) => ReactNode;
-  readonly noteHeadLabel?: string;
 }
 
 export function LineItemsEditor({
@@ -76,51 +76,48 @@ export function LineItemsEditor({
   lineTotal,
   total,
   renderNote,
-  noteHeadLabel = 'Available',
 }: LineItemsEditorProps) {
-  const noted = renderNote !== undefined;
+  const { t } = useTranslation();
+  const currency = useOrganizationCurrency();
+
+  // Resolve a row's note once: a null note means the cell does not exist for
+  // that row (for example, no warehouse chosen yet), not that it is empty.
+  const noteFor = (index: number): ReactNode => renderNote?.(index) ?? null;
 
   return (
     <div className="line-items-editor">
       <div className="line-items-editor__header">
-        <h3 className="line-items-editor__title">Line items</h3>
+        <h3 className="line-items-editor__title">{t('ui.lineItems.title')}</h3>
         <Button type="button" variant="default" onClick={onAdd} disabled={disabled}>
-          Add line
+          {t('ui.lineItems.addLine')}
         </Button>
       </div>
 
       {lines.length === 0 ? (
-        <p className="line-items-editor__empty">No lines yet. Add a product line to order.</p>
+        <p className="line-items-editor__empty">{t('ui.lineItems.emptyHelp')}</p>
       ) : (
         <div>
-          <div className={['line-items-editor__line', 'line-items-editor__line--head', noted ? 'line-items-editor__line--with-note' : ''].filter(Boolean).join(' ')} aria-hidden="true">
-            <span>Product</span>
-            <span>Quantity</span>
-            <span>{priceLabel}</span>
-            <span>Line total</span>
-            {noted && <span>{noteHeadLabel}</span>}
-            <span className="sr-only">Remove</span>
-          </div>
           {lines.map((line, index) => {
             const rowTotal = lineTotal(line);
+            const note = noteFor(index);
             return (
               <div
                 key={index}
-                className={['line-items-editor__line', noted ? 'line-items-editor__line--with-note' : ''].filter(Boolean).join(' ')}
+                className={['line-items-editor__line', note !== null ? 'line-items-editor__line--with-note' : ''].filter(Boolean).join(' ')}
               >
                 <Select
                   id={`${idPrefix}-product-${index}`}
-                  label="Product"
+                  label={t('ui.lineItems.columnProduct')}
                   options={productOptions}
                   value={line.productId}
                   onChange={(event) => onPickProduct(index, event.target.value)}
                   onBlur={() => onBlur(index, 'productId')}
                   error={fieldError(index, 'productId')}
-                  placeholder="Select a product"
+                  placeholder={t('ui.lineItems.selectProduct')}
                 />
                 <Input
                   id={`${idPrefix}-quantity-${index}`}
-                  label="Quantity"
+                  label={t('ui.lineItems.columnQuantity')}
                   error={fieldError(index, 'quantity')}
                   value={line.quantity}
                   onChange={(event) => onChange(index, 'quantity', event.target.value)}
@@ -139,20 +136,22 @@ export function LineItemsEditor({
                   helpText={priceHelpText}
                 />
                 <div className="line-items-editor__line-total">
-                  <span className="form-label">Line total</span>
+                  <span className="form-label">{t('ui.lineItems.columnLineTotal')}</span>
                   {/* Derived, never typed: quantity x price, half-up to 2 decimals. */}
-                  <span className="qty">{rowTotal === undefined ? '—' : formatMoneyGrouped(rowTotal)}</span>
+                  <span className="qty">{rowTotal === undefined ? '—' : formatMoneyLocalized(rowTotal, currency, 2)}</span>
                 </div>
-                {noted && <div className="line-items-editor__note-cell">{renderNote(index)}</div>}
-                <button
-                  type="button"
-                  className="button line-items-editor__line-remove"
-                  onClick={() => onRemove(index)}
-                  disabled={disabled}
-                  aria-label={`Remove line ${index + 1}`}
-                >
-                  Remove
-                </button>
+                {note !== null && <div className="line-items-editor__note-cell">{note}</div>}
+                <div className="line-items-editor__line-remove">
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={() => onRemove(index)}
+                    disabled={disabled}
+                    aria-label={t('ui.lineItems.removeLine', { number: index + 1 })}
+                  >
+                    {t('ui.lineItems.remove')}
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -160,9 +159,9 @@ export function LineItemsEditor({
       )}
 
       <div className="line-items-editor__totals">
-        <span>Order total</span>
+        <span>{t('ui.lineItems.orderTotal')}</span>
         {/* Right aligned, tabular numerals, thousands separators (totals read at a glance). */}
-        <strong className="qty">{formatMoneyGrouped(total)}</strong>
+        <strong className="qty">{formatMoneyLocalized(total, currency, 2)}</strong>
       </div>
     </div>
   );

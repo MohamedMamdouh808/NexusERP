@@ -4,13 +4,18 @@
  * The identity shown is the real signed-in user, read from the session store
  * (which is the service's own answer to /auth/me): email and role. No password
  * material and no other user's data exists on this screen (FR-026). The
- * appearance card below it is the one local preference surface: theme and
- * layout direction stay in this browser and are never sent to the service.
+ * appearance card is the one local preference surface: theme stays in this
+ * browser and never reaches the server; the LANGUAGE is a local preference
+ * too, stored in this browser as `nexuserp_language` and applied in place -
+ * no reload, the route is preserved, and the theme is untouched.
  */
+
+import { useTranslation } from 'react-i18next';
 
 import { PageHeader } from '../../components/shell/page-header';
 import { Card } from '../../components/ui';
 import { roleLabel } from '../../components/shell/role-label';
+import { isAppLanguage, setAppLanguage, type AppLanguage } from '../../i18n';
 import { useAppearance } from '../../lib/use-appearance';
 import { useSession } from '../../services/auth-session';
 
@@ -22,51 +27,73 @@ interface AppearanceOption {
   readonly onSelect: () => void;
 }
 
-/** The theme rows: Light and Dark, the two themes the design system ships. */
-function themeOptions(onPick: (theme: 'light' | 'dark') => void, preference: string, resolved: 'light' | 'dark'): AppearanceOption[] {
-  const effective = preference === 'light' || preference === 'dark' ? preference : resolved;
-  return [
-    { id: 'theme-light', label: 'Light', detail: 'White surfaces with the indigo signal', selected: effective === 'light', onSelect: () => onPick('light') },
-    { id: 'theme-dark', label: 'Dark', detail: 'Nexus Slate on a deep canvas', selected: effective === 'dark', onSelect: () => onPick('dark') },
-  ];
-}
-
-/** The direction rows: English reads left to right, Arabic right to left. */
-function directionOptions(onPick: (direction: 'ltr' | 'rtl') => void, direction: 'ltr' | 'rtl'): AppearanceOption[] {
-  return [
-    { id: 'direction-ltr', label: 'English', detail: 'Layout runs from left to right', selected: direction === 'ltr', onSelect: () => onPick('ltr') },
-    { id: 'direction-rtl', label: 'العربية', detail: 'Layout runs from right to left', selected: direction === 'rtl', onSelect: () => onPick('rtl') },
-  ];
-}
-
 export function ProfilePage() {
+  const { t, i18n } = useTranslation();
   const session = useSession();
   const appearance = useAppearance();
-  const pickTheme = (theme: 'light' | 'dark') => appearance.theme(theme);
-  const pickDirection = (direction: 'ltr' | 'rtl') => appearance.switchDirection(direction);
+
+  const language: AppLanguage = isAppLanguage(i18n.language) ? i18n.language : 'en';
+
+  const themeOptions: AppearanceOption[] = [
+    {
+      id: 'theme-light',
+      label: t('profile.appearance.light.label'),
+      detail: t('profile.appearance.light.detail'),
+      selected: appearance.preference === 'light' ? true : appearance.preference === 'system' ? appearance.resolved === 'light' : false,
+      onSelect: () => appearance.theme('light'),
+    },
+    {
+      id: 'theme-dark',
+      label: t('profile.appearance.dark.label'),
+      detail: t('profile.appearance.dark.detail'),
+      selected: appearance.preference === 'dark' ? true : appearance.preference === 'system' ? appearance.resolved === 'dark' : false,
+      onSelect: () => appearance.theme('dark'),
+    },
+  ];
+
+  const languageOptions: AppearanceOption[] = [
+    {
+      id: 'language-en',
+      label: 'English',
+      detail: t('profile.appearance.english.detail'),
+      selected: language === 'en',
+      onSelect: () => {
+        void setAppLanguage('en');
+      },
+    },
+    {
+      id: 'language-ar',
+      label: 'العربية',
+      detail: t('profile.appearance.arabic.detail'),
+      selected: language === 'ar',
+      onSelect: () => {
+        void setAppLanguage('ar');
+      },
+    },
+  ];
 
   return (
     <section className="profile-page">
-      <PageHeader title="Profile" description="The account you are signed in with, and this browser's appearance." />
+      <PageHeader title={t('profile.header.title')} description={t('profile.header.description')} />
       {session.status === 'signed-in' && (
-        <Card title="Your account">
+        <Card title={t('profile.account.title')}>
           <dl className="profile-details">
-            <dt>Email</dt>
+            <dt>{t('profile.account.email')}</dt>
             <dd>{session.user.email}</dd>
-            <dt>Role</dt>
+            <dt>{t('profile.account.role')}</dt>
             <dd>{roleLabel(session.membership.roles)}</dd>
-            <dt>Organization</dt>
+            <dt>{t('profile.account.organization')}</dt>
             <dd>{session.organization.name}</dd>
           </dl>
-          <p className="form-help-text">Access to application data is enforced by the server, scoped to this organization.</p>
+          <p className="form-help-text">{t('profile.account.serverEnforces')}</p>
         </Card>
       )}
-      <Card title="Appearance" description="Theme and layout direction for this browser; stored locally and never sent to the server.">
+      <Card title={t('profile.appearance.title')} description={t('profile.appearance.description')}>
         <div className="profile-appearance">
-          <div className="profile-appearance__group" role="group" aria-label="Theme">
+          <div className="profile-appearance__group" role="group" aria-label={t('profile.appearance.themeAria')}>
             <fieldset className="profile-appearance__options">
-              <legend>Theme</legend>
-              {themeOptions(pickTheme, appearance.preference, appearance.resolved).map((option) => (
+              <legend>{t('profile.appearance.themeLegend')}</legend>
+              {themeOptions.map((option) => (
                 <button
                   key={option.id}
                   type="button"
@@ -80,10 +107,10 @@ export function ProfilePage() {
               ))}
             </fieldset>
           </div>
-          <div className="profile-appearance__group" role="group" aria-label="Layout direction">
+          <div className="profile-appearance__group" role="group" aria-label={t('profile.appearance.languageAria')}>
             <fieldset className="profile-appearance__options">
-              <legend>Language &amp; direction</legend>
-              {directionOptions(pickDirection, appearance.direction).map((option) => (
+              <legend>{t('profile.appearance.languageLegend')}</legend>
+              {languageOptions.map((option) => (
                 <button
                   key={option.id}
                   type="button"
@@ -98,7 +125,7 @@ export function ProfilePage() {
             </fieldset>
           </div>
         </div>
-        <p className="form-help-text">Light and dark are the two themes; English lays the interface out left to right, Arabic mirrors it right to left.</p>
+        <p className="form-help-text">{t('profile.appearance.helpText')}</p>
       </Card>
     </section>
   );

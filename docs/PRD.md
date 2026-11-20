@@ -460,6 +460,7 @@ Format: Condition → System behavior → User feedback.
 
 #### P0-F006 — Inventory Balances, Adjustments, and Movement History
 - **Description:** Organizations manage warehouses and see on-hand, reserved, and available quantities per product and warehouse. Authorized users post adjustments with a reason. Every stock change creates an immutable movement record.
+- **Contract:** [api-inventory-contract.md](./api-inventory-contract.md) documents the endpoints, exact-decimal rules, and idempotency behaviour.
 - **User Story:** As Karim, I want an accurate stock balance and movement history so that I can explain every change in quantity.
 - **Trigger:** User opens Inventory or selects "New Adjustment".
 - **Pre-conditions:** Actor holds `inventory.read` or `inventory.adjust`. At least one warehouse exists.
@@ -487,6 +488,7 @@ Format: Condition → System behavior → User feedback.
 
 #### P0-F007 — Purchase Orders and Goods Receipts
 - **Description:** Users create purchase orders for suppliers, confirm them, and receive goods in full or in part. Receipts increase stock.
+- **Contract:** [api-purchasing-contract.md](./api-purchasing-contract.md) documents the endpoints, exact-decimal rules, and idempotency behaviour.
 - **User Story:** As Nour, I want to track ordered, received, and outstanding quantities so that I know what is still due from each supplier.
 - **Trigger:** User creates a purchase order, or selects "Receive Goods" on a confirmed order.
 - **Pre-conditions:** Supplier and products exist and are active. Actor holds `purchasing.write` or `inventory.receive`.
@@ -969,7 +971,7 @@ All endpoints use the `/api/v1` prefix and require authentication except registe
 | POST | /purchase-orders/:id/confirm | P0-F007 | purchasing.write | No |
 | POST | /purchase-orders/:id/cancel | P0-F007 | purchasing.write | No |
 | POST | /purchase-orders/:id/receipts | P0-F007 | inventory.receive | Yes |
-| GET | /goods-receipts | P0-F007 | inventory.read | No |
+| GET | /goods-receipts | P0-F007 | purchasing.read | No |
 | GET | /sales-orders | P0-F008 | sales.read | No |
 | POST | /sales-orders | P0-F008 | sales.write | No |
 | GET | /sales-orders/:id | P0-F008 | sales.read | No |
@@ -977,8 +979,8 @@ All endpoints use the `/api/v1` prefix and require authentication except registe
 | POST | /sales-orders/:id/confirm | P0-F008 | sales.write | Yes |
 | POST | /sales-orders/:id/cancel | P0-F008 | sales.write | Yes |
 | POST | /sales-orders/:id/shipments | P0-F009 | inventory.ship | Yes |
-| GET | /shipments | P0-F009 | inventory.read | No |
-| GET | /shipments/:id | P0-F009 | inventory.read | No |
+| GET | /shipments | P0-F009 | sales.read | No |
+| GET | /shipments/:id | P0-F009 | sales.read | No |
 | POST | /sales-orders/:id/invoices | P0-F010 | invoices.write | No |
 | GET | /invoices | P0-F010 | invoices.read | No |
 | GET | /invoices/:id | P0-F010 | invoices.read | No |
@@ -1302,4 +1304,5 @@ No implementation begins until Gates 1 and 2 are approved.
 
 | Version | Date | Author | Changes |
 |---|---|---|---|
+| v1.1 | 2026-11-14 | Mohamed | GET /shipments and GET /shipments/:id permission changed from inventory.read to sales.read — shipments are sales documents, matching the Purchasing receipts rule |
 | v1.0 | 2026-10-17 | Mohamed | Initial PRD created |

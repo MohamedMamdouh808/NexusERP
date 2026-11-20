@@ -14,6 +14,11 @@ import { AuditModule } from './modules/audit/audit.module';
 import { AccessControlModule } from './modules/access-control/access-control.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { ProductsModule } from './modules/products/products.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { PurchasingModule } from './modules/purchasing/purchasing.module';
+import { SalesModule } from './modules/sales/sales.module';
+import { InvoicingModule } from './modules/invoicing/invoicing.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 /**
  * The application root.
@@ -41,6 +46,11 @@ import { ProductsModule } from './modules/products/products.module';
     AuditModule,
     ContactsModule,
     ProductsModule,
+    InventoryModule,
+    PurchasingModule,
+    SalesModule,
+    InvoicingModule,
+    ReportsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

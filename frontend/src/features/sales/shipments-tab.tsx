@@ -1,4 +1,7 @@
+import { useTranslation } from 'react-i18next';
+
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import {
   Card,
@@ -9,7 +12,6 @@ import {
   Skeleton,
 } from '../../components/ui';
 import type { Column } from '../../components/ui';
-import { addQuantities, compactQuantity } from '../../lib/quantity';
 import { useShipments } from './use-sales';
 
 type ShipmentRow = {
@@ -19,26 +21,28 @@ type ShipmentRow = {
   orderNumber: string;
   customerName: string;
   warehouseName: string;
-  shipmentDate: string;
-  unitsText: string;
+  shippedAt: string;
+  lineCount: number;
   user: string;
 };
 
 export function ShipmentsTab() {
+  const navigate = useNavigate();
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
 
-  const { data, isPending, isError, error } = useShipments({
+  const { data, isPending, isError, error, refetch } = useShipments({
     search,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
     page,
     pageSize,
-    sort: 'number',
-    direction: 'asc',
+    sortBy: 'number',
+    sortOrder: 'asc',
   });
 
   const shipments = data?.items ?? [];
@@ -47,42 +51,42 @@ export function ShipmentsTab() {
   // The end date closes the range, so an end before the start is an error.
   const dateError =
     startDate !== '' && endDate !== '' && endDate < startDate
-      ? 'The end date must not be before the start date.'
+      ? t('sales.shipments.filters.endBeforeStart')
       : undefined;
 
   const columns: Column<ShipmentRow>[] = useMemo(
     () => [
       {
         key: 'number',
-        header: 'SH number',
+        header: t('sales.shipments.columns.shNumber'),
         render: (row) => <span className="mono">{row.number}</span>,
       },
       {
         key: 'orderNumber',
-        header: 'SO number',
+        header: t('sales.shipments.columns.soNumber'),
         render: (row) => (
           <a href={`/sales/${row.orderId}`} className="inventory-product-link">
             <span className="mono">{row.orderNumber}</span>
           </a>
         ),
       },
-      { key: 'customerName', header: 'Customer' },
-      { key: 'warehouseName', header: 'Warehouse' },
-      { key: 'shipmentDate', header: 'Date' },
+      { key: 'customerName', header: t('sales.shipments.columns.customer') },
+      { key: 'warehouseName', header: t('sales.shipments.columns.warehouse') },
+      { key: 'shippedAt', header: t('sales.shipments.columns.date') },
       {
-        key: 'unitsText',
-        header: 'Units',
+        key: 'lineCount',
+        header: t('sales.shipments.columns.lines'),
         numeric: true,
-        render: (row) => <span className="qty">{row.unitsText}</span>,
+        render: (row) => <span className="qty">{row.lineCount}</span>,
       },
-      { key: 'user', header: 'User' },
+      { key: 'user', header: t('sales.shipments.columns.user') },
     ],
-    [],
+    [t],
   );
 
   const apiFailure =
     error && typeof error === 'object' && 'requestId' in error
-      ? (error as Error & { requestId: string })
+      ? (error as Error & { requestId: string; status?: number })
       : undefined;
 
   const rows: ShipmentRow[] = shipments.map((shipment) => ({
@@ -92,8 +96,8 @@ export function ShipmentsTab() {
     orderNumber: shipment.orderNumber,
     customerName: shipment.customerName,
     warehouseName: shipment.warehouseName,
-    shipmentDate: shipment.shipmentDate,
-    unitsText: compactQuantity(addQuantities(...shipment.lines.map((line) => line.quantity))),
+    shippedAt: shipment.shippedAt,
+    lineCount: shipment.lineCount,
     user: shipment.user,
   }));
 
@@ -107,38 +111,42 @@ export function ShipmentsTab() {
   const hasFilters = search !== '' || startDate !== '' || endDate !== '';
 
   return (
-    <div className="receipts-tab" aria-label="Shipments">
+    <div className="receipts-tab" aria-label={t('sales.shipments.sectionAria')}>
       {isPending ? (
-        <Card title="Shipments">
-          <Skeleton label="Loading shipments" />
+        <Card title={t('sales.shipments.title')}>
+          <Skeleton label={t('sales.shipments.loading')} />
         </Card>
       ) : isError || data === undefined ? (
-        <Card title="Shipments">
+        <Card title={t('sales.shipments.title')}>
           <ErrorState
-            message={error instanceof Error ? error.message : 'The shipments could not be loaded.'}
-            requestId={apiFailure?.requestId}
-            onRetry={() => setPage(1)}
+            message={error instanceof Error ? error.message : t('sales.shipments.loadError')}
+            requestId={apiFailure?.requestId} status={apiFailure?.status}
+            onRetry={() => {
+              void refetch();
+            }}
           />
         </Card>
       ) : rows.length === 0 && !hasFilters ? (
         <EmptyState
-          title="No shipments yet"
-          description="Ship a confirmed sales order and the shipment appears here."
+          title={t('sales.shipments.empty.title')}
+          description={t('sales.shipments.empty.description')}
+          actionLabel={t('sales.shipments.empty.actionLabel')}
+          onAction={() => navigate('/sales')}
         />
       ) : rows.length === 0 ? (
         <EmptyState
-          title="No shipments match your filters"
-          description="Try adjusting the search or the date range to see shipments."
-          actionLabel="Clear filters"
+          title={t('sales.shipments.empty.filteredTitle')}
+          description={t('sales.shipments.empty.filteredDescription')}
+          actionLabel={t('sales.shipments.empty.filteredActionLabel')}
           onAction={clearFilters}
         />
       ) : (
-        <Card title="Shipments">
+        <Card title={t('sales.shipments.title')}>
           <div className="goods-receipts__toolbar">
             <Input
               id="shipment-search"
-              label="Search"
-              placeholder="SH number, SO number, customer or product"
+              label={t('sales.shipments.filters.search')}
+              placeholder={t('sales.shipments.filters.searchPlaceholder')}
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -147,7 +155,7 @@ export function ShipmentsTab() {
             />
             <Input
               id="shipment-start"
-              label="From date"
+              label={t('sales.shipments.filters.fromDate')}
               type="date"
               value={startDate}
               onChange={(event) => {
@@ -157,7 +165,7 @@ export function ShipmentsTab() {
             />
             <Input
               id="shipment-end"
-              label="To date"
+              label={t('sales.shipments.filters.toDate')}
               type="date"
               value={endDate}
               onChange={(event) => {
@@ -167,7 +175,7 @@ export function ShipmentsTab() {
               error={dateError}
             />
           </div>
-          <p className="movements__note">Shipments are permanent records.</p>
+          <p className="movements__note">{t('sales.shipments.note')}</p>
           <DataTable<ShipmentRow>
             columns={columns}
             data={rows}
@@ -177,7 +185,7 @@ export function ShipmentsTab() {
             sortColumn="number"
             sortDirection="asc"
             onPageChange={setPage}
-            emptyMessage="No shipments found."
+            emptyMessage={t('sales.shipments.empty.tableMessage')}
           />
         </Card>
       )}

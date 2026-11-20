@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import { Icon } from './icon';
 
 export interface Column<T> {
@@ -24,6 +26,12 @@ export interface DataTableProps<T> {
   readonly className?: string;
   /** An accessible name for the table (WCAG 2.1 AA: the table needs a name). */
   readonly ariaLabel?: string;
+  /**
+   * What the pager says the total counts. Defaults to the shared "total
+   * records" text; a table whose rows represent documents (goods receipts)
+   * passes its own words instead.
+   */
+  readonly totalLabel?: string;
 }
 
 export function DataTable<T extends object = Record<string, unknown>>({
@@ -37,10 +45,13 @@ export function DataTable<T extends object = Record<string, unknown>>({
   sortDirection,
   onSortChange,
   onPageChange,
-  emptyMessage = 'No records found',
+  emptyMessage,
   className,
   ariaLabel,
+  totalLabel,
 }: DataTableProps<T>) {
+  const { t } = useTranslation();
+  const resolvedEmptyMessage = emptyMessage ?? t('ui.table.noRecords');
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   function handleHeaderClick(col: Column<T>) {
@@ -50,8 +61,9 @@ export function DataTable<T extends object = Record<string, unknown>>({
   }
 
   return (
-    <div className={['table-container', className].filter(Boolean).join(' ')}>
-      <table className="data-table" role="table" aria-busy={loading ? 'true' : undefined} aria-label={ariaLabel}>
+    <div className={['table-container', 'table-container--fixed', className].filter(Boolean).join(' ')}>
+      <div className="table-scroll">
+        <table className="data-table" role="table" aria-busy={loading ? 'true' : undefined} aria-label={ariaLabel}>
         <thead>
           <tr>
             {columns.map((col) => {
@@ -102,7 +114,7 @@ export function DataTable<T extends object = Record<string, unknown>>({
           ) : data.length === 0 ? (
             <tr>
               <td colSpan={columns.length} style={{ textAlign: 'center', padding: 'var(--spacing-xl)' }}>
-                {emptyMessage}
+                {resolvedEmptyMessage}
               </td>
             </tr>
           ) : (
@@ -120,12 +132,13 @@ export function DataTable<T extends object = Record<string, unknown>>({
             ))
           )}
         </tbody>
-      </table>
+        </table>
+      </div>
       <div className="data-table__pager">
-        <span>{total} total records</span>
+        <span>{totalLabel ?? t('ui.table.totalRecords', { count: total })}</span>
         <div style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'center' }}>
           <span>
-            Page {page} of {totalPages}
+            {t('ui.table.pageOf', { page, totalPages })}
           </span>
           <button
             type="button"
@@ -133,7 +146,7 @@ export function DataTable<T extends object = Record<string, unknown>>({
             disabled={page <= 1}
             onClick={() => onPageChange?.(page - 1)}
           >
-            Prev
+            {t('ui.table.previous')}
           </button>
           <button
             type="button"
@@ -141,7 +154,7 @@ export function DataTable<T extends object = Record<string, unknown>>({
             disabled={page >= totalPages}
             onClick={() => onPageChange?.(page + 1)}
           >
-            Next
+            {t('ui.table.next')}
           </button>
         </div>
       </div>

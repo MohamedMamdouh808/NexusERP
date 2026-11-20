@@ -1,49 +1,68 @@
+import { useTranslation } from 'react-i18next';
+
 import { useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
 import { Badge, Button, Card, DataTable, EmptyState, ErrorState, Input, KebabMenu, Select, Skeleton, Toast } from '../../components/ui';
 import type { Column } from '../../components/ui';
-import { compareQuantities, addQuantities, formatQuantity } from '../../lib/quantity';
-import { usePostAdjustment, useStockBalances, useWarehouses } from './use-inventory';
-import type { AdjustmentReason, PostAdjustmentInput } from '../../services/catalog-service';
+import { addQuantities, formatQuantity, subtractQuantities } from '../../lib/quantity';
+import { useArchivedWithStockCount, usePostAdjustment, useStockBalances, useWarehouses } from './use-inventory';
+import type { AdjustmentReason, StockBalanceRow } from './use-inventory';
+import { newIdempotencyKey } from './idempotency-key';
 
-const LOW_STOCK_TONES: Record<string, 'success' | 'warning' | 'destructive'> = {
-  'In stock': 'success',
-  'Low stock': 'warning',
-  'Out of stock': 'destructive',
+/**
+ * The stock balances screen.
+ *
+ * One endpoint answers three selections with one row shape: the balance rows
+ * themselves (one per warehouse and product that holds stock), the products the
+ * low-stock rule selects (a product that holds nothing anywhere yet is IN that
+ * selection, shown with the default warehouse and zero quantities), and the
+ * archived products that still hold stock.
+ *
+ * The total is labelled: the default selection counts ROWS, the other two count
+ * PRODUCTS. Two hints keep what is not on this page visible: products that need
+ * attention but have no stock rows yet, and archived products that still hold
+ * stock.
+ */
+
+const STATUS_TONES: Record<NonNullable<StockBalanceRow['status']>, 'success' | 'warning' | 'destructive'> = {
+  IN_STOCK: 'success',
+  LOW_STOCK: 'warning',
+  OUT_OF_STOCK: 'destructive',
 };
-
-function stockPill(available: string, reorderLevel: string | null): string {
-  if (reorderLevel === null) return 'In stock';
-  if (compareQuantities(available, '0.000') <= 0) return 'Out of stock';
-  if (compareQuantities(available, reorderLevel) <= 0) return 'Low stock';
-  return 'In stock';
-}
 
 interface BalanceRow {
   [key: string]: unknown;
   productId: string;
-  productSku: string;
+  sku: string;
   productName: string;
-  warehouseId: string;
-  warehouseName: string;
+  warehouseId: string | null;
+  warehouseName: string | null;
   onHand: string;
   reserved: string;
   available: string;
-  reorderLevel: string | null;
+  archived: boolean;
+  status: 'OUT_OF_STOCK' | 'LOW_STOCK' | 'IN_STOCK' | null;
+  hasStockRow: boolean;
 }
 
 const ADJUSTMENT_REASONS: readonly AdjustmentReason[] = [
-  'Damage',
-  'Loss',
-  'Found',
-  'Count correction',
-  'Other',
+  'DAMAGE',
+  'LOSS',
+  'FOUND',
+  'COUNT_CORRECTION',
+  'OTHER',
 ];
 
+type StatusFilter = '' | 'archivedWithStock';
+
 export function StockBalancesTab() {
+  const { t } = useTranslation();
+  const location = useLocation();
   const [search, setSearch] = useState('');
   const [warehouseId, setWarehouseId] = useState<string>('');
   const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
   const [page, setPage] = useState(1);
   const [pageSize] = useState(12);
 
@@ -53,223 +72,164 @@ export function StockBalancesTab() {
   const [toasts, setToasts] = useState<{ id: string; tone: 'success' | 'failure' | 'informational'; message: string }[]>([]);
 
   const { data: warehousesData } = useWarehouses();
-  const { data, isPending, isError, error } = useStockBalances({
-    search,
+  const { data, isPending, isError, error, refetch } = useStockBalances({
+    search: search === '' ? undefined : search,
     warehouseId: warehouseId || undefined,
-    lowStockOnly,
+    lowStockOnly: lowStockOnly || undefined,
+    status: statusFilter === '' ? undefined : statusFilter,
     page,
     pageSize,
-    sort: 'productSku',
-    direction: 'asc',
+    sortBy: 'sku',
+    sortOrder: 'asc',
   });
+
+  // The hint counts what is NOT on this page: it is wanted only while the
+  // archived filter is off.
+  const archivedHint = useArchivedWithStockCount(!lowStockOnly && statusFilter === '');
   const postAdjustment = usePostAdjustment();
 
-  const balances = data?.items ?? [];
+  const balances = (data?.items ?? []) as BalanceRow[];
   const total = data?.total ?? 0;
+  const totalKind = data?.totalKind ?? 'rows';
+  const lowStockCount = data?.lowStockCount ?? 0;
 
-  const warehouseOptions = (warehousesData ?? []).map((w) => ({ value: w.id, label: w.name }));
+  // The rows on THIS page that already carry the low-stock status. When the
+  // rule selects more products than are visible here, the hint names the
+  // difference - some of them have no stock rows yet.
+  const visibleLowStock = balances.filter(
+    (row) => row.status === 'LOW_STOCK' || row.status === 'OUT_OF_STOCK',
+  ).length;
+  const showLowStockHint = !lowStockOnly && statusFilter === '' && lowStockCount > visibleLowStock;
+
+  const warehouseOptions = (warehousesData?.items ?? []).map((w) => ({ value: w.id, label: w.name }));
+
+  // A deep link from an archived product's page (?adjust=<productId>) opens the
+  // dialog preselected once the balances are in: the product's row (from the
+  // archived-with-stock selection if it is archived) names its warehouse.
+  const deepLinkProductId = new URLSearchParams(location.search).get('adjust') ?? '';
+  const deepLinkHandled = useMemo(
+    () => ({ done: false as boolean }),
+    // The key re-arms only when the link changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [deepLinkProductId],
+  );
+  if (deepLinkProductId !== '' && !deepLinkHandled.done && !isPending && data !== undefined) {
+    deepLinkHandled.done = true;
+    const row = balances.find((item) => item.productId === deepLinkProductId);
+    if (row !== undefined) {
+      setAdjustProductId(row.productId);
+      setAdjustWarehouseId(row.warehouseId ?? warehousesData?.items.find((w) => w.isDefault)?.id ?? '');
+      if (row.archived && statusFilter === '') {
+        setStatusFilter('archivedWithStock');
+      }
+      setAdjustOpen(true);
+    }
+  }
 
   const columns: Column<BalanceRow>[] = useMemo(
     () => [
-      { key: 'productSku', header: 'SKU', render: (row) => <span className="mono">{row.productSku}</span> },
+      { key: 'sku', header: t('inventory.balances.columns.sku'), render: (row) => <span className="mono">{row.sku}</span> },
       {
         key: 'productName',
-        header: 'Product',
+        header: t('inventory.balances.columns.product'),
         render: (row) => (
-          <a href={`/products/${row.productId}`} className="inventory-product-link">
-            {row.productName}
-          </a>
+          <span className="inventory-product-cell">
+            <a href={`/products/${row.productId}`} className="inventory-product-link">
+              {row.productName}
+            </a>
+            {row.archived ? <Badge tone="neutral">{t('inventory.balances.archivedBadge')}</Badge> : null}
+            {!row.hasStockRow ? <Badge tone="info">{t('inventory.balances.noStockRowBadge')}</Badge> : null}
+          </span>
         ),
       },
-      { key: 'warehouseName', header: 'Warehouse' },
-      { key: 'onHand', header: 'On hand', numeric: true, render: (row) => <span className="qty">{formatQuantity(row.onHand)}</span> },
-      { key: 'reserved', header: 'Reserved', numeric: true, render: (row) => <span className="qty">{formatQuantity(row.reserved)}</span> },
-      { key: 'available', header: 'Available', numeric: true, render: (row) => <span className="qty available">{formatQuantity(row.available)}</span> },
-      {
-        key: 'reorderLevel',
-        header: 'Reorder level',
-        numeric: true,
-        render: (row) => (row.reorderLevel === null ? <span>-</span> : <span className="qty">{formatQuantity(row.reorderLevel)}</span>),
-      },
+      { key: 'warehouseName', header: t('inventory.balances.columns.warehouse'), render: (row) => <span>{row.warehouseName ?? '—'}</span> },
+      { key: 'onHand', header: t('inventory.balances.columns.onHand'), numeric: true, render: (row) => <span className="qty">{formatQuantity(row.onHand)}</span> },
+      { key: 'reserved', header: t('inventory.balances.columns.reserved'), numeric: true, render: (row) => <span className="qty">{formatQuantity(row.reserved)}</span> },
+      { key: 'available', header: t('inventory.balances.columns.available'), numeric: true, render: (row) => <span className="qty available">{formatQuantity(row.available)}</span> },
       {
         key: 'stockStatus',
-        header: 'Stock',
-        render: (row) => {
-          const status = stockPill(row.available, row.reorderLevel);
-          return <Badge tone={LOW_STOCK_TONES[status]}>{status}</Badge>;
-        },
+        header: t('inventory.balances.columns.stock'),
+        render: (row) =>
+          row.status === null ? (
+            <span>—</span>
+          ) : (
+            <Badge tone={STATUS_TONES[row.status]}>
+              {row.status === 'IN_STOCK'
+                ? t('inventory.balances.stock.inStock')
+                : row.status === 'LOW_STOCK'
+                  ? t('inventory.balances.stock.lowStock')
+                  : t('inventory.balances.stock.outOfStock')}
+            </Badge>
+          ),
       },
       {
         key: 'actions',
-        header: 'Actions',
+        header: t('inventory.balances.columns.actions'),
         render: (row) => {
           const entries = [
-            { kind: 'item' as const, id: 'adjust', label: 'Adjust stock', onSelect: () => {
+            { kind: 'item' as const, id: 'adjust', label: t('inventory.balances.adjust.action'), onSelect: () => {
               setAdjustProductId(row.productId);
-              setAdjustWarehouseId(row.warehouseId);
+              setAdjustWarehouseId(row.warehouseId ?? '');
               setAdjustOpen(true);
             } },
           ];
-          return <KebabMenu label={`Actions for ${row.productName}`} entries={entries} />;
+          return <KebabMenu label={t('inventory.balances.adjust.actionsFor', { name: row.productName })} entries={entries} />;
         },
       },
     ],
-    [],
+    [t],
   );
 
   const apiFailure =
     error && typeof error === 'object' && 'requestId' in error
-      ? (error as Error & { requestId: string })
+      ? (error as Error & { requestId: string; status?: number })
       : undefined;
 
-  const [adjustForm, setAdjustForm] = useState({
-    quantity: '',
-    reason: 'Damage' as AdjustmentReason,
-    note: '',
-  });
-  const [adjustError, setAdjustError] = useState<string>('');
-  const [adjustPreview, setAdjustPreview] = useState<{ onHand: string; newOnHand: string; reserved: string; available: string } | null>(null);
-
-  // Find the current balance for the selected product/warehouse.
-  const currentBalance = balances.find(
-    (b) => b.productId === adjustProductId && b.warehouseId === adjustWarehouseId,
-  );
-
-  function handleAdjustQuantity(event: React.ChangeEvent<HTMLInputElement>) {
-    const value = event.target.value;
-    setAdjustForm({ ...adjustForm, quantity: value });
-    computePreview(value);
-  }
-
-  function handleAdjustReason(event: React.ChangeEvent<HTMLSelectElement>) {
-    const reason = event.target.value as AdjustmentReason;
-    setAdjustForm({ ...adjustForm, reason });
-  }
-
-  function handleAdjustNote(event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) {
-    const value = event.target.value;
-    setAdjustForm({ ...adjustForm, note: value });
-    // Clear the "note required for Other" error when user types
-    if (adjustForm.reason === 'Other' && adjustError?.includes('note')) {
-      setAdjustError('');
-    }
-  }
-
-  function computePreview(quantity: string) {
-    if (!currentBalance) {
-      setAdjustPreview(null);
-      return;
-    }
-    const q = quantity.trim();
-    if (!q || !/^-?\d+(\.\d{1,3})?$/.test(q)) {
-      setAdjustPreview(null);
-      return;
-    }
-    const newOnHand = addQuantities(currentBalance.onHand, q);
-    const available = addQuantities(newOnHand, `-${currentBalance.reserved}`);
-    setAdjustPreview({
-      onHand: formatQuantity(currentBalance.onHand),
-      newOnHand: formatQuantity(newOnHand),
-      reserved: formatQuantity(currentBalance.reserved),
-      available: formatQuantity(available),
-    });
-  }
-
-  function handleAdjustSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setAdjustError('');
-
-    if (!currentBalance) {
-      setAdjustError('No stock balance found.');
-      return;
-    }
-
-    if (!adjustForm.quantity.trim()) {
-      setAdjustError('Quantity is required.');
-      return;
-    }
-    if (!/^-?\d+(\.\d{1,3})?$/.test(adjustForm.quantity)) {
-      setAdjustError('Enter a valid quantity (up to 3 decimal places).');
-      return;
-    }
-
-    if (adjustForm.reason === 'Other' && !adjustForm.note.trim()) {
-      setAdjustError('A note is required when the reason is Other.');
-      return;
-    }
-
-    const idempotencyKey = `adj-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-    const input: PostAdjustmentInput = {
-      idempotencyKey,
-      productId: adjustProductId,
-      warehouseId: adjustWarehouseId,
-      quantity: adjustForm.quantity,
-      reason: adjustForm.reason,
-      note: adjustForm.note,
-    };
-
-    postAdjustment.mutate(input, {
-      onSuccess: (result) => {
-        setAdjustOpen(false);
-        setAdjustForm({ quantity: '', reason: 'Damage', note: '' });
-        setAdjustError('');
-        setAdjustPreview(null);
-        setToasts((prev) => [
-          ...prev,
-          {
-            id: `toast-${Date.now()}`,
-            tone: 'success',
-            message: `Stock adjusted for ${currentBalance.productName}: ${result.source}`,
-          },
-        ]);
-      },
-      onError: (err) => {
-        setAdjustError(err instanceof Error ? err.message : 'The adjustment could not be posted.');
-      },
-    });
-  }
-
   function dismissToast(id: string) {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }
+
+  function clearFilters() {
+    setSearch('');
+    setWarehouseId('');
+    setLowStockOnly(false);
+    setStatusFilter('');
+    setPage(1);
   }
 
   return (
-    <section className="stock-balances-tab" aria-label="Stock balances">
-      {toasts.map((t) => (
-        <Toast key={t.id} id={t.id} tone={t.tone} message={t.message} onDismiss={dismissToast} />
+    <section className="stock-balances-tab" aria-label={t('inventory.balances.sectionAria')}>
+      {toasts.map((toast) => (
+        <Toast key={toast.id} id={toast.id} tone={toast.tone} message={toast.message} onDismiss={dismissToast} />
       ))}
       {isPending ? (
-        <Card title="Stock balances">
-          <Skeleton label="Loading stock balances" />
+        <Card title={t('inventory.balances.title')}>
+          <Skeleton label={t('inventory.balances.loading')} />
         </Card>
       ) : isError || data === undefined ? (
-        <Card title="Stock balances">
+        <Card title={t('inventory.balances.title')}>
           <ErrorState
-            message={error instanceof Error ? error.message : 'The stock balances could not be loaded.'}
-            requestId={apiFailure?.requestId}
-            onRetry={() => setPage(1)}
+            message={error instanceof Error ? error.message : t('inventory.balances.loadError')}
+            requestId={apiFailure?.requestId} status={apiFailure?.status}
+            onRetry={() => {
+              void refetch();
+            }}
           />
         </Card>
-      ) : balances.length === 0 ? (
+      ) : balances.length === 0 && total === 0 ? (
         <EmptyState
-          title="No stock balances match your filters"
-          description="Try adjusting the search, warehouse or low stock filter to see balances."
-          actionLabel="Clear filters"
-          onAction={() => {
-            setSearch('');
-            setWarehouseId('');
-            setLowStockOnly(false);
-            setPage(1);
-          }}
+          title={t('inventory.balances.empty.title')}
+          description={t('inventory.balances.empty.description')}
+          actionLabel={t('inventory.balances.empty.actionLabel')}
+          onAction={clearFilters}
         />
       ) : (
-        <Card title="Stock balances">
+        <Card title={t('inventory.balances.title')}>
           <div className="stock-balances__toolbar">
             <Input
               id="balance-search"
-              label="Search"
-              placeholder="SKU or product name"
+              label={t('inventory.balances.toolbar.search')}
+              placeholder={t('inventory.balances.toolbar.searchPlaceholder')}
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -278,16 +238,30 @@ export function StockBalancesTab() {
             />
             <Select
               id="balance-warehouse"
-              label="Warehouse"
-              options={[{ value: '', label: 'All warehouses' }, ...warehouseOptions]}
+              label={t('inventory.balances.toolbar.warehouse')}
+              options={[{ value: '', label: t('inventory.balances.toolbar.allWarehouses') }, ...warehouseOptions]}
               value={warehouseId}
               onChange={(event) => {
                 setWarehouseId(event.target.value);
                 setPage(1);
               }}
-              placeholder="All warehouses"
+              placeholder={t('inventory.balances.toolbar.allWarehouses')}
             />
-            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', fontSize: '0.875rem', color: 'var(--color-foreground)' }}>
+            <Select
+              id="balance-status"
+              label={t('inventory.balances.toolbar.status')}
+              options={[
+                { value: '', label: t('inventory.balances.toolbar.statusAll') },
+                { value: 'archivedWithStock', label: t('inventory.balances.toolbar.statusArchivedWithStock') },
+              ]}
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value as StatusFilter);
+                setPage(1);
+              }}
+              placeholder={t('inventory.balances.toolbar.statusAll')}
+            />
+            <label className="toolbar-checkbox">
               <input
                 type="checkbox"
                 checked={lowStockOnly}
@@ -296,36 +270,60 @@ export function StockBalancesTab() {
                   setPage(1);
                 }}
               />
-              Low stock only
+              {t('inventory.balances.toolbar.lowStockOnly')}
             </label>
           </div>
+
+          {/* The total says what it counts: rows in the default selection,
+              products in the low-stock and archived selections. */}
+          <p className="stock-balances__total" data-testid="balances-total">
+            {totalKind === 'products'
+              ? t('inventory.balances.total.products', { count: total })
+              : t('inventory.balances.total.rows', { count: total })}
+          </p>
+
+          {showLowStockHint && (
+            <button type="button" className="hint-action" data-testid="low-stock-hint" onClick={() => { setLowStockOnly(true); setPage(1); }}>
+              {t('inventory.balances.hints.lowStock', { count: lowStockCount })}
+            </button>
+          )}
+          {statusFilter === '' && !lowStockOnly && (archivedHint.data ?? 0) > 0 && (
+            <button type="button" className="hint-action" data-testid="archived-hint" onClick={() => { setStatusFilter('archivedWithStock'); setPage(1); }}>
+              {t('inventory.balances.hints.archived', { count: archivedHint.data ?? 0 })}
+            </button>
+          )}
+
           <DataTable<BalanceRow>
             columns={columns}
             data={balances}
             total={total}
             page={page}
             pageSize={pageSize}
-            sortColumn="productSku"
+            sortColumn="sku"
             sortDirection="asc"
             onPageChange={setPage}
-            emptyMessage="No stock balances found."
+            emptyMessage={t('inventory.balances.empty.tableMessage')}
           />
         </Card>
       )}
 
       {adjustOpen && (
         <AdjustStockDialog
-          open={adjustOpen}
           onClose={() => setAdjustOpen(false)}
-          currentBalance={currentBalance}
-          form={adjustForm}
-          onQuantityChange={handleAdjustQuantity}
-          onReasonChange={handleAdjustReason}
-          onNoteChange={handleAdjustNote}
-          preview={adjustPreview}
-          error={adjustError}
-          onSubmit={handleAdjustSubmit}
-          submitting={postAdjustment.isPending}
+          productId={adjustProductId}
+          warehouseId={adjustWarehouseId}
+          rows={balances}
+          onPosted={(message) => {
+            setToasts((prev) => [
+              ...prev,
+              { id: `toast-${Date.now()}`, tone: 'success', message },
+            ]);
+          }}
+          onProductPicked={(productId) => {
+            setAdjustProductId(productId);
+            setAdjustWarehouseId('');
+          }}
+          postAdjustment={postAdjustment}
         />
       )}
     </section>
@@ -333,101 +331,224 @@ export function StockBalancesTab() {
 }
 
 interface AdjustStockDialogProps {
-  open: boolean;
   onClose: () => void;
-  currentBalance: BalanceRow | undefined;
-  form: { quantity: string; reason: AdjustmentReason; note: string };
-  onQuantityChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onReasonChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
-  onNoteChange: (event: React.ChangeEvent<HTMLTextAreaElement | HTMLInputElement>) => void;
-  preview: { onHand: string; newOnHand: string; reserved: string; available: string } | null;
-  error: string;
-  onSubmit: (event: React.FormEvent) => void;
-  submitting: boolean;
+  productId: string;
+  warehouseId: string;
+  rows: BalanceRow[];
+  onPosted: (message: string) => void;
+  onProductPicked: (productId: string) => void;
+  postAdjustment: ReturnType<typeof usePostAdjustment>;
 }
 
+/**
+ * The adjust-stock dialog.
+ *
+ * The idempotency key is generated when the dialog OPENS and stays for the
+ * dialog's lifetime: a retry after a refused or lost attempt sends the same
+ * key, so the service can replay or refuse safely, and only a fresh dialog
+ * posts under a fresh key.
+ */
 function AdjustStockDialog({
-  open,
   onClose,
-  currentBalance,
-  form,
-  onQuantityChange,
-  onReasonChange,
-  onNoteChange,
-  preview,
-  error,
-  onSubmit,
-  submitting,
+  productId,
+  warehouseId,
+  rows,
+  onPosted,
+  onProductPicked,
+  postAdjustment,
 }: AdjustStockDialogProps) {
-  const product = currentBalance;
-  const warehouseName = product?.warehouseName ?? '';
-  const productName = product?.productName ?? '';
+  const { t } = useTranslation();
+  const [idempotencyKey] = useState(() => newIdempotencyKey());
+  const [form, setForm] = useState({ quantity: '', reason: 'FOUND' as AdjustmentReason, note: '' });
+  const [error, setError] = useState<{ message: string; requestId: string | null } | null>(null);
+  const [previewQuantity, setPreviewQuantity] = useState('');
+
+  const row = rows.find((item) => item.productId === productId && item.warehouseId === warehouseId)
+    ?? rows.find((item) => item.productId === productId);
+  const product = row !== undefined
+    ? { productId: row.productId, sku: row.sku, productName: row.productName, warehouseId: row.warehouseId, warehouseName: row.warehouseName, onHand: row.onHand, reserved: row.reserved, archived: row.archived, hasStockRow: row.hasStockRow }
+    : null;
+
+  // The preview is exact string arithmetic on the quantities as recorded.
+  const preview = useMemo(() => {
+    if (product === null) return null;
+    const trimmed = previewQuantity.trim();
+    if (trimmed === '' || !/^-?\d+(\.\d{1,3})?$/.test(trimmed)) return null;
+    const newOnHand = addQuantities(product.onHand, trimmed);
+    const available = subtractQuantities(newOnHand, product.reserved);
+    return {
+      onHand: formatQuantity(product.onHand),
+      newOnHand: formatQuantity(newOnHand),
+      reserved: formatQuantity(product.reserved),
+      available: formatQuantity(available),
+    };
+  }, [product, previewQuantity]);
+
+  function changeQuantity(value: string) {
+    setForm((prev) => ({ ...prev, quantity: value }));
+    setPreviewQuantity(value);
+  }
+
+  function changeReason(reason: AdjustmentReason) {
+    setForm((prev) => ({ ...prev, reason }));
+  }
+
+  function changeNote(note: string) {
+    setForm((prev) => ({ ...prev, note }));
+    // Typing clears the note error that was standing.
+    if (error !== null && error.message === t('inventory.balances.adjust.errors.noteRequired')) {
+      setError(null);
+    }
+  }
+
+  function pickProduct(nextProductId: string) {
+    onProductPicked(nextProductId);
+    setError(null);
+  }
+
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+
+    if (product === null || product.warehouseId === null) {
+      setError({ message: t('inventory.balances.adjust.errors.noBalance'), requestId: null });
+      return;
+    }
+    if (!form.quantity.trim()) {
+      setError({ message: t('inventory.balances.adjust.errors.quantityRequired'), requestId: null });
+      return;
+    }
+    if (!/^-?\d+(\.\d{1,3})?$/.test(form.quantity)) {
+      setError({ message: t('inventory.balances.adjust.errors.invalidQuantity'), requestId: null });
+      return;
+    }
+    if (form.reason === 'OTHER' && !form.note.trim()) {
+      setError({ message: t('inventory.balances.adjust.errors.noteRequired'), requestId: null });
+      return;
+    }
+
+    postAdjustment.mutate(
+      {
+        idempotencyKey,
+        productId: product.productId,
+        warehouseId: product.warehouseId,
+        quantity: form.quantity,
+        reason: form.reason,
+        note: form.note.trim() === '' ? undefined : form.note.trim(),
+      },
+      {
+        onSuccess: (result) => {
+          onPosted(
+            t('inventory.balances.adjust.postedToast', {
+              name: product.productName,
+              source: result.movement.sourceNumber,
+            }),
+          );
+          onClose();
+        },
+        onError: (caught) => {
+          const failure = caught as Error & { requestId?: string };
+          setError({
+            message: failure.message || t('inventory.balances.adjust.postError'),
+            requestId: failure.requestId ?? null,
+          });
+        },
+      },
+    );
+  }
 
   return (
-    <form onSubmit={onSubmit} className="adjust-stock-dialog">
-      <div className="dialog-backdrop" style={{ display: open ? 'block' : 'none' }}>
+    <form onSubmit={handleSubmit} className="adjust-stock-dialog">
+      <div className="dialog-backdrop">
         <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="adjust-dialog-title">
           <div className="dialog__header">
-            <h2 id="adjust-dialog-title" className="dialog__title">Adjust stock</h2>
-            <button type="button" className="button" aria-label="Close dialog" onClick={onClose} style={{ padding: 'var(--spacing-xs)' }}>
-              <span className="sr-only">Close</span>
+            <h2 id="adjust-dialog-title" className="dialog__title">{t('inventory.balances.adjust.dialogTitle')}</h2>
+            <button type="button" className="button" aria-label={t('ui.dialog.closeDialog')} onClick={onClose} style={{ padding: 'var(--spacing-xs)' }}>
+              <span className="sr-only">{t('common.actions.close')}</span>
               <span>×</span>
             </button>
           </div>
           <div className="dialog__body">
-            <p>
-              Product: <strong>{productName}</strong> &nbsp;|&nbsp; Warehouse: <strong>{warehouseName}</strong>
-            </p>
+            {product !== null ? (
+              <p>
+                {t('inventory.balances.adjust.product')} <strong>{product.productName}</strong> &nbsp;|&nbsp; {t('inventory.balances.adjust.warehouse')} <strong>{product.warehouseName ?? '—'}</strong>
+              </p>
+            ) : (
+              <p>{t('inventory.balances.adjust.pickProduct')}</p>
+            )}
+            {product === null && (
+              <Select
+                id="adjust-product"
+                label={t('inventory.balances.adjust.productLabel')}
+                options={rows.map((item) => ({ value: item.productId, label: `${item.sku} — ${item.productName}` }))}
+                value={productId}
+                onChange={(event) => pickProduct(event.target.value)}
+              />
+            )}
+            {product !== null && product.archived && (
+              <p className="adjust-archived-warning" role="note">
+                {t('inventory.balances.adjust.archivedWarning')}
+              </p>
+            )}
             <Input
               id="adjust-quantity"
-              label="Signed quantity *"
-              error={error}
+              label={t('inventory.balances.adjust.signedQuantity')}
+              error={error !== null && error.requestId === null ? error.message : undefined}
               value={form.quantity}
-              onChange={onQuantityChange}
+              onChange={(event) => changeQuantity(event.target.value)}
               required
-              helpText="Positive adds stock, negative removes stock. Up to 3 decimal places."
+              helpText={product?.archived
+                ? t('inventory.balances.adjust.signedQuantityArchivedHelp')
+                : t('inventory.balances.adjust.signedQuantityHelp')}
             />
             <Select
               id="adjust-reason"
-              label="Reason *"
-              options={ADJUSTMENT_REASONS.map((r) => ({ value: r, label: r }))}
+              label={t('inventory.balances.adjust.reason')}
+              options={ADJUSTMENT_REASONS.map((reason) => ({ value: reason, label: t(`inventory.balances.adjust.reasons.${reason}`) }))}
               value={form.reason}
-              onChange={onReasonChange}
+              onChange={(event) => changeReason(event.target.value as AdjustmentReason)}
               required
             />
             <div className="form-control">
-              <label htmlFor="adjust-note" className="form-label">Note</label>
+              <label htmlFor="adjust-note" className="form-label">{t('inventory.balances.adjust.note')}</label>
               <textarea
                 id="adjust-note"
-                className={['input', error ? 'input--error' : ''].filter(Boolean).join(' ')}
+                className={['input', error !== null ? 'input--error' : ''].filter(Boolean).join(' ')}
                 value={form.note}
-                onChange={onNoteChange}
+                onChange={(event) => changeNote(event.target.value)}
                 rows={3}
               />
-              {form.reason === 'Other' && (
-                <span id="adjust-note-help" className="form-help-text">Required when the reason is Other.</span>
+              {form.reason === 'OTHER' && (
+                <span id="adjust-note-help" className="form-help-text">{t('inventory.balances.adjust.reasonOtherHelp')}</span>
               )}
             </div>
-            {form.reason === 'Other' && !form.note.trim() && (
-              <span className="form-error" role="alert">A note is required when the reason is Other.</span>
+            {form.reason === 'OTHER' && !form.note.trim() && (
+              <span className="form-error" role="alert">{t('inventory.balances.adjust.errors.noteRequired')}</span>
             )}
-            {error && <span className="form-error" role="alert">{error}</span>}
-            {preview && (
+            {error !== null && error.requestId !== null && (
+              <div className="form-error" role="alert" data-testid="adjust-error">
+                <span>{error.message}</span>
+                {error.requestId !== null && (
+                  <span className="form-error__request">{t('inventory.balances.adjust.requestId', { id: error.requestId })}</span>
+                )}
+              </div>
+            )}
+            {preview !== null && (
               <div className="adjust-preview">
-                <p>Live preview:</p>
-                <p>On hand {preview.onHand} to {preview.newOnHand}, Reserved {preview.reserved}, Available {preview.available}</p>
+                <p>{t('inventory.balances.adjust.livePreview')}</p>
+                <p>{t('inventory.balances.adjust.previewOnHand', { onHand: preview.onHand, newOnHand: preview.newOnHand, reserved: preview.reserved, available: preview.available })}</p>
               </div>
             )}
             <p className="adjust-consequence">
-              A posted adjustment cannot be edited or deleted. It is corrected only by a compensating adjustment.
+              {t('inventory.balances.adjust.consequence')}
             </p>
           </div>
           <div className="dialog__actions">
-            <Button type="button" variant="default" onClick={onClose} disabled={submitting}>
-              Cancel
+            <Button type="button" variant="default" onClick={onClose} disabled={postAdjustment.isPending}>
+              {t('inventory.balances.adjust.cancel')}
             </Button>
-            <Button type="submit" variant="primary" disabled={submitting} loading={submitting}>
-              Post adjustment
+            <Button type="submit" variant="primary" disabled={postAdjustment.isPending} loading={postAdjustment.isPending}>
+              {t('inventory.balances.adjust.post')}
             </Button>
           </div>
         </div>

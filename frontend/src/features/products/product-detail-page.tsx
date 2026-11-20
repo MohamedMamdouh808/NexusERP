@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PRODUCT_PERMISSIONS } from '@nexuserp/shared';
@@ -14,6 +15,9 @@ import {
 } from '../../components/ui';
 import { hasPermission, useSession } from '../../services/auth-session';
 import { useArchiveProduct, useProduct, useRestoreProduct } from './use-products';
+import { listStockBalances } from '../../services/inventory-client';
+import { formatMoneyLocalized } from '../../lib/i18n-format';
+import { useQuery } from '@tanstack/react-query';
 
 /**
  * One product.
@@ -23,13 +27,18 @@ import { useArchiveProduct, useProduct, useRestoreProduct } from './use-products
  *
  * There is no stock figure here: the inventory feature owns the balances, and
  * this feature stores no stock at all. Saying so is better than showing a
- * number that means nothing yet.
+ * number that means nothing yet. The one exception is an ARCHIVED product that
+ * still holds stock: its page offers the "Adjust stock" entry point that
+ * deep-links into the Inventory balances with the product preselected, because
+ * writing that stock off is the reason an archived product would still be
+ * touched at all.
  */
 export function ProductDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const productId = id ?? '';
   const session = useSession();
+  const { t } = useTranslation();
   const canWrite = hasPermission(session, PRODUCT_PERMISSIONS.write);
   const currencyCode = session.status === 'signed-in' ? session.organization.currencyCode : null;
 
@@ -40,12 +49,39 @@ export function ProductDetailPage() {
   const [dialogError, setDialogError] = useState('');
   const [toast, setToast] = useState<string | null>(null);
 
+  // An archived product can still hold stock. This page offers the write-off
+  // entry point: when the archived-with-stock selection still names this
+  // product, an "Adjust stock" button deep-links into the Inventory balances
+  // with the product preselected, where the write-off is posted with a reason.
+  const archivedStock = useQuery({
+    queryKey: ['inventory', 'archivedWithStock', productId],
+    queryFn: async () => {
+      const result = await listStockBalances({
+        status: 'archivedWithStock',
+        search: data?.sku,
+        page: 1,
+        pageSize: 1,
+      });
+      if (!result.ok) {
+        const failure = result.failure;
+        const enriched = new Error(failure.message) as Error & { requestId?: string };
+        enriched.requestId = failure.requestId;
+        throw enriched;
+      }
+      return result.data;
+    },
+    // Only an archived product needs the entry point, and only once its sku
+    // is known for the search.
+    enabled: data?.isArchived === true && data.sku !== '',
+  });
+  const holdsStock = (archivedStock.data?.total ?? 0) > 0;
+
   if (isPending) {
     return (
-      <section className="product-detail-page" aria-label="Product detail">
-        <PageHeader title="Product" />
-        <Card title="Product">
-          <Skeleton label="Loading product" />
+      <section className="product-detail-page" aria-label={t('products.detail.title')}>
+        <PageHeader title={t('shell.sidebar.entries.Products')} />
+        <Card title={t('shell.sidebar.entries.Products')}>
+          <Skeleton label={t('products.detail.loading')} />
         </Card>
       </section>
     );
@@ -53,11 +89,11 @@ export function ProductDetailPage() {
 
   if (isError || data === undefined) {
     return (
-      <section className="product-detail-page" aria-label="Product detail">
-        <PageHeader title="Product" />
-        <Card title="Product">
+      <section className="product-detail-page" aria-label={t('products.detail.title')}>
+        <PageHeader title={t('shell.sidebar.entries.Products')} />
+        <Card title={t('shell.sidebar.entries.Products')}>
           <ErrorState
-            message={error instanceof Error ? error.message : 'The product could not be loaded.'}
+            message={error instanceof Error ? error.message : t('products.detail.loadError')}
           />
         </Card>
       </section>
@@ -71,11 +107,11 @@ export function ProductDetailPage() {
     archiveProduct.mutate(productId, {
       onSuccess: () => {
         setDialogOpen(false);
-        setToast(`${data!.name} archived`);
+        setToast(t('products.detail.archiveToast', { name: data!.name }));
       },
       onError: (caught) => {
         setDialogError(
-          caught instanceof Error ? caught.message : 'The product could not be archived.',
+          caught instanceof Error ? caught.message : t('products.detail.archiveError'),
         );
       },
     });
@@ -86,18 +122,18 @@ export function ProductDetailPage() {
     restoreProduct.mutate(productId, {
       onSuccess: () => {
         setDialogOpen(false);
-        setToast(`${data!.name} restored`);
+        setToast(t('products.detail.restoreToast', { name: data!.name }));
       },
       onError: (caught) => {
         setDialogError(
-          caught instanceof Error ? caught.message : 'The product could not be restored.',
+          caught instanceof Error ? caught.message : t('products.detail.restoreError'),
         );
       },
     });
   }
 
   return (
-    <section className="product-detail-page" aria-label="Product detail">
+    <section className="product-detail-page" aria-label={t('products.detail.title')}>
       <PageHeader
         title={data.name}
         secondaryActions={[
@@ -105,43 +141,51 @@ export function ProductDetailPage() {
             {canWrite ? (
               <>
                 <Button variant="primary" onClick={() => navigate(`/products/${data.id}/edit`)}>
-                  Edit
+                  {t('products.detail.edit')}
                 </Button>
                 <Button
                   variant="danger"
                   onClick={() => setDialogOpen(true)}
                   disabled={archiveProduct.isPending || restoreProduct.isPending}
                 >
-                  {archived ? 'Restore' : 'Archive'}
+                  {archived ? t('products.detail.restore') : t('products.detail.archive')}
                 </Button>
               </>
             ) : null}
+            {archived && holdsStock ? (
+              <Button
+                variant="default"
+                onClick={() => navigate(`/inventory?adjust=${data.id}`)}
+              >
+                {t('products.detail.adjustStock')}
+              </Button>
+            ) : null}
             <Button variant="default" onClick={() => navigate('/products')}>
-              Back to list
+              {t('products.detail.backToList')}
             </Button>
           </div>,
         ]}
       />
-      <Card title="Product details">
+      <Card title={t('products.detail.title')}>
         <dl className="contact-detail-page__details">
-          <dt>SKU</dt>
+          <dt>{t('products.detail.sku')}</dt>
           <dd>{data.sku}</dd>
-          <dt>Status</dt>
+          <dt>{t('products.detail.status')}</dt>
           <dd>
             <Badge tone={archived ? 'destructive' : 'success'}>
-              {archived ? 'Archived' : 'Active'}
+              {archived ? t('common.status.archived') : t('common.status.active')}
             </Badge>
           </dd>
-          <dt>Purchase price</dt>
-          <dd>{currencyCode === null ? data.purchasePrice : `${data.purchasePrice} ${currencyCode}`}</dd>
-          <dt>Selling price</dt>
-          <dd>{currencyCode === null ? data.sellingPrice : `${data.sellingPrice} ${currencyCode}`}</dd>
-          <dt>Reorder level</dt>
+          <dt>{t('products.detail.purchasePrice')}</dt>
+          <dd>{currencyCode === null ? data.purchasePrice : formatMoneyLocalized(data.purchasePrice, currencyCode, 4)}</dd>
+          <dt>{t('products.detail.sellingPrice')}</dt>
+          <dd>{currencyCode === null ? data.sellingPrice : formatMoneyLocalized(data.sellingPrice, currencyCode, 4)}</dd>
+          <dt>{t('products.detail.reorderLevel')}</dt>
           <dd>{data.lowStockThreshold ?? '—'}</dd>
-          <dt>Version</dt>
+          <dt>{t('products.detail.version')}</dt>
           <dd>{data.version}</dd>
-          <dt>Stock</dt>
-          <dd className="form-help-text">Stock arrives with the Inventory feature.</dd>
+          <dt>{t('products.detail.stockLabel')}</dt>
+          <dd className="form-help-text">{t('products.detail.stockNote')}</dd>
         </dl>
       </Card>
 
@@ -163,13 +207,13 @@ export function ProductDetailPage() {
           }
         }}
         onConfirm={archived ? handleRestore : handleArchive}
-        title={archived ? 'Restore product' : 'Archive product'}
+        title={archived ? t('products.detail.restoreTitle') : t('products.detail.archiveTitle')}
         description={
           archived
-            ? `Are you sure you want to restore “${data.name}”? It becomes selectable again.`
-            : `Are you sure you want to archive “${data.name}”? It leaves the catalogue but can be restored, and its SKU stays reserved.`
+            ? t('products.detail.restoreDescription', { name: data.name })
+            : t('products.detail.archiveDescription', { name: data.name })
         }
-        actionLabel={archived ? 'Restore' : 'Archive'}
+        actionLabel={archived ? t('products.detail.restoreLabel') : t('products.detail.archiveLabel')}
         destructive={!archived}
         loading={archiveProduct.isPending || restoreProduct.isPending}
         error={dialogError}

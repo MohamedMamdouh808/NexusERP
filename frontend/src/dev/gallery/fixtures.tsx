@@ -387,3 +387,17 @@ export const FIXTURES: Record<FixtureSlot, () => ReactNode> = {
     />
   ),
 };
+
+/**
+ * Local, dev-only state simulator for the gallery's interactive toggles.
+ * It replaces the old sample service: these flags are in-memory gallery state,
+ * never production data, and `removeRecord` only removes a local demo id.
+ */
+export const gallerySimulator = {
+  simulateFailure: false,
+  simulateSlowResponse: false,
+  simulateEmptyData: false,
+  removeRecord(input: { id: string }): Promise<{ removedLabel: string }> {
+    return Promise.resolve({ removedLabel: `Sample record ${input.id}` });
+  },
+};

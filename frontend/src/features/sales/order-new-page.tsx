@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { useNavigate } from 'react-router-dom';
 
 import { PageHeader } from '../../components/shell/page-header';
@@ -6,19 +8,20 @@ import { OrderForm } from './order-form';
 
 export function OrderNewPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
-    <section className="order-new-page" aria-label="New sales order">
+    <section className="order-new-page" aria-label={t('sales.create.sectionAria')}>
       <PageHeader
-        title="New Sales Order"
+        title={t('sales.create.title')}
         primaryAction={
           <Button variant="default" onClick={() => navigate('/sales')}>
-            Cancel
+            {t('common.actions.cancel')}
           </Button>
         }
       />
-      <Card title="New Sales Order" description="Orders are saved as drafts; confirm one on its detail page to reserve stock.">
-        <OrderForm submitLabel="Save draft" />
+      <Card title={t('sales.create.title')} description={t('sales.create.description')}>
+        <OrderForm submitLabel={t('sales.form.saveDraft')} />
       </Card>
     </section>
   );

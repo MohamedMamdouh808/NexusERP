@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run check:design-values && tsc -b && vite build && npm run check:no-gallery",
+    "build": "npm run check:design-values && npm run check:no-sample-imports && tsc -b && vite build && npm run check:no-gallery && npm run check:css-classes",
     "preview": "vite preview",
     "typecheck": "tsc -b --pretty",
     "lint": "eslint .",
@@ -16,15 +16,19 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "check:design-values": "tsx scripts/check-no-raw-design-values.ts",
-    "check:no-gallery": "tsx scripts/check-no-gallery-in-build.ts"
+    "check:no-sample-imports": "tsx scripts/check-no-sample-imports.ts",
+    "check:no-gallery": "tsx scripts/check-no-gallery-in-build.ts",
+    "check:css-classes": "node scripts/check-css-classes.mjs"
   },
   "dependencies": {
     "@nexuserp/shared": "*",
     "@tanstack/react-query": "^5.62.7",
+    "i18next": "^27.1.1",
     "lucide-react": "^1.60.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.2",
+    "react-i18next": "^18.0.1",
     "react-router-dom": "^6.28.0",
     "recharts": "^3.10.1",
     "zod": "^3.24.1"

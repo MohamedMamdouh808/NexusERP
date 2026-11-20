@@ -1,5 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
+import { i18nInstance } from '../i18n';
+
 /**
  * Last line of defence for a render failure (T088).
  *
@@ -28,10 +30,10 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
     if (this.state.failed) {
       return (
         <div className="app-shell__content" role="alert">
-          <h1>Something went wrong</h1>
-          <p>The interface could not be displayed. Reloading usually resolves this.</p>
+          <h1>{i18nInstance.t('error.title')}</h1>
+          <p>{i18nInstance.t('error.description')}</p>
           <button type="button" className="button" onClick={() => window.location.reload()}>
-            Reload
+            {i18nInstance.t('error.reload')}
           </button>
         </div>
       );

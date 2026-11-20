@@ -1,0 +1,51 @@
+/** The application shell: sidebar, top bar, breadcrumb, menus, roles. */
+export default {
+  skipToMain: 'Skip to main content',
+  sidebar: {
+    mainNav: 'Main',
+    groups: {
+      General: 'General',
+      Management: 'Management',
+      Settings: 'Settings',
+    },
+    entries: {
+      Overview: 'Overview',
+      SalesOrders: 'Sales Orders',
+      Inventory: 'Inventory',
+      Reports: 'Reports',
+      Products: 'Products',
+      Contacts: 'Customers & Suppliers',
+      Purchasing: 'Purchasing',
+      Invoicing: 'Invoicing',
+      UsersAndRoles: 'Users & Roles',
+      Organization: 'Organization',
+      AuditLog: 'Audit Log',
+      SystemHealth: 'System Health',
+    },
+    soon: 'Soon',
+    unavailable: 'Unavailable',
+    turnedOff: 'Turned off in Settings',
+  },
+  topBar: {
+    search: 'Search…',
+    commandPaletteAria: 'Open command palette (Ctrl K)',
+    commandPaletteTitle: 'Search and commands (Ctrl K)',
+    openNavigationMenu: 'Open navigation menu',
+    closeNavigationMenu: 'Close navigation menu',
+    closeNavigationDrawer: 'Close navigation drawer',
+    signIn: 'Sign in',
+    signOut: 'Sign out',
+    profile: 'Profile',
+    organizationAria: 'Organization: ',
+    userAria: 'User: ',
+    organizationMenuLabel: 'Organization',
+    userMenuLabel: 'User',
+  },
+  breadcrumb: {
+    ariaLabel: 'Breadcrumb',
+  },
+  roles: {
+    administrator: 'Administrator',
+    member: 'Member',
+  },
+};

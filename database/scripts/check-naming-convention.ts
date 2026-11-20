@@ -98,6 +98,54 @@ const NOT_A_COLUMN = [
 ];
 
 /**
+ * Blanks out the CONTENT of SQL line comments, keeping every character position.
+ *
+ * A comment inside a CREATE TABLE is not a column. Without this, the checker
+ * reads `-- A note is required ...` as a column named "--" and reports a
+ * violation that does not exist - which is what happened to the inventory
+ * migrations, whose explanatory comments sit inside the table body.
+ *
+ * The characters are REPLACED by spaces rather than removed, so every offset
+ * stays the same and the reported line numbers still point at the original
+ * file. Block comments are not touched: no migration in this repository uses
+ * one inside a table body.
+ */
+export function blankOutLineComments(sql: string): string {
+  let result = '';
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let inLineComment = false;
+
+  for (let index = 0; index < sql.length; index += 1) {
+    const character = sql[index];
+
+    if (inLineComment) {
+      if (character === '\n') {
+        inLineComment = false;
+        result += character;
+      } else {
+        result += ' ';
+      }
+      continue;
+    }
+
+    if (!inSingleQuote && !inDoubleQuote && character === '-' && sql[index + 1] === '-') {
+      inLineComment = true;
+      result += '  ';
+      index += 1;
+      continue;
+    }
+
+    if (character === "'" && !inDoubleQuote) inSingleQuote = !inSingleQuote;
+    else if (character === '"' && !inSingleQuote) inDoubleQuote = !inDoubleQuote;
+
+    result += character;
+  }
+
+  return result;
+}
+
+/**
  * Finds the camelCase identifiers in a migration.
  *
  * Only the statements that CREATE a table or a column are inspected: renaming
@@ -110,10 +158,14 @@ export function findNamingViolations(migration: string, sql: string): NamingViol
 
   const lineOf = (offset: number): number => sql.slice(0, offset).split('\n').length;
 
+  // The comments are blanked out for the parsing only; the offsets and the line
+  // numbers still come from the original file.
+  const parsed = blankOutLineComments(sql);
+
   // CREATE TABLE "name" ( ... ) - the table name AND every column in the body.
   const createTable =
     /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?("?[\w$]+"?)\s*\(/gi;
-  for (const match of sql.matchAll(createTable)) {
+  for (const match of parsed.matchAll(createTable)) {
     const table = (match[1] ?? '').replace(/"/g, '');
     const tableOffset = match.index ?? 0;
     if (!isSnakeCase(table)) {
@@ -124,9 +176,9 @@ export function findNamingViolations(migration: string, sql: string): NamingViol
     const open = tableOffset + match[0].length - 1;
     let depth = 0;
     let close = open;
-    for (let index = open; index < sql.length; index += 1) {
-      if (sql[index] === '(') depth += 1;
-      else if (sql[index] === ')') {
+    for (let index = open; index < parsed.length; index += 1) {
+      if (parsed[index] === '(') depth += 1;
+      else if (parsed[index] === ')') {
         depth -= 1;
         if (depth === 0) {
           close = index;
@@ -135,7 +187,8 @@ export function findNamingViolations(migration: string, sql: string): NamingViol
       }
     }
 
-    for (const part of splitTopLevel(sql.slice(open + 1, close))) {
+    const body = parsed.slice(open + 1, close);
+    for (const part of splitTopLevel(body)) {
       const trimmed = part.trim();
       if (trimmed.length === 0) continue;
       const firstToken = trimmed.split(/[\s(]+/)[0] ?? '';
@@ -147,7 +200,7 @@ export function findNamingViolations(migration: string, sql: string): NamingViol
           migration,
           identifier: name,
           kind: 'column',
-          line: lineOf(open + sql.slice(open + 1, close).indexOf(trimmed) + 1),
+          line: lineOf(open + body.indexOf(trimmed) + 1),
         });
       }
     }
@@ -159,7 +212,7 @@ export function findNamingViolations(migration: string, sql: string): NamingViol
   // column. The keywords are excluded so they are not mistaken for one.
   const addColumn =
     /ALTER\s+TABLE\s+(?:ONLY\s+)?("?[\w$]+"?)\s+ADD\s+(?:COLUMN\s+)?(?!CONSTRAINT\b|PRIMARY\b|UNIQUE\b|CHECK\b|FOREIGN\b|EXCLUDE\b|LIKE\b)(?:IF\s+NOT\s+EXISTS\s+)?("?[\w$]+"?)/gi;
-  for (const match of sql.matchAll(addColumn)) {
+  for (const match of parsed.matchAll(addColumn)) {
     const name = (match[2] ?? '').replace(/"/g, '');
     if (!isSnakeCase(name)) {
       violations.push({
@@ -177,7 +230,7 @@ export function findNamingViolations(migration: string, sql: string): NamingViol
   // tables that predate it keep their camelCase columns) adds no new name.
   const createIndex =
     /CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?("?[\w$]+"?)\s+ON\s+(?:ONLY\s+)?("?[\w$]+"?)\s*\(([^)]*)\)/gi;
-  for (const match of sql.matchAll(createIndex)) {
+  for (const match of parsed.matchAll(createIndex)) {
     const indexName = (match[1] ?? '').replace(/"/g, '');
     if (!isSnakeCase(indexName)) {
       violations.push({

@@ -16,6 +16,8 @@ import { ERROR_CODES } from '@nexuserp/shared';
 import { AppException } from '../../common/errors/all-exceptions.filter';
 import { AuthService } from './auth.service';
 import { SessionGuard, SessionRequest } from './guards/session.guard';
+import { ApiOkResponse } from '@nestjs/swagger';
+import { MeResponseDto } from './dto/me-response.dto';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 import { registerSchema, type RegisterDto } from './dto/register.dto';
 import { loginSchema, type LoginDto } from './dto/login.dto';
@@ -43,8 +45,10 @@ export class AuthController {
    */
   @Public()
   @Post('register')
-  async register(@Body(new ZodValidationPipe(registerSchema)) body: RegisterDto) {
-    return this.authService.register(body.email, body.password);
+  async register(
+    @Body(new ZodValidationPipe(registerSchema)) body: RegisterDto,
+  ) {
+    return this.authService.register(body.email, body.password, body.organizationName, body.currencyCode);
   }
 
   /**
@@ -117,6 +121,7 @@ export class AuthController {
   @Authenticated()
   @Get('me')
   @UseGuards(SessionGuard)
+  @ApiOkResponse({ description: 'The current user, membership and organization', type: MeResponseDto })
   async me(@Req() request: SessionRequest) {
     if (!request.userId || !request.membershipId) {
       throw new AppException(ERROR_CODES.UNAUTHENTICATED, [], 'Not authenticated.');

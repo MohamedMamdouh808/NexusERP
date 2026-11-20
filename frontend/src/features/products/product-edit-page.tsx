@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PRODUCT_PERMISSIONS, PRODUCT_REORDER_LEVEL_LABEL } from '@nexuserp/shared';
+import { useTranslation } from 'react-i18next';
+import { PRODUCT_PERMISSIONS } from '@nexuserp/shared';
 
 import { PageHeader } from '../../components/shell/page-header';
 import { Button, Card, ErrorState, Input, Select } from '../../components/ui';
@@ -34,27 +35,12 @@ interface FormErrors {
   unitId?: string;
 }
 
-/**
- * A price the interface accepts locally: digits with at most the column's
- * decimals. A leading minus is accepted by the pattern so the refusal says
- * what is wrong ("must not be negative") rather than "not a decimal".
- */
-function priceError(value: string, decimals: number, label: string): string | undefined {
-  const trimmed = value.trim();
-  if (!new RegExp(`^-?\\d+(\\.\\d{1,${decimals}})?$`).test(trimmed)) {
-    return `${label} must be a decimal with at most ${decimals} decimal places.`;
-  }
-  if (trimmed.startsWith('-')) {
-    return `${label} must not be negative.`;
-  }
-  return undefined;
-}
-
 export function ProductEditPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const productId = id ?? '';
   const session = useSession();
+  const { t } = useTranslation();
   const canWrite = hasPermission(session, PRODUCT_PERMISSIONS.write);
 
   const categories = useCategories();
@@ -96,17 +82,31 @@ export function ProductEditPage() {
   function validate(): boolean {
     if (!form) return false;
     const next: FormErrors = {};
-    if (form.name.trim().length === 0) next.name = 'Name is required.';
-    if (form.sku.trim().length === 0) next.sku = 'SKU is required.';
-    if (form.categoryId === '') next.categoryId = 'Choose a category.';
-    if (form.unitId === '') next.unitId = 'Choose a unit of measure.';
-    const purchasePriceError = priceError(form.purchasePrice, 4, 'Purchase price');
-    if (purchasePriceError !== undefined) next.purchasePrice = purchasePriceError;
-    const sellingPriceError = priceError(form.sellingPrice, 4, 'Selling price');
-    if (sellingPriceError !== undefined) next.sellingPrice = sellingPriceError;
-    if (form.lowStockThreshold.trim().length > 0) {
-      const reorderError = priceError(form.lowStockThreshold, 3, PRODUCT_REORDER_LEVEL_LABEL);
-      if (reorderError !== undefined) next.lowStockThreshold = reorderError;
+    const decimalPattern = (decimals: number) => new RegExp(`^\\d+(\\.\\d{1,${decimals}})?$`);
+    const minusPattern = (decimals: number) => new RegExp(`^-\\d+(\\.\\d{1,${decimals}})?$`);
+    if (form.name.trim().length === 0) next.name = t('products.form.nameRequired');
+    if (form.sku.trim().length === 0) next.sku = t('products.form.skuRequired');
+    if (form.categoryId === '') next.categoryId = t('products.form.categoryRequired');
+    if (form.unitId === '') next.unitId = t('products.form.unitRequired');
+
+    const purchase = form.purchasePrice.trim();
+    if (!decimalPattern(4).test(purchase)) {
+      next.purchasePrice = minusPattern(4).test(purchase)
+        ? t('products.form.purchasePriceNonNegative')
+        : t('products.form.purchasePriceDecimals');
+    }
+    const selling = form.sellingPrice.trim();
+    if (!decimalPattern(4).test(selling)) {
+      next.sellingPrice = minusPattern(4).test(selling)
+        ? t('products.form.sellingPriceNonNegative')
+        : t('products.form.sellingPriceDecimals');
+    }
+    const reorder = form.lowStockThreshold.trim();
+    if (reorder.length > 0 && !decimalPattern(3).test(reorder)) {
+      const label = t('products.fields.reorderLevel');
+      next.lowStockThreshold = minusPattern(3).test(reorder)
+        ? t('products.form.reorderLevelNonNegative', { label })
+        : t('products.form.reorderLevelDecimals', { label });
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -165,10 +165,10 @@ export function ProductEditPage() {
 
   if (isPending) {
     return (
-      <section className="product-edit-page" aria-label="Edit product">
-        <PageHeader title="Edit Product" />
-        <Card title="Edit Product">
-          <span>Loading product…</span>
+      <section className="product-edit-page" aria-label={t('products.form.editTitle')}>
+        <PageHeader title={t('products.form.editTitle')} />
+        <Card title={t('products.form.editTitle')}>
+          <span>{t('products.form.loadingEdit')}</span>
         </Card>
       </section>
     );
@@ -176,11 +176,11 @@ export function ProductEditPage() {
 
   if (isError || data === undefined) {
     return (
-      <section className="product-edit-page" aria-label="Edit product">
-        <PageHeader title="Edit Product" />
-        <Card title="Edit Product">
+      <section className="product-edit-page" aria-label={t('products.form.editTitle')}>
+        <PageHeader title={t('products.form.editTitle')} />
+        <Card title={t('products.form.editTitle')}>
           <ErrorState
-            message={error instanceof Error ? error.message : 'The product could not be loaded.'}
+            message={error instanceof Error ? error.message : t('products.form.loadError')}
           />
         </Card>
       </section>
@@ -189,12 +189,12 @@ export function ProductEditPage() {
 
   if (!canWrite) {
     return (
-      <section className="product-edit-page" aria-label="Edit product">
-        <PageHeader title="Edit Product" />
-        <Card title="Edit Product">
-          <ErrorState message="You do not have permission to change products." />
+      <section className="product-edit-page" aria-label={t('products.form.editTitle')}>
+        <PageHeader title={t('products.form.editTitle')} />
+        <Card title={t('products.form.editTitle')}>
+          <ErrorState message={t('products.form.forbiddenEdit')} />
           <Button variant="default" onClick={() => navigate(`/products/${productId}`)}>
-            Back to product
+            {t('common.actions.back')}
           </Button>
         </Card>
       </section>
@@ -204,23 +204,20 @@ export function ProductEditPage() {
   if (!form) return null;
 
   return (
-    <section className="product-edit-page" aria-label="Edit product">
+    <section className="product-edit-page" aria-label={t('products.form.editTitle')}>
       <PageHeader
-        title="Edit Product"
-        description={`Editing “${data.name}”.`}
+        title={t('products.form.editTitle')}
+        description={t('products.form.editDescription', { name: data.name })}
         primaryAction={
           <Button variant="default" onClick={() => navigate(`/products/${productId}`)}>
-            Cancel
+            {t('common.actions.cancel')}
           </Button>
         }
       />
-      <Card title="Edit Product">
+      <Card title={t('products.form.editTitle')}>
         {stale && (
           <div role="alert" aria-live="assertive" className="form-error contact-form__server-error">
-            <p>
-              This product was changed by someone else. Reload the current version before saving
-              yours.
-            </p>
+            <p>{t('products.form.staleBanner')}</p>
             <Button
               variant="default"
               type="button"
@@ -230,7 +227,7 @@ export function ProductEditPage() {
                 void refetch();
               }}
             >
-              Reload the product
+              {t('products.form.reloadProduct')}
             </Button>
           </div>
         )}
@@ -238,16 +235,17 @@ export function ProductEditPage() {
           <div role="alert" aria-live="assertive" className="form-error contact-form__server-error">
             <p>{serverError.message}</p>
             <p className="contact-form__reference">
-              Reference ID: <code>{serverError.requestId}</code>
+              {t('ui.errorState.referenceLabel')}
+              <code>{serverError.requestId}</code>
             </p>
           </div>
         )}
         <form onSubmit={handleSubmit} className="product-edit-page__form" noValidate={true}>
           <fieldset className="contact-form__section">
-            <legend>Details</legend>
+            <legend>{t('products.form.details')}</legend>
             <Input
               id="name"
-              label="Name"
+              label={t('products.fields.name')}
               value={form.name}
               error={errors.name}
               onChange={(event) => update({ name: event.target.value })}
@@ -255,7 +253,7 @@ export function ProductEditPage() {
             />
             <Input
               id="sku"
-              label="SKU"
+              label={t('products.fields.sku')}
               value={form.sku}
               error={errors.sku}
               onChange={(event) => update({ sku: event.target.value })}
@@ -264,10 +262,10 @@ export function ProductEditPage() {
           </fieldset>
 
           <fieldset className="contact-form__section">
-            <legend>Classification</legend>
+            <legend>{t('products.form.classification')}</legend>
             <Select
               id="categoryId"
-              label="Category"
+              label={t('products.fields.category')}
               value={form.categoryId}
               error={errors.categoryId}
               options={(categories.data ?? []).map((category) => ({
@@ -275,11 +273,11 @@ export function ProductEditPage() {
                 label: category.name,
               }))}
               onChange={(event) => update({ categoryId: event.target.value })}
-              placeholder="Choose a category"
+              placeholder={t('products.form.categoryPlaceholder')}
             />
             <Select
               id="unitId"
-              label="Unit of measure"
+              label={t('products.fields.unit')}
               value={form.unitId}
               error={errors.unitId}
               options={(units.data ?? []).map((unit) => ({
@@ -287,23 +285,23 @@ export function ProductEditPage() {
                 label: `${unit.name} (${unit.abbreviation})`,
               }))}
               onChange={(event) => update({ unitId: event.target.value })}
-              placeholder="Choose a unit of measure"
+              placeholder={t('products.form.unitPlaceholder')}
             />
           </fieldset>
 
           <fieldset className="contact-form__section">
-            <legend>Prices</legend>
+            <legend>{t('products.form.prices')}</legend>
             <div className="contact-form__row">
               <Input
                 id="purchasePrice"
-                label="Purchase price"
+                label={t('products.fields.purchasePrice')}
                 value={form.purchasePrice}
                 error={errors.purchasePrice}
                 onChange={(event) => update({ purchasePrice: event.target.value })}
               />
               <Input
                 id="sellingPrice"
-                label="Selling price"
+                label={t('products.fields.sellingPrice')}
                 value={form.sellingPrice}
                 error={errors.sellingPrice}
                 onChange={(event) => update({ sellingPrice: event.target.value })}
@@ -311,7 +309,7 @@ export function ProductEditPage() {
             </div>
             <Input
               id="lowStockThreshold"
-              label={PRODUCT_REORDER_LEVEL_LABEL}
+              label={t('products.fields.reorderLevel')}
               value={form.lowStockThreshold}
               error={errors.lowStockThreshold}
               onChange={(event) => update({ lowStockThreshold: event.target.value })}
@@ -325,10 +323,10 @@ export function ProductEditPage() {
               disabled={updateProduct.isPending}
               loading={updateProduct.isPending}
             >
-              {updateProduct.isPending ? 'Saving…' : 'Save changes'}
+              {updateProduct.isPending ? t('products.form.saving') : t('products.form.save')}
             </Button>
             <Button variant="default" type="button" onClick={() => navigate(`/products/${productId}`)}>
-              Cancel
+              {t('common.actions.cancel')}
             </Button>
           </div>
         </form>

@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -6,9 +8,9 @@ import type { LineField, LineEditorLine, ToastTone } from '../../components/ui';
 import { addQuantities, compareQuantities, multiplyQuantities } from '../../lib/quantity';
 import { compactQuantity } from '../../lib/quantity';
 import { useCreateSalesOrder, useUpdateSalesOrder } from './use-sales';
-import { useStockBalances, useWarehouses } from '../inventory/use-inventory';
-import { SAMPLE_PRODUCTS } from '../../mocks/sample-products';
 import { useContacts } from '../contacts/use-contacts';
+import { useProducts } from '../products/use-products';
+import { useStockBalances, useWarehouses } from '../inventory/use-inventory';
 import type { CreateSalesOrderInput, SalesOrder } from '../../services/catalog-service';
 
 /**
@@ -56,6 +58,7 @@ function asLineEditorLine(line: LineForm): LineEditorLine {
 
 export function OrderForm({ order, submitLabel }: OrderFormProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const isEdit = order !== undefined;
 
   const [form, setForm] = useState<FormState>(() =>
@@ -84,21 +87,17 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
   const { data: contactsData } = useContacts({ role: 'customer', status: 'active', page: 1, pageSize: 100 });
   const customers = contactsData?.items ?? [];
 
-  // Shipping warehouses: active warehouses only.
+  // Shipping warehouses: the organization's active warehouses.
   const { data: warehousesData } = useWarehouses();
-  const warehouses = (warehousesData ?? []).filter((warehouse) => warehouse.status === 'ACTIVE');
+  const warehouses = (warehousesData?.items ?? []).filter((warehouse) => warehouse.isActive);
 
-  // Line products: the demonstration list. This module is still a demonstration
-  // module, so it must not call the real product service - a real product in a
-  // demonstration order would name a record that belongs to nothing.
-  const products = useMemo(
-    () => SAMPLE_PRODUCTS.filter((product) => product.status !== 'ARCHIVED'),
-    [],
-  );
+  // Line products: the organization's active, unarchived products.
+  const { data: productsData } = useProducts({ status: 'active', page: 1, pageSize: 100 });
+  const products = useMemo(() => productsData?.items ?? [], [productsData]);
 
-  // Live availability in the chosen warehouse, from the sample the Inventory
-  // screens read. Unfiltered while no warehouse is chosen; the lookup below
-  // only becomes meaningful once one is picked.
+  // Live availability in the chosen warehouse, from the real balance rows the
+  // organization holds. Unfiltered while no warehouse is chosen; the lookup
+  // below only becomes meaningful once one is picked.
   const { data: balancesData } = useStockBalances({
     warehouseId: form.warehouseId === '' ? undefined : form.warehouseId,
     page: 1,
@@ -156,13 +155,13 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
 
   function validateField(field: string, state: FormState): string | undefined {
     if (field === 'customerId') {
-      return state.customerId === '' ? 'Customer is required.' : undefined;
+      return state.customerId === '' ? t('sales.form.customerRequired') : undefined;
     }
     if (field === 'warehouseId') {
-      return state.warehouseId === '' ? 'Shipping warehouse is required.' : undefined;
+      return state.warehouseId === '' ? t('sales.form.shippingWarehouseRequired') : undefined;
     }
     if (field === 'orderDate') {
-      return state.orderDate === '' ? 'Order date is required.' : undefined;
+      return state.orderDate === '' ? t('sales.form.orderDateRequired') : undefined;
     }
 
     const match = /^lines\.(\d+)\.(productId|quantity|unitPrice)$/.exec(field);
@@ -173,17 +172,17 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
     if (line === undefined) return undefined;
 
     if (match[2] === 'productId') {
-      return line.productId === '' ? 'Select a product.' : undefined;
+      return line.productId === '' ? t('sales.form.selectProduct') : undefined;
     }
     if (match[2] === 'quantity') {
-      if (line.quantity === '') return 'Quantity is required.';
-      if (!QUANTITY_PATTERN.test(line.quantity)) return 'Enter a quantity of up to 3 decimal places.';
-      if (compareQuantities(line.quantity, '0.000') <= 0) return 'Quantity must be greater than 0.';
+      if (line.quantity === '') return t('sales.form.quantityRequired');
+      if (!QUANTITY_PATTERN.test(line.quantity)) return t('sales.form.quantityDecimals');
+      if (compareQuantities(line.quantity, '0.000') <= 0) return t('sales.form.quantityPositive');
       return undefined;
     }
     // unitPrice
-    if (!PRICE_PATTERN.test(line.unitPrice)) return 'Enter a unit price of up to 4 decimal places.';
-    if (compareQuantities(line.unitPrice, '0.0000') < 0) return 'Unit price must not be negative.';
+    if (!PRICE_PATTERN.test(line.unitPrice)) return t('sales.form.unitPriceDecimals');
+    if (compareQuantities(line.unitPrice, '0.0000') < 0) return t('sales.form.unitPriceNonNegative');
     return undefined;
   }
 
@@ -195,7 +194,7 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
     [form.lines],
   );
 
-  const linesEmptyError = form.lines.length === 0 ? 'Add at least one line before saving.' : undefined;
+  const linesEmptyError = form.lines.length === 0 ? t('sales.form.linesEmpty') : undefined;
 
   function errorFor(field: string): string | undefined {
     if (touched[field] !== true) return undefined;
@@ -205,7 +204,7 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
       const index = Number.parseInt(/^lines\.(\d+)\./.exec(field)?.[1] ?? '-1', 10);
       const line = form.lines[index];
       if (line !== undefined && line.productId !== '' && form.lines.some((other, i) => i !== index && other.productId === line.productId)) {
-        return 'This product is already on another line.';
+        return t('sales.form.duplicateLine');
       }
     }
     return undefined;
@@ -235,8 +234,9 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
     if (line === undefined) return null;
 
     if (form.warehouseId === '') {
-      // No warehouse chosen yet: nothing to show a quantity against.
-      return <span className="line-items-editor__note">—</span>;
+      // No warehouse chosen yet: there is nothing to show a quantity against,
+      // so the note cell renders empty rather than a placeholder.
+      return null;
     }
 
     const quantity = line.quantity;
@@ -244,16 +244,16 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
     if (!over) {
       return (
         <span className="line-items-editor__note">
-          {`Available: ${compactQuantity(availableByProduct.get(line.productId) ?? '0.000')}`}
+          {t('sales.form.available', { quantity: compactQuantity(availableByProduct.get(line.productId) ?? '0.000') })}
         </span>
       );
     }
 
     const available = availableByProduct.get(line.productId) ?? '0.000';
     if (compareQuantities(quantity, available) > 0) {
-      return <span className="line-items-editor__note line-items-editor__note--warning">{`Only ${compactQuantity(available)} available`}</span>;
+      return <span className="line-items-editor__note line-items-editor__note--warning">{t('sales.form.onlyAvailable', { quantity: compactQuantity(available) })}</span>;
     }
-    return <span className="line-items-editor__note">{`Available: ${compactQuantity(available)}`}</span>;
+    return <span className="line-items-editor__note">{t('sales.form.available', { quantity: compactQuantity(available) })}</span>;
   }
 
   function validateAll(): string[] {
@@ -270,7 +270,7 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
       }
     }
     if (duplicateProductIndex !== -1) {
-      errors.push('This product is already on another line.');
+      errors.push(t('sales.form.duplicateLine'));
     }
     if (linesEmptyError !== undefined) {
       errors.push(linesEmptyError);
@@ -316,16 +316,16 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
     setSaving(true);
     if (isEdit) {
       updateMutation.mutate(
-        { ...input, id: order.id },
+        { ...input, id: order.id, version: order.version },
         {
           onSuccess: (result) => {
             // The detail page shows the named success notice from navigation state.
             navigate(`/sales/${order.id}`, {
-              state: { notice: `Sales order ${result.number} saved.` },
+              state: { notice: t('sales.form.savedToast', { number: result.number }) },
             });
           },
           onError: (mutationError) => {
-            pushToast('failure', mutationError instanceof Error ? mutationError.message : 'The order could not be saved.');
+            pushToast('failure', mutationError instanceof Error ? mutationError.message : t('sales.form.saveError'));
             setSaving(false);
           },
         },
@@ -334,11 +334,11 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
       createMutation.mutate(input, {
         onSuccess: (result) => {
           navigate(`/sales/${result.id}`, {
-            state: { notice: `Sales order ${result.number} created.` },
+            state: { notice: t('sales.form.createdToast', { number: result.number }) },
           });
         },
         onError: (mutationError) => {
-          pushToast('failure', mutationError instanceof Error ? mutationError.message : 'The order could not be created.');
+          pushToast('failure', mutationError instanceof Error ? mutationError.message : t('sales.form.createError'));
           setSaving(false);
         },
       });
@@ -356,31 +356,31 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
       <div className="order-form__header-fields">
         <Select
           id="so-customer"
-          label="Customer *"
+          label={t('sales.form.customer')}
           options={customers.map((customer) => ({ value: customer.id, label: `${customer.code} — ${customer.name}` }))}
           value={form.customerId}
           onChange={(event) => changeForm({ customerId: event.target.value })}
           onBlur={() => touch('customerId')}
           error={errorFor('customerId')}
           required
-          placeholder="Select a customer"
-          helpText="Only active contacts with the customer role are listed."
+          placeholder={t('sales.form.customerPlaceholder')}
+          helpText={t('sales.form.customerHelp')}
         />
         <Select
           id="so-warehouse"
-          label="Shipping warehouse *"
+          label={t('sales.form.shippingWarehouse')}
           options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
           value={form.warehouseId}
           onChange={(event) => changeForm({ warehouseId: event.target.value })}
           onBlur={() => touch('warehouseId')}
           error={errorFor('warehouseId')}
           required
-          placeholder="Select a warehouse"
-          helpText="Active warehouses only. Availability is checked here."
+          placeholder={t('sales.form.shippingPlaceholder')}
+          helpText={t('sales.form.shippingHelp')}
         />
         <Input
           id="so-order-date"
-          label="Order date *"
+          label={t('sales.form.orderDate')}
           type="date"
           error={errorFor('orderDate')}
           value={form.orderDate}
@@ -390,20 +390,20 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
         />
         <Textarea
           id="so-notes"
-          label="Notes"
+          label={t('sales.form.notes')}
           value={form.notes}
           onChange={(event) => changeForm({ notes: event.target.value })}
           rows={2}
-          placeholder="Optional"
+          placeholder={t('sales.form.optional')}
         />
       </div>
 
       <LineItemsEditor
         lines={form.lines.map(asLineEditorLine)}
         productOptions={products.map((product) => ({ value: product.id, label: `${product.sku} — ${product.name}` }))}
-        priceLabel="Unit price"
-        quantityHelpText="Greater than 0, up to 3 decimals."
-        priceHelpText="Not negative, up to 4 decimals. Defaults to the selling price."
+        priceLabel={t('sales.form.unitPriceLabel')}
+        quantityHelpText={t('sales.form.quantityHelp')}
+        priceHelpText={t('sales.form.unitPriceHelp')}
         idPrefix="so-line"
         disabled={busy}
         fieldError={(index, field: LineField) => errorFor(`lines.${index}.${field === 'price' ? 'unitPrice' : field}`)}
@@ -428,7 +428,7 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
           {submitLabel}
         </Button>
         <Button type="button" variant="default" onClick={() => navigate(isEdit ? `/sales/${order.id}` : '/sales')} disabled={busy}>
-          Cancel
+          {t('common.actions.cancel')}
         </Button>
       </div>
     </form>

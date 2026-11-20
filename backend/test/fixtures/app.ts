@@ -1,5 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, type InjectionToken } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
@@ -27,7 +27,7 @@ export interface TestApp {
 }
 
 export async function createTestApp(
-  providerOverrides: readonly { token: string; useValue: unknown }[] = [],
+  providerOverrides: readonly { token: InjectionToken; useValue: unknown }[] = [],
 ): Promise<TestApp> {
   // Touch the client first so a missing DATABASE_URL fails here with a clear message
   // rather than surfacing as a confusing connection error inside the first request.

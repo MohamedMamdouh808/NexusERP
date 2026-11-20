@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -6,9 +8,9 @@ import type { LineField, LineEditorLine } from '../../components/ui';
 import type { ToastTone } from '../../components/ui';
 import { addQuantities, compareQuantities, multiplyQuantities } from '../../lib/quantity';
 import { useCreatePurchaseOrder, useUpdatePurchaseOrder } from './use-purchasing';
-import { useWarehouses } from '../inventory/use-inventory';
-import { SAMPLE_PRODUCTS } from '../../mocks/sample-products';
 import { useContacts } from '../contacts/use-contacts';
+import { useProducts } from '../products/use-products';
+import { useWarehouses } from '../inventory/use-inventory';
 import type { CreatePurchaseOrderInput, PurchaseOrder } from '../../services/catalog-service';
 
 /**
@@ -54,6 +56,7 @@ function asLineEditorLine(line: LineForm): LineEditorLine {
 
 export function OrderForm({ order, submitLabel }: OrderFormProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const isEdit = order !== undefined;
 
   const [form, setForm] = useState<FormState>(() =>
@@ -83,17 +86,14 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
   const { data: contactsData } = useContacts({ role: 'supplier', status: 'active', page: 1, pageSize: 100 });
   const suppliers = contactsData?.items ?? [];
 
-  // Destination warehouses: active warehouses only.
+  // Destination warehouses: the real list, active warehouses only.
   const { data: warehousesData } = useWarehouses();
-  const warehouses = (warehousesData ?? []).filter((warehouse) => warehouse.status === 'ACTIVE');
+  const warehouses = (warehousesData?.items ?? []).filter((warehouse) => warehouse.isActive);
 
-  // Line products: the demonstration list. This module is still a demonstration
-  // module, so it must not call the real product service - a real product in a
-  // demonstration order would name a record that belongs to nothing.
-  const products = useMemo(
-    () => SAMPLE_PRODUCTS.filter((product) => product.status !== 'ARCHIVED'),
-    [],
-  );
+  // Line products: the real catalogue, active products only - the service
+  // refuses archived products outright.
+  const { data: productsData } = useProducts({ status: 'active', page: 1, pageSize: 100 });
+  const products = productsData?.items ?? [];
 
   function pushToast(tone: ToastTone, message: string) {
     setToasts((prev) => [
@@ -137,17 +137,17 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
 
   function validateField(field: string, state: FormState): string | undefined {
     if (field === 'supplierId') {
-      return state.supplierId === '' ? 'Supplier is required.' : undefined;
+      return state.supplierId === '' ? t('purchasing.form.supplierRequired') : undefined;
     }
     if (field === 'warehouseId') {
-      return state.warehouseId === '' ? 'Destination warehouse is required.' : undefined;
+      return state.warehouseId === '' ? t('purchasing.form.destinationWarehouseRequired') : undefined;
     }
     if (field === 'orderDate') {
-      return state.orderDate === '' ? 'Order date is required.' : undefined;
+      return state.orderDate === '' ? t('purchasing.form.orderDateRequired') : undefined;
     }
     if (field === 'expectedDate') {
       if (state.expectedDate !== '' && state.orderDate !== '' && state.expectedDate < state.orderDate) {
-        return 'The expected date must not be before the order date.';
+        return t('purchasing.form.expectedBeforeOrder');
       }
       return undefined;
     }
@@ -160,17 +160,17 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
     if (line === undefined) return undefined;
 
     if (match[2] === 'productId') {
-      return line.productId === '' ? 'Select a product.' : undefined;
+      return line.productId === '' ? t('purchasing.form.selectProduct') : undefined;
     }
     if (match[2] === 'quantity') {
-      if (line.quantity === '') return 'Quantity is required.';
-      if (!QUANTITY_PATTERN.test(line.quantity)) return 'Enter a quantity of up to 3 decimal places.';
-      if (compareQuantities(line.quantity, '0.000') <= 0) return 'Quantity must be greater than 0.';
+      if (line.quantity === '') return t('purchasing.form.quantityRequired');
+      if (!QUANTITY_PATTERN.test(line.quantity)) return t('purchasing.form.quantityDecimals');
+      if (compareQuantities(line.quantity, '0.000') <= 0) return t('purchasing.form.quantityPositive');
       return undefined;
     }
     // unitCost
-    if (!COST_PATTERN.test(line.unitCost)) return 'Enter a unit cost of up to 4 decimal places.';
-    if (compareQuantities(line.unitCost, '0.0000') < 0) return 'Unit cost must not be negative.';
+    if (!COST_PATTERN.test(line.unitCost)) return t('purchasing.form.unitCostDecimals');
+    if (compareQuantities(line.unitCost, '0.0000') < 0) return t('purchasing.form.unitCostNonNegative');
     return undefined;
   }
 
@@ -182,8 +182,6 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
     [form.lines],
   );
 
-  const linesEmptyError = form.lines.length === 0 ? 'Add at least one line before saving.' : undefined;
-
   function errorFor(field: string): string | undefined {
     if (touched[field] !== true) return undefined;
     const message = validateField(field, form);
@@ -192,7 +190,7 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
       const index = Number.parseInt(/^lines\.(\d+)\./.exec(field)?.[1] ?? '-1', 10);
       const line = form.lines[index];
       if (line !== undefined && line.productId !== '' && form.lines.some((other, i) => i !== index && other.productId === line.productId)) {
-        return 'This product is already on another line.';
+        return t('purchasing.form.duplicateLine');
       }
     }
     return undefined;
@@ -230,11 +228,10 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
       }
     }
     if (duplicateProductIndex !== -1) {
-      errors.push('This product is already on another line.');
+      errors.push(t('purchasing.form.duplicateLine'));
     }
-    if (linesEmptyError !== undefined) {
-      errors.push(linesEmptyError);
-    }
+    // An order with no lines is a valid draft: the service accepts it and the
+    // caller comes back to fill the lines in.
     return errors;
   }
 
@@ -278,16 +275,16 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
     setSaving(true);
     if (isEdit) {
       updateMutation.mutate(
-        { ...input, id: order.id },
+        { ...input, id: order.id, version: order.version },
         {
           onSuccess: (result) => {
             // The detail page shows the named success notice from navigation state.
             navigate(`/purchasing/${order.id}`, {
-              state: { notice: `Purchase order ${result.number} saved.` },
+              state: { notice: t('purchasing.form.savedToast', { number: result.number }) },
             });
           },
           onError: (mutationError) => {
-            pushToast('failure', mutationError instanceof Error ? mutationError.message : 'The order could not be saved.');
+            pushToast('failure', mutationError instanceof Error ? mutationError.message : t('purchasing.form.saveError'));
             setSaving(false);
           },
         },
@@ -296,11 +293,11 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
       createMutation.mutate(input, {
         onSuccess: (result) => {
           navigate(`/purchasing/${result.id}`, {
-            state: { notice: `Purchase order ${result.number} created.` },
+            state: { notice: t('purchasing.form.createdToast', { number: result.number }) },
           });
         },
         onError: (mutationError) => {
-          pushToast('failure', mutationError instanceof Error ? mutationError.message : 'The order could not be created.');
+          pushToast('failure', mutationError instanceof Error ? mutationError.message : t('purchasing.form.createError'));
           setSaving(false);
         },
       });
@@ -318,31 +315,31 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
       <div className="order-form__header-fields">
         <Select
           id="po-supplier"
-          label="Supplier *"
+          label={t('purchasing.form.supplier')}
           options={suppliers.map((supplier) => ({ value: supplier.id, label: `${supplier.code} — ${supplier.name}` }))}
           value={form.supplierId}
           onChange={(event) => changeForm({ supplierId: event.target.value })}
           onBlur={() => touch('supplierId')}
           error={errorFor('supplierId')}
           required
-          placeholder="Select a supplier"
-          helpText="Only active contacts with the supplier role are listed."
+          placeholder={t('purchasing.form.supplierPlaceholder')}
+          helpText={t('purchasing.form.supplierHelp')}
         />
         <Select
           id="po-warehouse"
-          label="Destination warehouse *"
+          label={t('purchasing.form.destinationWarehouse')}
           options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
           value={form.warehouseId}
           onChange={(event) => changeForm({ warehouseId: event.target.value })}
           onBlur={() => touch('warehouseId')}
           error={errorFor('warehouseId')}
           required
-          placeholder="Select a warehouse"
-          helpText="Active warehouses only. Receipts are posted here."
+          placeholder={t('purchasing.form.destinationPlaceholder')}
+          helpText={t('purchasing.form.destinationHelp')}
         />
         <Input
           id="po-order-date"
-          label="Order date *"
+          label={t('purchasing.form.orderDate')}
           type="date"
           error={errorFor('orderDate')}
           value={form.orderDate}
@@ -352,30 +349,30 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
         />
         <Input
           id="po-expected-date"
-          label="Expected date"
+          label={t('purchasing.form.expectedDate')}
           type="date"
           error={errorFor('expectedDate')}
           value={form.expectedDate}
           onChange={(event) => changeForm({ expectedDate: event.target.value })}
           onBlur={() => touch('expectedDate')}
-          helpText="Optional. Must not be before the order date."
+          helpText={t('purchasing.form.expectedBeforeOrderHelp')}
         />
         <Textarea
           id="po-notes"
-          label="Notes"
+          label={t('purchasing.form.notes')}
           value={form.notes}
           onChange={(event) => changeForm({ notes: event.target.value })}
           rows={2}
-          placeholder="Optional"
+          placeholder={t('purchasing.form.optional')}
         />
       </div>
 
       <LineItemsEditor
         lines={form.lines.map(asLineEditorLine)}
         productOptions={products.map((product) => ({ value: product.id, label: `${product.sku} — ${product.name}` }))}
-        priceLabel="Unit cost"
-        quantityHelpText="Greater than 0, up to 3 decimals."
-        priceHelpText="Not negative, up to 4 decimals. Defaults to the purchase price."
+        priceLabel={t('purchasing.form.unitCostLabel')}
+        quantityHelpText={t('purchasing.form.quantityHelp')}
+        priceHelpText={t('purchasing.form.unitCostHelp')}
         idPrefix="po-line"
         disabled={busy}
         fieldError={(index, field: LineField) => errorFor(`lines.${index}.${field === 'price' ? 'unitCost' : field}`)}
@@ -388,18 +385,12 @@ export function OrderForm({ order, submitLabel }: OrderFormProps) {
         total={totalsText}
       />
 
-      {linesEmptyError && (
-        <p className="form-error" role="alert">
-          {linesEmptyError}
-        </p>
-      )}
-
       <div className="order-form__actions">
         <Button type="submit" variant="primary" disabled={busy} loading={busy}>
           {submitLabel}
         </Button>
         <Button type="button" variant="default" onClick={() => navigate(isEdit ? `/purchasing/${order.id}` : '/purchasing')} disabled={busy}>
-          Cancel
+          {t('common.actions.cancel')}
         </Button>
       </div>
     </form>

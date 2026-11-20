@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
@@ -13,17 +15,18 @@ import {
   Toast,
 } from '../../components/ui';
 import type { Column, ToastTone } from '../../components/ui';
-import { formatMoneyGrouped } from '../../lib/format';
+import { formatMoneyLocalized, useOrganizationCurrency } from '../../lib/i18n-format';
 import { compactQuantity } from '../../lib/quantity';
 import {
   useCancelSalesOrder,
   useConfirmSalesOrder,
   useSalesOrder,
   useShipSalesOrder,
-  useShipments,
 } from './use-sales';
-import type { Shipment, SalesOrder, SalesOrderLine } from '../../services/catalog-service';
-import { useCreateInvoice, useInvoices } from '../invoicing/use-invoicing';
+import type { SalesOrder, SalesOrderLine } from '../../services/catalog-service';
+import { INVENTORY_PERMISSIONS, INVOICING_PERMISSIONS, SALES_PERMISSIONS } from '@nexuserp/shared';
+import { hasPermission, useSession } from '../../services/auth-session';
+import { useCreateInvoice, useInvoiceForOrder } from '../invoicing/use-invoicing';
 import { DocumentTrail } from '../../components/ui/document-trail';
 
 type LineRow = {
@@ -64,13 +67,23 @@ export function OrderDetailPage() {
   const location = useLocation();
   const { id } = useParams();
   const orderId = id ?? '';
+  const { t } = useTranslation();
+  const currency = useOrganizationCurrency();
 
   const { data: order, isPending, isError, error } = useSalesOrder(orderId);
   const confirm = useConfirmSalesOrder();
   const ship = useShipSalesOrder();
   const cancel = useCancelSalesOrder();
-  const allInvoices = useInvoices({ page: 1, pageSize: 100 });
+  // The order's non-void invoice, if it already has one. The query is keyed by
+  // this order and is only used by the SHIPPED action below.
+  const invoiceForOrder = useInvoiceForOrder(orderId);
   const createInvoice = useCreateInvoice();
+  const session = useSession();
+  // What the member may do: writes are sales.write, the shipment is a stock
+  // movement and declares inventory.ship, and the invoice is an invoicing write.
+  const canWrite = hasPermission(session, SALES_PERMISSIONS.write);
+  const mayShip = hasPermission(session, INVENTORY_PERMISSIONS.ship);
+  const canInvoice = hasPermission(session, INVOICING_PERMISSIONS.write);
 
   // A notice arrives in navigation state: a created/saved order or an
   // explanation from the edit page's draft-only guard.
@@ -89,24 +102,18 @@ export function OrderDetailPage() {
   const [shipError, setShipError] = useState<string | undefined>(undefined);
   const [confirmKey, setConfirmKey] = useState('');
   const [shipKey, setShipKey] = useState('');
-  const [invoiceKey, setInvoiceKey] = useState('');
+  const [cancelKey, setCancelKey] = useState('');
   const [toasts, setToasts] = useState<{ id: string; tone: ToastTone; message: string }[]>([]);
 
-  // Shipment history: one query narrowed by the order number as its search term.
-  const { data: shipmentsData } = useShipments({
-    search: order?.number,
-    page: 1,
-    pageSize: 50,
-  });
-  const shipments: readonly Shipment[] = shipmentsData?.items ?? [];
-  const orderInvoice = allInvoices.data?.items.find((invoice) => invoice.orderId === orderId && invoice.status !== 'VOID');
+  // Shipment history: the order detail carries it, newest first.
+  const shipments = order?.shipments ?? [];
 
   if (isPending) {
     return (
-      <section className="order-detail-page" aria-label="Sales order detail">
-        <PageHeader title="Sales order" />
-        <Card title="Sales order">
-          <Skeleton label="Loading sales order" />
+      <section className="order-detail-page" aria-label={t('sales.detail.sectionAria')}>
+        <PageHeader title={t('sales.detail.title')} />
+        <Card title={t('sales.detail.title')}>
+          <Skeleton label={t('sales.detail.loading')} />
         </Card>
       </section>
     );
@@ -114,11 +121,11 @@ export function OrderDetailPage() {
 
   if (isError || order === undefined) {
     return (
-      <section className="order-detail-page" aria-label="Sales order detail">
-        <PageHeader title="Sales order" />
-        <Card title="Sales order">
+      <section className="order-detail-page" aria-label={t('sales.detail.sectionAria')}>
+        <PageHeader title={t('sales.detail.title')} />
+        <Card title={t('sales.detail.title')}>
           <ErrorState
-            message={error instanceof Error ? error.message : 'The sales order could not be loaded.'}
+            message={error instanceof Error ? error.message : t('sales.detail.loadError')}
           />
         </Card>
       </section>
@@ -146,21 +153,27 @@ export function OrderDetailPage() {
     setShipOpen(true);
   }
 
+  function openCancel() {
+    // The cancel dialog follows the same rule: one key per open dialog.
+    setCancelKey(`cnc-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    setCancelOpen(true);
+  }
+
   function handleConfirm() {
     if (order === undefined) return;
     confirm.mutate(
-      { orderId: order.id, idempotencyKey: confirmKey },
+      { orderId: order.id, idempotencyKey: confirmKey, version: order.version },
       {
         onSuccess: (result) => {
           setConfirmOpen(false);
           setConfirmError(undefined);
-          pushToast('success', `Sales order ${result.number} confirmed. Stock is reserved.`);
+          pushToast('success', t('sales.detail.confirmedToast', { number: result.number }));
         },
         onError: (mutationError) => {
           // The dialog stays open: the shortage is visible where the action
           // was taken, and the same idempotency key is reused on retry.
           setConfirmError(
-            mutationError instanceof Error ? mutationError.message : 'The order could not be confirmed.',
+            mutationError instanceof Error ? mutationError.message : t('sales.detail.confirmFailed'),
           );
         },
       },
@@ -175,10 +188,10 @@ export function OrderDetailPage() {
         onSuccess: (result) => {
           setShipOpen(false);
           setShipError(undefined);
-          pushToast('success', `Shipment ${result.shipmentNumber} shipped. Stock is deducted.`);
+          pushToast('success', t('sales.detail.shippedToast', { number: result.shipment.number }));
         },
         onError: (mutationError) => {
-          setShipError(mutationError instanceof Error ? mutationError.message : 'The order could not be shipped.');
+          setShipError(mutationError instanceof Error ? mutationError.message : t('sales.detail.shipFailed'));
         },
       },
     );
@@ -186,46 +199,74 @@ export function OrderDetailPage() {
 
   function handleCancel() {
     if (order === undefined) return;
-    cancel.mutate(order.id, {
-      onSuccess: (result) => {
-        setCancelOpen(false);
-        pushToast('success', `Sales order ${result.number} cancelled.`);
+    cancel.mutate(
+      { orderId: order.id, idempotencyKey: cancelKey, version: order.version },
+      {
+        onSuccess: (result) => {
+          setCancelOpen(false);
+          pushToast('success', t('sales.detail.cancelledToast', { number: result.number }));
+        },
+        onError: (mutationError) => {
+          setCancelOpen(false);
+          pushToast('failure', mutationError instanceof Error ? mutationError.message : t('sales.detail.cancelFailed'));
+        },
       },
-      onError: (mutationError) => {
-        setCancelOpen(false);
-        pushToast('failure', mutationError instanceof Error ? mutationError.message : 'The order could not be cancelled.');
+    );
+  }
+
+  function handleCreateInvoice() {
+    if (order === undefined) return;
+    createInvoice.mutate(
+      { orderId: order.id },
+      {
+        onSuccess: (result) => {
+          navigate(`/invoicing/${result.id}`, {
+            state: { notice: t('sales.detail.draftCreatedToast') },
+          });
+        },
+        onError: (mutationError) => {
+          // The server stays the authority: a stale SHIPPED read, a duplicate
+          // invoice or a missing permission is shown where the action was
+          // taken, with the message the service sent.
+          pushToast(
+            'failure',
+            mutationError instanceof Error
+              ? mutationError.message
+              : t('sales.detail.invoiceCreateFailed'),
+          );
+        },
       },
-    });
+    );
   }
 
   const status = order.status;
-  const canEdit = status === 'DRAFT';
-  const canConfirm = status === 'DRAFT';
-  const canShip = status === 'CONFIRMED';
-  const canCancel = status === 'DRAFT' || status === 'CONFIRMED';
+  const canEdit = status === 'DRAFT' && canWrite;
+  const canConfirm = status === 'DRAFT' && canWrite;
+  const canShip = status === 'CONFIRMED' && mayShip;
+  const canCancel = (status === 'DRAFT' || status === 'CONFIRMED') && canWrite;
   const isShipped = status === 'SHIPPED';
   const showReserved = status === 'CONFIRMED' || isShipped;
 
   const columns: Column<LineRow>[] = [
     {
       key: 'productSku',
-      header: 'Product',
+      header: t('sales.detail.columns.product'),
       render: (row) => (
         <span>
           <span className="mono">{row.productSku}</span> — {row.productName}
         </span>
       ),
     },
-    { key: 'quantity', header: 'Quantity', numeric: true, render: (row) => <span className="qty">{row.quantity}</span> },
+    { key: 'quantity', header: t('sales.detail.columns.quantity'), numeric: true, render: (row) => <span className="qty">{row.quantity}</span> },
     ...(showReserved
-      ? [{ key: 'reserved', header: 'Reserved', numeric: true, render: (row: LineRow) => <span className="qty">{row.reserved}</span> }]
+      ? [{ key: 'reserved', header: t('sales.detail.columns.reserved'), numeric: true, render: (row: LineRow) => <span className="qty">{row.reserved}</span> }]
       : []),
-    { key: 'unitPrice', header: 'Unit price', numeric: true, render: (row) => <span className="qty">{row.unitPrice}</span> },
-    { key: 'lineTotal', header: 'Line total', numeric: true, render: (row) => <span className="qty">{row.lineTotal}</span> },
+    { key: 'unitPrice', header: t('sales.detail.columns.unitPrice'), numeric: true, render: (row) => <span className="qty">{row.unitPrice}</span> },
+    { key: 'lineTotal', header: t('sales.detail.columns.lineTotal'), numeric: true, render: (row) => <span className="qty">{row.lineTotal}</span> },
   ];
 
   return (
-    <section className="order-detail-page" aria-label="Sales order detail">
+    <section className="order-detail-page" aria-label={t('sales.detail.sectionAria')}>
       {notice !== undefined && !dismissedNotice && (
         <Toast id="page-notice" tone="success" message={notice} onDismiss={() => setDismissedNotice(true)} />
       )}
@@ -235,88 +276,102 @@ export function OrderDetailPage() {
 
       <PageHeader
         title={order.number}
-        description={`Sales order for ${order.customerName}`}
+        description={t('sales.detail.description', { name: order.customerName })}
         secondaryActions={[
           <div className="order-detail-page__actions" key="order-actions">
             {canConfirm && (
               <Button variant="primary" onClick={openConfirm}>
-                Confirm
+                {t('sales.detail.confirm')}
               </Button>
             )}
             {canShip && (
               <Button variant="primary" onClick={openShip}>
-                Ship
+                {t('sales.detail.ship')}
               </Button>
             )}
             {canEdit && (
               <Button variant="default" onClick={() => navigate(`/sales/${order.id}/edit`)}>
-                Edit
+                {t('sales.detail.edit')}
               </Button>
             )}
             {canCancel && (
-              <Button variant="danger" onClick={() => setCancelOpen(true)}>
-                Cancel order
+              <Button variant="danger" onClick={openCancel}>
+                {t('sales.detail.cancel')}
               </Button>
             )}
-            {orderInvoice && <Link className="sales-invoice-link" to={`/invoicing/${orderInvoice.id}`}>{orderInvoice.number ?? 'Draft invoice'} · {orderInvoice.status}</Link>}
-            {isShipped && !orderInvoice && (
-              <Button variant="default" loading={createInvoice.isPending} disabled={createInvoice.isPending} onClick={() => {
-                const idempotencyKey = invoiceKey || globalThis.crypto?.randomUUID?.() || `invoice-${Date.now()}`;
-                setInvoiceKey(idempotencyKey);
-                createInvoice.mutate({ orderId, idempotencyKey }, { onSuccess: (result) => navigate(`/invoicing/${result.id}`, { state: { notice: 'Draft invoice created' } }), onError: () => pushToast('failure', 'Could not create an invoice for this order.') });
-              }}>
-                Create Invoice
-              </Button>
+            {/* The invoice is the next step once the order has shipped. When a
+                non-void invoice already exists, the action becomes a link to
+                it instead of offering a second one. */}
+            {isShipped && (
+              <span className="order-detail-page__invoice-action">
+                {invoiceForOrder.data ? (
+                  <Link className="doc-number" to={`/invoicing/${invoiceForOrder.data.id}`}>
+                    {t('sales.detail.viewInvoice', {
+                      number:
+                        invoiceForOrder.data.number ?? t('invoicing.detail.draftInvoice'),
+                    })}
+                  </Link>
+                ) : (
+                  <Button
+                    variant="default"
+                    disabled={!canInvoice || invoiceForOrder.isPending || createInvoice.isPending}
+                    reason={!canInvoice ? t('sales.detail.noInvoicePermission') : undefined}
+                    onClick={handleCreateInvoice}
+                  >
+                    {t('sales.detail.createInvoice')}
+                  </Button>
+                )}
+              </span>
             )}
             <Button variant="default" onClick={() => navigate('/sales')}>
-              Back to list
+              {t('sales.detail.backToList')}
             </Button>
           </div>,
         ]}
         primaryAction={
           <div className="order-detail-page__status">
-            <Badge status={status}>{status}</Badge>
+            <Badge status={status}>{t(`sales.status.${status}`)}</Badge>
           </div>
         }
       />
 
-      <Card title="Order details">
+      <Card title={t('sales.detail.cards.details')}>
         <dl className="order-detail-page__details">
-          <dt>Customer</dt>
+          <dt>{t('sales.detail.fields.customer')}</dt>
           <dd>{order.customerName}</dd>
-          <dt>Warehouse</dt>
+          <dt>{t('sales.detail.fields.warehouse')}</dt>
           <dd>{order.warehouseName}</dd>
-          <dt>Order date</dt>
+          <dt>{t('sales.detail.fields.orderDate')}</dt>
           <dd>{order.orderDate}</dd>
-          <dt>Notes</dt>
+          <dt>{t('sales.detail.fields.notes')}</dt>
           <dd>{order.notes === '' ? '—' : order.notes}</dd>
         </dl>
       </Card>
 
-      <Card title="Lines">
+      <Card title={t('sales.detail.cards.lines')}>
         <DataTable<LineRow>
           columns={columns}
           data={lineRows(order)}
           total={order.lines.length}
           page={1}
           pageSize={Math.max(1, order.lines.length)}
-          emptyMessage="This order has no lines."
+          emptyMessage={t('sales.detail.linesEmpty')}
         />
         <div className="order-detail-page__total">
-          <span>Order total</span>
-          <strong className="qty">{formatMoneyGrouped(order.total)}</strong>
+          <span>{t('sales.detail.total')}</span>
+          <strong className="qty">{formatMoneyLocalized(order.total, currency, 2)}</strong>
         </div>
       </Card>
 
-      <Card title="Shipment history">
+      <Card title={t('sales.detail.cards.shipmentsHistory')}>
         {shipments.length === 0 ? (
-          <p className="order-detail-page__receipts-empty">No shipments against this order yet.</p>
+          <p className="order-detail-page__receipts-empty">{t('sales.detail.shipmentsEmpty')}</p>
         ) : (
           <ul className="order-detail-page__receipts">
             {shipments.map((shipment) => (
               <li key={shipment.id}>
                 <span className="mono">{shipment.number}</span>
-                <span>{shipment.shipmentDate.replace('T', ' ').replace('Z', '')}</span>
+                <span>{shipment.shippedAt.replace('T', ' ').replace('Z', '')}</span>
                 <span>
                   {shipment.lines
                     .map((line) => `${compactQuantity(line.quantity)} × ${line.productSku}`)
@@ -327,7 +382,7 @@ export function OrderDetailPage() {
             ))}
           </ul>
         )}
-        <p className="movements__note">Shipments are permanent records.</p>
+        <p className="movements__note">{t('sales.shipments.note')}</p>
       </Card>
 
       <DocumentTrail recordType="Sales order" recordNumber={order.number} />
@@ -339,9 +394,9 @@ export function OrderDetailPage() {
           setConfirmError(undefined);
         }}
         onConfirm={handleConfirm}
-        title="Confirm sales order"
-        description="Confirming reserves stock for every line of this order. A confirmed order can no longer be edited or deleted; to change it, cancel it and create a new one."
-        actionLabel="Confirm order"
+        title={t('sales.confirm.title')}
+        description={t('sales.confirm.description')}
+        actionLabel={t('sales.confirm.actionLabel')}
         loading={confirm.isPending}
         error={confirmError}
       />
@@ -352,9 +407,9 @@ export function OrderDetailPage() {
           setShipError(undefined);
         }}
         onConfirm={handleShipConfirmed}
-        title="Ship sales order"
-        description="Shipping deducts the stock from the warehouse and consumes the reservation, and the shipment becomes permanent: it cannot be edited or deleted."
-        actionLabel="Ship order"
+        title={t('sales.ship.title')}
+        description={t('sales.ship.description')}
+        actionLabel={t('sales.ship.actionLabel')}
         loading={ship.isPending}
         error={shipError}
       />
@@ -362,13 +417,13 @@ export function OrderDetailPage() {
         open={cancelOpen}
         onClose={() => setCancelOpen(false)}
         onConfirm={handleCancel}
-        title="Cancel sales order"
+        title={t('sales.cancel.title')}
         description={
           status === 'CONFIRMED'
-            ? 'Cancelling releases the stock this order reserved back to the warehouse, and the cancelled order is permanent: it cannot be reopened. It is kept for the audit trail.'
-            : 'A cancelled order is permanent: it cannot be reopened, and it is kept for the audit trail.'
+            ? t('sales.cancel.descriptionReserved')
+            : t('sales.cancel.description')
         }
-        actionLabel="Cancel order"
+        actionLabel={t('sales.cancel.actionLabel')}
         destructive
         loading={cancel.isPending}
       />

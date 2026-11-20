@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useId, useRef } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { Icon } from './icon';
@@ -12,6 +13,7 @@ export interface DialogProps {
 }
 
 export function Dialog({ open, onClose, title, children, actions, className }: DialogProps) {
+  const { t } = useTranslation();
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -67,7 +69,7 @@ export function Dialog({ open, onClose, title, children, actions, className }: D
           <button
             type="button"
             className="button"
-            aria-label="Close dialog"
+            aria-label={t('ui.dialog.closeDialog')}
             onClick={onClose}
             style={{ padding: 'var(--spacing-xs)' }}
           >

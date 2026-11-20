@@ -72,18 +72,21 @@ warehouse, default `invoice` document sequence, and the first session.
 Request:
 
 ```json
-{ "email": "user@example.com", "password": "Password123" }
+{ "email": "user@example.com", "password": "Password123", "organizationName": "Acme Logistics" }
 ```
 
+`organizationName` is **optional**. When absent, registration behaves exactly as before (the organization is named `<email>'s Organization`). When present, it is trimmed of leading/trailing whitespace and must be **2–128 characters** after trimming; anything else is rejected with 400. Stored verbatim (post-trim); it grants no authority and is returned by the API exactly as stored.
+
 Validation (Zod, strict — unknown keys rejected): valid email; password ≥ 12
-chars with at least one uppercase, one lowercase, one digit.
+chars with at least one uppercase, one lowercase, one digit; `organizationName`,
+if present, trimmed to 2–128 characters.
 
 Responses:
 
 | Status | Body | Notes |
 |--------|------|-------|
-| 201    | `{ user: { id, email }, organization: { id, name: "<email>'s Organization" }, membership: { id, roles: [{ id, key, name }] }, session: { id }, sessionToken, csrfToken }` | `sessionToken`/`csrfToken` are returned ONCE here; no cookies are set on this endpoint. |
-| 400    | envelope `VALIDATION_ERROR` with `details[].field` = `email`/`password` | |
+| 201    | `{ user: { id, email }, organization: { id, name }, membership: { id, roles: [{ id, key, name }] }, session: { id }, sessionToken, csrfToken }` | `sessionToken`/`csrfToken` are returned ONCE here; no cookies are set on this endpoint. `organization.name` is the typed name when provided, otherwise `<email>'s Organization`. |
+| 400    | envelope `VALIDATION_ERROR` with `details[].field` = `email`/`password`/`organizationName` | |
 | 409/500 | duplicate email currently produces 500 (`INTERNAL_ERROR` with `requestId`) | **Known gap**: duplicate email is not yet mapped to `CONFLICT`; do not rely on it. |
 
 ### POST /api/v1/auth/login — public

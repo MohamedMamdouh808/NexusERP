@@ -253,10 +253,21 @@
               "INVALID_STATE_TRANSITION",
               "INSUFFICIENT_STOCK",
               "PRODUCT_IN_USE",
+              "INACTIVE_WAREHOUSE",
+              "WAREHOUSE_IN_USE",
+              "PRODUCT_ARCHIVED",
               "CONTACT_IN_USE",
               "LAST_ADMINISTRATOR",
               "INVOICE_HAS_PAYMENTS",
+              "INVOICE_ALREADY_EXISTS",
+              "BALANCE_CHANGED",
+              "ORDER_SHIPPED",
               "STALE_VERSION",
+              "CURRENCY_LOCKED",
+              "MODULE_DEPENDENCY",
+              "MODULE_IN_USE",
+              "ORDER_HAS_RECEIPTS",
+              "CUSTOMER_NOT_ACTIVE",
               "PAYLOAD_TOO_LARGE",
               "IDEMPOTENCY_KEY_REUSED",
               "VALIDATION_FAILED",
@@ -329,6 +340,127 @@
           "status",
           "uptimeSeconds",
           "checks"
+        ],
+        "type": "object"
+      },
+      "MeResponseDto": {
+        "properties": {
+          "membership": {
+            "$ref": "#/components/schemas/MeResponseMembershipDto"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/MeResponseOrganizationDto"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "user": {
+            "$ref": "#/components/schemas/MeResponseUserDto"
+          }
+        },
+        "required": [
+          "user",
+          "membership",
+          "organization",
+          "permissions"
+        ],
+        "type": "object"
+      },
+      "MeResponseMembershipDto": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "name": {
+            "nullable": true,
+            "type": "object"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/MeResponseMembershipRoleDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "roles",
+          "name",
+          "isActive"
+        ],
+        "type": "object"
+      },
+      "MeResponseMembershipRoleDto": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name"
+        ],
+        "type": "object"
+      },
+      "MeResponseOrganizationDto": {
+        "properties": {
+          "currencyCode": {
+            "type": "string"
+          },
+          "defaultPaymentTermsDays": {
+            "type": "number"
+          },
+          "enabledModules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "currencyCode",
+          "defaultPaymentTermsDays",
+          "enabledModules"
+        ],
+        "type": "object"
+      },
+      "MeResponseUserDto": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "mustChangePassword": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "mustChangePassword"
         ],
         "type": "object"
       },
@@ -536,7 +668,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponseDto"
+                }
+              }
+            },
+            "description": "The current user, membership and organization"
           }
         },
         "tags": [
@@ -890,6 +1029,27 @@
         ]
       }
     },
+    "/api/v1/goods-receipts": {
+      "get": {
+        "operationId": "PurchasingController_listReceipts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The matching receipts, with the total count of receipts"
+          },
+          "400": {
+            "description": "The date range ends before it starts"
+          },
+          "403": {
+            "description": "Forbidden (requires purchasing.read)"
+          }
+        },
+        "summary": "List goods receipts, one row per receipt",
+        "tags": [
+          "Purchasing"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "description": "Reports whether the application is serving and whether its database connection is reachable. The checks are reported separately so a failure can be attributed. Never returns a version, hostname, connection string, or driver version, because this endpoint is unauthenticated and a probe response is public information.",
@@ -923,10 +1083,337 @@
         ]
       }
     },
+    "/api/v1/inventory/adjustments": {
+      "post": {
+        "operationId": "InventoryController_createAdjustment",
+        "parameters": [
+          {
+            "description": "A UUID generated per user action",
+            "in": "path",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The posted movement and the new balance"
+          },
+          "409": {
+            "description": "The result would be negative or below the reserved quantity"
+          },
+          "422": {
+            "description": "The key was already used for a different request"
+          }
+        },
+        "summary": "Post a stock adjustment with a reason",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/stock-balances": {
+      "get": {
+        "operationId": "InventoryController_listBalances",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The matching balances, with the total and its kind"
+          },
+          "403": {
+            "description": "Forbidden (requires inventory.read)"
+          }
+        },
+        "summary": "List stock balances with search, filters, sorting and paging",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/stock-movements": {
+      "get": {
+        "operationId": "InventoryController_listMovements",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The matching movements, with the total count"
+          },
+          "403": {
+            "description": "Forbidden (requires inventory.read)"
+          }
+        },
+        "summary": "List stock movements with product, warehouse, type and date filters",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/invoices": {
+      "get": {
+        "operationId": "InvoicingController_listInvoices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "A page of invoices, the whole-selection total, outstanding and overdue"
+          },
+          "400": {
+            "description": "An unknown sort key, or a malformed query"
+          },
+          "403": {
+            "description": "Forbidden (requires invoices.read)"
+          }
+        },
+        "summary": "List the organization's invoices with their selection figures",
+        "tags": [
+          "Invoicing"
+        ]
+      }
+    },
+    "/api/v1/invoices/open": {
+      "get": {
+        "operationId": "InvoicingController_listOpenInvoices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "ISSUED or PARTIALLY_PAID invoices with a balance above zero"
+          },
+          "400": {
+            "description": "The customer id is missing or malformed"
+          },
+          "403": {
+            "description": "Forbidden (requires invoices.read)"
+          },
+          "404": {
+            "description": "The customer is not in this organization"
+          }
+        },
+        "summary": "List one customer's open invoices for the Record payment screen",
+        "tags": [
+          "Invoicing"
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}": {
+      "get": {
+        "operationId": "InvoicingController_getInvoice",
+        "parameters": [
+          {
+            "description": "Invoice UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invoice"
+          },
+          "403": {
+            "description": "Forbidden (requires invoices.read)"
+          },
+          "404": {
+            "description": "Not found, including another organization's invoice"
+          }
+        },
+        "summary": "Read one invoice with its lines, allocations and void trail",
+        "tags": [
+          "Invoicing"
+        ]
+      },
+      "put": {
+        "operationId": "InvoicingController_updateInvoice",
+        "parameters": [
+          {
+            "description": "Invoice UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated draft"
+          },
+          "400": {
+            "description": "The due date precedes the creation date"
+          },
+          "403": {
+            "description": "Forbidden (requires invoices.write)"
+          },
+          "404": {
+            "description": "Not found, including another organization's invoice"
+          },
+          "409": {
+            "description": "The invoice is not a draft, or the version is stale"
+          }
+        },
+        "summary": "Update a draft invoice's due date",
+        "tags": [
+          "Invoicing"
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}/issue": {
+      "post": {
+        "operationId": "InvoicingController_issueInvoice",
+        "parameters": [
+          {
+            "description": "Invoice UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A key generated per user action",
+            "in": "path",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The issued invoice"
+          },
+          "400": {
+            "description": "The due date precedes the issue date, or the key is missing"
+          },
+          "403": {
+            "description": "Forbidden (requires invoices.issue)"
+          },
+          "404": {
+            "description": "Not found, including another organization's invoice"
+          },
+          "409": {
+            "description": "The invoice is not a draft"
+          },
+          "422": {
+            "description": "The key was already used for a different request"
+          }
+        },
+        "summary": "Issue a draft invoice, allocating its INV- number",
+        "tags": [
+          "Invoicing"
+        ]
+      }
+    },
+    "/api/v1/invoices/{id}/void": {
+      "post": {
+        "operationId": "InvoicingController_voidInvoice",
+        "parameters": [
+          {
+            "description": "Invoice UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A key generated per user action",
+            "in": "path",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The voided invoice"
+          },
+          "400": {
+            "description": "The reason is missing"
+          },
+          "403": {
+            "description": "Forbidden (requires invoices.void)"
+          },
+          "404": {
+            "description": "Not found, including another organization's invoice"
+          },
+          "409": {
+            "description": "The invoice has active payments, or is already void"
+          },
+          "422": {
+            "description": "The key was already used for a different request"
+          }
+        },
+        "summary": "Void an invoice, freeing its order for re-invoicing",
+        "tags": [
+          "Invoicing"
+        ]
+      }
+    },
     "/api/v1/memberships": {
       "get": {
         "operationId": "MembershipsController_list",
-        "parameters": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -941,6 +1428,29 @@
         "parameters": [],
         "responses": {
           "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Memberships"
+        ]
+      }
+    },
+    "/api/v1/memberships/{id}": {
+      "patch": {
+        "operationId": "MembershipsController_updateName",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": ""
           }
         },
@@ -1015,6 +1525,215 @@
         },
         "tags": [
           "Memberships"
+        ]
+      }
+    },
+    "/api/v1/organizations/current": {
+      "get": {
+        "operationId": "OrganizationsController_getCurrent",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Settings, version, currency lock and modules"
+          }
+        },
+        "summary": "Read the current organization settings and module list",
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "put": {
+        "operationId": "OrganizationsController_updateCurrent",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The updated settings with a new version"
+          },
+          "409": {
+            "description": "STALE_VERSION or CURRENCY_LOCKED"
+          }
+        },
+        "summary": "Update organization name, currency and payment terms",
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/api/v1/organizations/current/modules": {
+      "get": {
+        "operationId": "OrganizationsController_listModules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Switchable and always-on modules"
+          }
+        },
+        "summary": "List module availability for the current organization",
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/api/v1/organizations/current/modules/{key}": {
+      "put": {
+        "operationId": "OrganizationsController_toggleModule",
+        "parameters": [
+          {
+            "description": "A switchable module key",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The new module state and version"
+          },
+          "409": {
+            "description": "STALE_VERSION, MODULE_DEPENDENCY or MODULE_IN_USE"
+          }
+        },
+        "summary": "Switch a module on or off",
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/api/v1/payments": {
+      "get": {
+        "operationId": "InvoicingController_listPayments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "A page of payments and the whole-selection total"
+          },
+          "400": {
+            "description": "An unknown sort key, an unknown method, or an inverted date range"
+          },
+          "403": {
+            "description": "Forbidden (requires payments.read)"
+          }
+        },
+        "summary": "List the organization's payments with their derived status",
+        "tags": [
+          "Invoicing"
+        ]
+      },
+      "post": {
+        "operationId": "InvoicingController_recordPayment",
+        "parameters": [
+          {
+            "description": "A key generated per user action",
+            "in": "path",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The recorded payment with its allocations"
+          },
+          "400": {
+            "description": "A bad amount or date, allocations that do not sum to the amount, a duplicate invoice, or an allocation above the balance"
+          },
+          "403": {
+            "description": "Forbidden (requires payments.record)"
+          },
+          "404": {
+            "description": "Not found, including another organization's invoice"
+          },
+          "409": {
+            "description": "An invoice is not payable, or its balance changed since it was read"
+          },
+          "422": {
+            "description": "The key was already used for a different request"
+          }
+        },
+        "summary": "Record a payment and allocate it across open invoices",
+        "tags": [
+          "Invoicing"
+        ]
+      }
+    },
+    "/api/v1/payments/{id}": {
+      "get": {
+        "operationId": "InvoicingController_getPayment",
+        "parameters": [
+          {
+            "description": "Payment UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The payment"
+          },
+          "403": {
+            "description": "Forbidden (requires payments.read)"
+          },
+          "404": {
+            "description": "Not found, including another organization's payment"
+          }
+        },
+        "summary": "Read one payment with its allocations and its reversal block",
+        "tags": [
+          "Invoicing"
+        ]
+      }
+    },
+    "/api/v1/payments/{id}/reverse": {
+      "post": {
+        "operationId": "InvoicingController_reversePayment",
+        "parameters": [
+          {
+            "description": "Payment UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A key generated per user action",
+            "in": "path",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The payment detail with status REVERSED"
+          },
+          "400": {
+            "description": "The reason is missing, or the key is missing"
+          },
+          "403": {
+            "description": "Forbidden (requires payments.reverse)"
+          },
+          "404": {
+            "description": "Not found, including another organization's payment"
+          },
+          "409": {
+            "description": "The payment has already been reversed"
+          },
+          "422": {
+            "description": "The key was already used for a different request"
+          }
+        },
+        "summary": "Reverse a payment with a compensating, auditable record",
+        "tags": [
+          "Invoicing"
         ]
       }
     },
@@ -1238,6 +1957,410 @@
         ]
       }
     },
+    "/api/v1/purchase-orders": {
+      "get": {
+        "operationId": "PurchasingController_listOrders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The matching orders, with the progress summary and the total"
+          },
+          "403": {
+            "description": "Forbidden (requires purchasing.read)"
+          }
+        },
+        "summary": "List purchase orders with search, filters, sorting and paging",
+        "tags": [
+          "Purchasing"
+        ]
+      },
+      "post": {
+        "operationId": "PurchasingController_createOrder",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The created draft"
+          },
+          "400": {
+            "description": "The content does not belong on an order"
+          },
+          "403": {
+            "description": "Forbidden (requires purchasing.write)"
+          }
+        },
+        "summary": "Create a purchase order as a draft",
+        "tags": [
+          "Purchasing"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}": {
+      "get": {
+        "operationId": "PurchasingController_findOrder",
+        "parameters": [
+          {
+            "description": "Purchase order UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The order, its lines and its receipts"
+          },
+          "403": {
+            "description": "Forbidden (requires purchasing.read)"
+          },
+          "404": {
+            "description": "Not found, including another organization's order"
+          }
+        },
+        "summary": "Read one purchase order with its lines and its receipt history",
+        "tags": [
+          "Purchasing"
+        ]
+      },
+      "put": {
+        "operationId": "PurchasingController_updateOrder",
+        "parameters": [
+          {
+            "description": "Purchase order UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated draft"
+          },
+          "409": {
+            "description": "The order is not a draft, or the version is stale"
+          }
+        },
+        "summary": "Edit a draft purchase order",
+        "tags": [
+          "Purchasing"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}/cancel": {
+      "post": {
+        "operationId": "PurchasingController_cancelOrder",
+        "parameters": [
+          {
+            "description": "Purchase order UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cancelled order"
+          },
+          "409": {
+            "description": "The order has receipts, or the version is stale"
+          }
+        },
+        "summary": "Cancel a purchase order",
+        "tags": [
+          "Purchasing"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}/confirm": {
+      "post": {
+        "operationId": "PurchasingController_confirmOrder",
+        "parameters": [
+          {
+            "description": "Purchase order UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The confirmed order"
+          },
+          "400": {
+            "description": "The draft has no lines"
+          },
+          "409": {
+            "description": "The order is not a draft, or the version is stale"
+          }
+        },
+        "summary": "Confirm a draft purchase order",
+        "tags": [
+          "Purchasing"
+        ]
+      }
+    },
+    "/api/v1/purchase-orders/{id}/receipts": {
+      "post": {
+        "operationId": "PurchasingController_postReceipt",
+        "parameters": [
+          {
+            "description": "Purchase order UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A key generated per user action",
+            "in": "path",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The posted receipt and the resulting order"
+          },
+          "400": {
+            "description": "Nothing was received, or a quantity is above the outstanding one"
+          },
+          "409": {
+            "description": "The order cannot be received against"
+          },
+          "422": {
+            "description": "The key was already used for a different request"
+          }
+        },
+        "summary": "Post a goods receipt against a purchase order",
+        "tags": [
+          "Purchasing"
+        ]
+      }
+    },
+    "/api/v1/reports/document-statuses": {
+      "get": {
+        "operationId": "ReportsController_documentStatuses",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/documents-by-status": {
+      "get": {
+        "operationId": "ReportsController_documentsByStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/kpi-summary": {
+      "get": {
+        "operationId": "ReportsController_kpiSummary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/outstanding-invoices": {
+      "get": {
+        "operationId": "ReportsController_outstandingInvoices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/payments-received-over-time": {
+      "get": {
+        "operationId": "ReportsController_paymentsReceivedOverTime",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/purchases-over-time": {
+      "get": {
+        "operationId": "ReportsController_purchasesOverTime",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/receivables-aging": {
+      "get": {
+        "operationId": "ReportsController_receivablesAging",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/sales-over-time": {
+      "get": {
+        "operationId": "ReportsController_salesOverTime",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/stock-health": {
+      "get": {
+        "operationId": "ReportsController_stockHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/stock-movements": {
+      "get": {
+        "operationId": "ReportsController_stockMovements",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/stock-movements-over-time": {
+      "get": {
+        "operationId": "ReportsController_stockMovementsOverTime",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/stock-on-hand": {
+      "get": {
+        "operationId": "ReportsController_stockOnHand",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/stock-reconciliation": {
+      "get": {
+        "operationId": "ReportsController_stockReconciliation",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/top-customers": {
+      "get": {
+        "operationId": "ReportsController_topCustomers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/top-products": {
+      "get": {
+        "operationId": "ReportsController_topProducts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
     "/api/v1/roles": {
       "get": {
         "operationId": "RolesController_listRoles",
@@ -1300,6 +2423,27 @@
           "Roles"
         ]
       },
+      "get": {
+        "operationId": "RolesController_getRole",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Roles"
+        ]
+      },
       "put": {
         "operationId": "RolesController_updateRole",
         "parameters": [
@@ -1319,6 +2463,339 @@
         },
         "tags": [
           "Roles"
+        ]
+      }
+    },
+    "/api/v1/sales-orders": {
+      "get": {
+        "operationId": "SalesController_listSalesOrders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "A page of sales orders and the whole-selection total"
+          },
+          "400": {
+            "description": "An unknown sort key, or a malformed query"
+          },
+          "403": {
+            "description": "Forbidden (requires sales.read)"
+          }
+        },
+        "summary": "List the organization's sales orders",
+        "tags": [
+          "Sales"
+        ]
+      },
+      "post": {
+        "operationId": "SalesController_createOrder",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The created draft"
+          },
+          "400": {
+            "description": "The content does not belong on an order"
+          },
+          "403": {
+            "description": "Forbidden (requires sales.write)"
+          },
+          "404": {
+            "description": "Not found, including another organization's customer, product or warehouse"
+          }
+        },
+        "summary": "Create a sales order draft",
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}": {
+      "get": {
+        "operationId": "SalesController_getSalesOrder",
+        "parameters": [
+          {
+            "description": "Sales order UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The sales order, its lines and its shipment history"
+          },
+          "403": {
+            "description": "Forbidden (requires sales.read)"
+          },
+          "404": {
+            "description": "Not found, including another organization's order"
+          }
+        },
+        "summary": "Read one sales order with its lines and shipment history",
+        "tags": [
+          "Sales"
+        ]
+      },
+      "put": {
+        "operationId": "SalesController_updateOrder",
+        "parameters": [
+          {
+            "description": "Sales order UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated draft"
+          },
+          "400": {
+            "description": "The content does not belong on an order"
+          },
+          "403": {
+            "description": "Forbidden (requires sales.write)"
+          },
+          "404": {
+            "description": "Not found, including another organization's order"
+          },
+          "409": {
+            "description": "The order is not a draft, or the version is stale"
+          }
+        },
+        "summary": "Update a draft sales order",
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/cancel": {
+      "post": {
+        "operationId": "SalesController_cancelOrder",
+        "parameters": [
+          {
+            "description": "Sales order UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A key generated per user action",
+            "in": "path",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cancelled order"
+          },
+          "403": {
+            "description": "Forbidden (requires sales.write)"
+          },
+          "404": {
+            "description": "Not found, including another organization's order"
+          },
+          "409": {
+            "description": "The order has shipped, or the version is stale"
+          },
+          "422": {
+            "description": "The key was already used for a different request"
+          }
+        },
+        "summary": "Cancel a sales order, releasing its reservations",
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/confirm": {
+      "post": {
+        "operationId": "SalesController_confirmOrder",
+        "parameters": [
+          {
+            "description": "Sales order UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A key generated per user action",
+            "in": "path",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The confirmed order"
+          },
+          "400": {
+            "description": "The draft has no lines"
+          },
+          "403": {
+            "description": "Forbidden (requires sales.write)"
+          },
+          "404": {
+            "description": "Not found, including another organization's order"
+          },
+          "409": {
+            "description": "The order is not a draft, the version is stale, or stock is insufficient"
+          },
+          "422": {
+            "description": "The key was already used for a different request"
+          }
+        },
+        "summary": "Confirm a draft sales order, reserving stock",
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/invoices": {
+      "post": {
+        "operationId": "InvoicingController_createInvoice",
+        "parameters": [
+          {
+            "description": "Sales order UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The created draft invoice"
+          },
+          "403": {
+            "description": "Forbidden (requires invoices.write)"
+          },
+          "404": {
+            "description": "Not found, including another organization's order"
+          },
+          "409": {
+            "description": "The order is not shipped, or it already has a non-void invoice"
+          }
+        },
+        "summary": "Create the draft invoice of a shipped sales order",
+        "tags": [
+          "Invoicing"
+        ]
+      }
+    },
+    "/api/v1/sales-orders/{id}/shipments": {
+      "post": {
+        "operationId": "SalesController_shipOrder",
+        "parameters": [
+          {
+            "description": "Sales order UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A key generated per user action",
+            "in": "path",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The shipment and the shipped order"
+          },
+          "400": {
+            "description": "The draft has no lines"
+          },
+          "403": {
+            "description": "Forbidden (requires inventory.ship)"
+          },
+          "404": {
+            "description": "Not found, including another organization's order"
+          },
+          "409": {
+            "description": "The order is not a confirmed order with an active reservation per line, or the shipment was already posted"
+          },
+          "422": {
+            "description": "The key was already used for a different request"
+          }
+        },
+        "summary": "Ship a confirmed sales order, deducting stock",
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/shipments": {
+      "get": {
+        "operationId": "SalesController_listShipments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "A page of shipments and the whole-selection total"
+          },
+          "400": {
+            "description": "An unknown sort key, a malformed or inverted date range"
+          },
+          "403": {
+            "description": "Forbidden (requires sales.read)"
+          }
+        },
+        "summary": "List the organization's shipments",
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/api/v1/shipments/{id}": {
+      "get": {
+        "operationId": "SalesController_getShipment",
+        "parameters": [
+          {
+            "description": "Shipment UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The shipment and its lines"
+          },
+          "403": {
+            "description": "Forbidden (requires sales.read)"
+          },
+          "404": {
+            "description": "Not found, including another organization's shipment"
+          }
+        },
+        "summary": "Read one shipment with its lines",
+        "tags": [
+          "Sales"
         ]
       }
     },
@@ -1347,6 +2824,124 @@
         "summary": "Create a unit of measure",
         "tags": [
           "Units of measure"
+        ]
+      }
+    },
+    "/api/v1/warehouses": {
+      "get": {
+        "operationId": "InventoryController_listWarehouses",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The warehouses, with their default and active state"
+          },
+          "403": {
+            "description": "Forbidden (requires inventory.read)"
+          }
+        },
+        "summary": "List the organization warehouses",
+        "tags": [
+          "Inventory"
+        ]
+      },
+      "post": {
+        "operationId": "InventoryController_createWarehouse",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The created warehouse"
+          },
+          "409": {
+            "description": "The name is already used in this organization"
+          }
+        },
+        "summary": "Create a warehouse",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/warehouses/{id}": {
+      "put": {
+        "operationId": "InventoryController_updateWarehouse",
+        "parameters": [
+          {
+            "description": "Warehouse UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The updated warehouse"
+          },
+          "409": {
+            "description": "The name is taken, or the version is stale"
+          }
+        },
+        "summary": "Rename a warehouse, and make it the default",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/warehouses/{id}/deactivate": {
+      "post": {
+        "operationId": "InventoryController_deactivateWarehouse",
+        "parameters": [
+          {
+            "description": "Warehouse UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The deactivated warehouse"
+          },
+          "409": {
+            "description": "It is the default warehouse, or it still holds stock"
+          }
+        },
+        "summary": "Deactivate a warehouse",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/warehouses/{id}/reactivate": {
+      "post": {
+        "operationId": "InventoryController_reactivateWarehouse",
+        "parameters": [
+          {
+            "description": "Warehouse UUID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The reactivated warehouse"
+          },
+          "409": {
+            "description": "The version is stale"
+          }
+        },
+        "summary": "Reactivate a deactivated warehouse",
+        "tags": [
+          "Inventory"
         ]
       }
     }

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useId, useRef } from 'react';
 import type { KeyboardEvent } from 'react';
 import { Button } from './button';
@@ -26,11 +27,13 @@ export function ConfirmDialog({
   onConfirm,
   title,
   description,
-  actionLabel = 'Confirm',
+  actionLabel,
   destructive = false,
   loading = false,
   error,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
+  const resolvedActionLabel = actionLabel ?? t('ui.confirmDialog.confirm');
   const titleId = useId();
   const descId = useId();
   const confirmRef = useRef<HTMLButtonElement>(null);
@@ -67,7 +70,7 @@ export function ConfirmDialog({
             <button
               type="button"
               className="button"
-              aria-label="Close dialog"
+              aria-label={t('ui.confirmDialog.closeDialog')}
               onClick={onClose}
               style={{ padding: 'var(--spacing-xs)' }}
             >
@@ -85,7 +88,7 @@ export function ConfirmDialog({
         )}
         <div className="dialog__actions">
           <Button disabled={loading} onClick={onClose}>
-            Cancel
+            {t('ui.confirmDialog.cancel')}
           </Button>
           <Button
             ref={confirmRef}
@@ -93,7 +96,7 @@ export function ConfirmDialog({
             loading={loading}
             onClick={onConfirm}
           >
-            {actionLabel}
+            {resolvedActionLabel}
           </Button>
         </div>
       </div>

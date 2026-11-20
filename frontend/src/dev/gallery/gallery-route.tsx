@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { COMPONENTS, STATE_MANIFEST } from './state-manifest';
-import { FIXTURES } from './fixtures';
-import { sampleCatalogService } from '../../services/sample-catalog-service';
+import { FIXTURES, gallerySimulator } from './fixtures';
 import { Button, Card, Toast, ConfirmDialog } from '../../components/ui';
 
 const GALLERY_SAMPLE_RECORD_ID = 'sample-0001';
@@ -16,19 +15,19 @@ export function GalleryRoute() {
   function toggleFailure() {
     const next = !simulateFailure;
     setSimulateFailure(next);
-    sampleCatalogService.simulateFailure = next;
+    gallerySimulator.simulateFailure = next;
   }
 
   function toggleSlow() {
     const next = !simulateSlow;
     setSimulateSlow(next);
-    sampleCatalogService.simulateSlowResponse = next;
+    gallerySimulator.simulateSlowResponse = next;
   }
 
   function toggleEmptyData() {
     const next = !simulateEmptyData;
     setSimulateEmptyData(next);
-    sampleCatalogService.simulateEmptyData = next;
+    gallerySimulator.simulateEmptyData = next;
   }
 
   return (
@@ -98,7 +97,7 @@ export function GalleryRoute() {
           actionLabel="Delete Sample Record"
           onClose={() => setConfirmOpen(false)}
           onConfirm={async () => {
-            const res = await sampleCatalogService.removeRecord({ id: GALLERY_SAMPLE_RECORD_ID });
+            const res = await gallerySimulator.removeRecord({ id: GALLERY_SAMPLE_RECORD_ID });
             setConfirmOpen(false);
             setToastMessage(`Removed record: ${res.removedLabel}`);
           }}

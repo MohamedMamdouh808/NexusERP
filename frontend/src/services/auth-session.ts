@@ -48,6 +48,12 @@ export interface SessionMembership {
   readonly id: string;
   /** The roles the service attached to this membership (usually one). */
   readonly roles: readonly MembershipRole[];
+  /**
+   * The member's display name in this organization, when the administrator
+   * gave them one. The dashboard greets a member with it, falling back to
+   * the email address.
+   */
+  readonly name?: string | null;
 }
 
 /** The organization the session is scoped to, as /auth/me describes it. */
@@ -56,6 +62,10 @@ export interface SessionOrganization {
   readonly name: string;
   /** The ISO 4217 code the organization's prices are in. Read-only. */
   readonly currencyCode: string;
+  /** The default due date of an operational invoice, in days. Read-only. */
+  readonly defaultPaymentTermsDays: number;
+  /** The switchable modules this organization has switched on (FR-027). */
+  readonly enabledModules: readonly string[];
 }
 
 /** A signed-in user as the service describes them (no password material). */
@@ -211,7 +221,7 @@ function loadSignedInSession(): Promise<void> {
       hydrateSession({
         status: 'signed-in',
         user: meData.user,
-        membership: { id: meData.membership.id, roles: meData.membership.roles },
+        membership: { id: meData.membership.id, roles: meData.membership.roles, name: meData.membership.name ?? null },
         organization: meData.organization,
         organizations: orgsResult.ok ? orgsResult.data : [],
         permissions: meData.permissions ?? [],
@@ -295,8 +305,10 @@ export async function changeOwnPassword(
  */export async function registerAndSignIn(
   email: string,
   password: string,
+  organizationName?: string,
+  currencyCode?: string,
 ): Promise<SessionActionOutcome> {
-  const result = await register(email, password);
+  const result = await register(email, password, organizationName, currencyCode);
   if (!result.ok) return { ok: false, failure: result.failure };
   return signIn(email, password);
 }

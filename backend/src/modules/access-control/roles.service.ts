@@ -24,6 +24,13 @@ export class RolesService {
       orderBy: { key: 'asc' },
     });
 
+    const memberCounts = await this.prisma.membershipRole.groupBy({
+      by: ['roleId'],
+      where: { organizationId, membership: { isActive: true } },
+      _count: { _all: true },
+    });
+    const countByRole = new Map(memberCounts.map((c) => [c.roleId, c._count._all]));
+
     return roles.map((r) => ({
       id: r.id,
       key: r.key,
@@ -31,18 +38,46 @@ export class RolesService {
       description: r.description,
       isSystem: r.isSystem,
       permissions: r.permissions.map((rp) => rp.permission.code),
+      memberCount: countByRole.get(r.id) ?? 0,
     }));
   }
 
+  async getRole(organizationId: string, roleId: string) {
+    const role = await this.prisma.role.findFirst({
+      where: { id: roleId, organizationId },
+      include: { permissions: { include: { permission: true } } },
+    });
+    if (!role) return null;
+    const memberCount = await this.prisma.membershipRole.count({
+      where: { roleId, organizationId, membership: { isActive: true } },
+    });
+    return {
+      id: role.id,
+      key: role.key,
+      name: role.name,
+      description: role.description,
+      isSystem: role.isSystem,
+      permissions: role.permissions.map((rp) => rp.permission.code),
+      memberCount,
+    };
+  }
+
   /**
-   * List the system permission catalogue.
+   * List the system permission catalogue, grouped by module.
    */
   async listPermissions() {
     const permissions = await this.prisma.permission.findMany({
-      select: { code: true },
-      orderBy: { code: 'asc' },
+      select: { code: true, module: true, description: true },
+      orderBy: [{ module: 'asc' }, { code: 'asc' }],
     });
-    return permissions.map((p) => p.code);
+    const groups = new Map<string, { module: string; label: string; permissions: { code: string; description: string }[] }>();
+    for (const p of permissions) {
+      if (!groups.has(p.module)) {
+        groups.set(p.module, { module: p.module, label: p.module, permissions: [] });
+      }
+      groups.get(p.module)!.permissions.push({ code: p.code, description: p.description });
+    }
+    return Array.from(groups.values());
   }
 
   /**

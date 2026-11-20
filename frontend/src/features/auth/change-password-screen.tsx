@@ -16,6 +16,8 @@
  * digit, and different from the current password.
  */
 
+import { useTranslation } from 'react-i18next';
+
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 
@@ -35,31 +37,32 @@ interface FormErrors {
   readonly confirmPassword?: string;
 }
 
-function validate(form: FormState): FormErrors {
+function validate(form: FormState, t: (key: string) => string): FormErrors {
   const errors: { currentPassword?: string; newPassword?: string; confirmPassword?: string } = {};
   if (form.currentPassword.length === 0) {
-    errors.currentPassword = 'Current password is required.';
+    errors.currentPassword = t('auth.changePassword.currentRequired');
   }
   if (form.newPassword.length < 12) {
-    errors.newPassword = 'New password must be at least 12 characters long.';
+    errors.newPassword = t('auth.changePassword.newMinLength');
   } else if (!/[A-Z]/.test(form.newPassword)) {
-    errors.newPassword = 'New password must contain at least one uppercase letter.';
+    errors.newPassword = t('auth.changePassword.newUpper');
   } else if (!/[a-z]/.test(form.newPassword)) {
-    errors.newPassword = 'New password must contain at least one lowercase letter.';
+    errors.newPassword = t('auth.changePassword.newLower');
   } else if (!/[0-9]/.test(form.newPassword)) {
-    errors.newPassword = 'New password must contain at least one digit.';
+    errors.newPassword = t('auth.changePassword.newDigit');
   } else if (form.newPassword === form.currentPassword) {
-    errors.newPassword = 'New password must differ from the current password.';
+    errors.newPassword = t('auth.changePassword.newMustDiffer');
   }
   if (form.confirmPassword.length === 0) {
-    errors.confirmPassword = 'Confirm the new password.';
+    errors.confirmPassword = t('auth.changePassword.confirmRequired');
   } else if (form.confirmPassword !== form.newPassword) {
-    errors.confirmPassword = 'The two passwords do not match.';
+    errors.confirmPassword = t('auth.changePassword.confirmMismatch');
   }
   return errors;
 }
 
 export function ChangePasswordScreen({ email }: { readonly email: string }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<FormState>({
     currentPassword: '',
     newPassword: '',
@@ -75,7 +78,7 @@ export function ChangePasswordScreen({ email }: { readonly email: string }) {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    const validation = validate(form);
+    const validation = validate(form, t);
     setErrors(validation);
     if (Object.keys(validation).length > 0) return;
 
@@ -96,16 +99,16 @@ export function ChangePasswordScreen({ email }: { readonly email: string }) {
     <div className="auth-screen">
       <div className="auth-screen__inner">
         <div className="card auth-screen__card">
-          <h1 className="auth-screen__title">Choose your password</h1>
+          <h1 className="auth-screen__title">{t('auth.changePassword.title')}</h1>
           <p className="auth-screen__lede">
-            This account was created for you with a temporary password. Choose your own before you
-            continue{signedInAs(email)}
+            {t('auth.changePassword.lede')}
+            {signedInAs(email)}
           </p>
           <form onSubmit={onSubmit} noValidate={true}>
             <div className="auth-screen__fields">
               <Input
                 id="change-current-password"
-                label="Temporary password"
+                label={t('auth.changePassword.temporaryPassword')}
                 type="password"
                 autoComplete="current-password"
                 required={true}
@@ -115,7 +118,7 @@ export function ChangePasswordScreen({ email }: { readonly email: string }) {
               />
               <Input
                 id="change-new-password"
-                label="New password"
+                label={t('auth.changePassword.newPassword')}
                 type="password"
                 autoComplete="new-password"
                 required={true}
@@ -125,7 +128,7 @@ export function ChangePasswordScreen({ email }: { readonly email: string }) {
               />
               <Input
                 id="change-confirm-password"
-                label="Confirm new password"
+                label={t('auth.changePassword.confirmPassword')}
                 type="password"
                 autoComplete="new-password"
                 required={true}
@@ -138,13 +141,14 @@ export function ChangePasswordScreen({ email }: { readonly email: string }) {
               <div className="auth-screen__error" role="alert" aria-live="assertive">
                 <p>{failure.message}</p>
                 <p className="auth-screen__error-request-id">
-                  Reference ID: <code>{failure.requestId}</code>
+                  {t('ui.errorState.referenceLabel')}
+                  <code>{failure.requestId}</code> · HTTP {failure.status}
                 </p>
               </div>
             )}
             <div className="auth-screen__actions">
               <Button variant="primary" type="submit" loading={pending} disabled={pending}>
-                {pending ? 'Saving…' : 'Save password'}
+                {pending ? t('auth.changePassword.submitPending') : t('auth.changePassword.submit')}
               </Button>
             </div>
           </form>

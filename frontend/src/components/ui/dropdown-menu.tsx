@@ -33,6 +33,13 @@ export interface DropdownMenuItem {
   readonly selected?: boolean;
 }
 
+/** A row that labels the menu, not an entry. Never focusable, never activatable. */
+export interface DropdownMenuHeader {
+  readonly kind: 'header';
+  readonly id: string;
+  readonly label: string;
+}
+
 /** An entry that cannot act, and says why. */
 export interface DropdownMenuUnavailableItem {
   readonly kind: 'unavailable';
@@ -41,7 +48,7 @@ export interface DropdownMenuUnavailableItem {
   readonly reason: string;
 }
 
-export type DropdownMenuEntry = DropdownMenuItem | DropdownMenuUnavailableItem;
+export type DropdownMenuEntry = DropdownMenuItem | DropdownMenuUnavailableItem | DropdownMenuHeader;
 
 export interface DropdownMenuProps {
   /** The trigger's visible content. It should name itself, not rely on an icon. */
@@ -193,7 +200,13 @@ export function DropdownMenu({ trigger, label, entries, className }: DropdownMen
           onKeyDown={onListKeyDown}
         >
           {entries.map((entry) =>
-            entry.kind === 'unavailable' ? (
+            entry.kind === 'header' ? (
+              <li key={entry.id} className="menu__header" role="none">
+                <span className="menu__header-label" title={entry.label}>
+                  {entry.label}
+                </span>
+              </li>
+            ) : entry.kind === 'unavailable' ? (
               <li
                 key={entry.id}
                 className="menu__item menu__item--unavailable"

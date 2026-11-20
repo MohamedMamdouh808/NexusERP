@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
@@ -13,11 +15,11 @@ import {
   Toast,
 } from '../../components/ui';
 import type { Column, ToastTone } from '../../components/ui';
-import { formatMoneyGrouped } from '../../lib/format';
-import { useCancelPurchaseOrder, useConfirmPurchaseOrder, useGoodsReceipts, usePurchaseOrder } from './use-purchasing';
+import { formatMoneyLocalized, useOrganizationCurrency } from '../../lib/i18n-format';
+import { useCancelPurchaseOrder, useConfirmPurchaseOrder, usePurchaseOrder } from './use-purchasing';
 import { ReceiveGoodsDialog } from './receive-goods-dialog';
 import { DocumentTrail } from '../../components/ui/document-trail';
-import type { GoodsReceipt, PurchaseOrder } from '../../services/catalog-service';
+import type { PurchaseOrder } from '../../services/catalog-service';
 
 type LineRow = {
   id: string;
@@ -27,6 +29,7 @@ type LineRow = {
   received: string;
   outstanding: string;
   unitCost: string;
+  unitOfMeasure: string;
   lineTotal: string;
 };
 
@@ -40,6 +43,7 @@ function lineRows(order: PurchaseOrder | undefined): LineRow[] {
     received: line.received,
     outstanding: line.outstanding,
     unitCost: line.unitCost,
+    unitOfMeasure: line.unitOfMeasure,
     lineTotal: line.lineTotal,
   }));
 }
@@ -49,6 +53,8 @@ export function OrderDetailPage() {
   const location = useLocation();
   const { id } = useParams();
   const orderId = id ?? '';
+  const { t } = useTranslation();
+  const currency = useOrganizationCurrency();
 
   const { data: order, isPending, isError, error } = usePurchaseOrder(orderId);
   const confirm = useConfirmPurchaseOrder();
@@ -68,20 +74,15 @@ export function OrderDetailPage() {
   const [receiveKey, setReceiveKey] = useState('');
   const [toasts, setToasts] = useState<{ id: string; tone: ToastTone; message: string }[]>([]);
 
-  // Receipts history: one query narrowed by the order number as its search term.
-  const { data: receiptsData } = useGoodsReceipts({
-    search: order?.number,
-    page: 1,
-    pageSize: 50,
-  });
-  const receipts: readonly GoodsReceipt[] = receiptsData?.items ?? [];
+  // The receipt history travels embedded in the order's detail response.
+  const receipts = order?.receipts ?? [];
 
   if (isPending) {
     return (
-      <section className="order-detail-page" aria-label="Purchase order detail">
-        <PageHeader title="Purchase order" />
-        <Card title="Purchase order">
-          <Skeleton label="Loading purchase order" />
+      <section className="order-detail-page" aria-label={t('purchasing.detail.sectionAria')}>
+        <PageHeader title={t('purchasing.detail.title')} />
+        <Card title={t('purchasing.detail.title')}>
+          <Skeleton label={t('purchasing.detail.loading')} />
         </Card>
       </section>
     );
@@ -89,11 +90,11 @@ export function OrderDetailPage() {
 
   if (isError || order === undefined) {
     return (
-      <section className="order-detail-page" aria-label="Purchase order detail">
-        <PageHeader title="Purchase order" />
-        <Card title="Purchase order">
+      <section className="order-detail-page" aria-label={t('purchasing.detail.sectionAria')}>
+        <PageHeader title={t('purchasing.detail.title')} />
+        <Card title={t('purchasing.detail.title')}>
           <ErrorState
-            message={error instanceof Error ? error.message : 'The purchase order could not be loaded.'}
+            message={error instanceof Error ? error.message : t('purchasing.detail.loadError')}
           />
         </Card>
       </section>
@@ -116,28 +117,28 @@ export function OrderDetailPage() {
 
   function handleConfirm() {
     if (order === undefined) return;
-    confirm.mutate(order.id, {
+    confirm.mutate({ id: order.id, version: order.version }, {
       onSuccess: (result) => {
         setConfirmOpen(false);
-        pushToast('success', `Purchase order ${result.number} confirmed.`);
+        pushToast('success', t('purchasing.detail.confirmedToast', { number: result.number }));
       },
       onError: (mutationError) => {
         setConfirmOpen(false);
-        pushToast('failure', mutationError instanceof Error ? mutationError.message : 'The order could not be confirmed.');
+        pushToast('failure', mutationError instanceof Error ? mutationError.message : t('purchasing.detail.confirmFailed'));
       },
     });
   }
 
   function handleCancel() {
     if (order === undefined) return;
-    cancel.mutate(order.id, {
+    cancel.mutate({ id: order.id, version: order.version }, {
       onSuccess: (result) => {
         setCancelOpen(false);
-        pushToast('success', `Purchase order ${result.number} cancelled.`);
+        pushToast('success', t('purchasing.detail.cancelledToast', { number: result.number }));
       },
       onError: (mutationError) => {
         setCancelOpen(false);
-        pushToast('failure', mutationError instanceof Error ? mutationError.message : 'The order could not be cancelled.');
+        pushToast('failure', mutationError instanceof Error ? mutationError.message : t('purchasing.detail.cancelFailed'));
       },
     });
   }
@@ -151,22 +152,23 @@ export function OrderDetailPage() {
   const columns: Column<LineRow>[] = [
     {
       key: 'productSku',
-      header: 'Product',
+      header: t('purchasing.detail.columns.product'),
       render: (row) => (
         <span>
           <span className="mono">{row.productSku}</span> — {row.productName}
         </span>
       ),
     },
-    { key: 'quantity', header: 'Ordered', numeric: true, render: (row) => <span className="qty">{row.quantity}</span> },
-    { key: 'received', header: 'Received', numeric: true, render: (row) => <span className="qty">{row.received}</span> },
-    { key: 'outstanding', header: 'Outstanding', numeric: true, render: (row) => <span className="qty">{row.outstanding}</span> },
-    { key: 'unitCost', header: 'Unit cost', numeric: true, render: (row) => <span className="qty">{row.unitCost}</span> },
-    { key: 'lineTotal', header: 'Line total', numeric: true, render: (row) => <span className="qty">{row.lineTotal}</span> },
+    { key: 'quantity', header: t('purchasing.detail.columns.quantity'), numeric: true, render: (row) => <span className="qty">{row.quantity}</span> },
+    { key: 'unitOfMeasure', header: t('purchasing.detail.columns.unit'), render: (row) => row.unitOfMeasure },
+    { key: 'received', header: t('purchasing.detail.columns.received'), numeric: true, render: (row) => <span className="qty">{row.received}</span> },
+    { key: 'outstanding', header: t('purchasing.detail.columns.outstanding'), numeric: true, render: (row) => <span className="qty">{row.outstanding}</span> },
+    { key: 'unitCost', header: t('purchasing.detail.columns.unitCost'), numeric: true, render: (row) => <span className="qty">{row.unitCost}</span> },
+    { key: 'lineTotal', header: t('purchasing.detail.columns.lineTotal'), numeric: true, render: (row) => <span className="qty">{row.lineTotal}</span> },
   ];
 
   return (
-    <section className="order-detail-page" aria-label="Purchase order detail">
+    <section className="order-detail-page" aria-label={t('purchasing.detail.sectionAria')}>
       {notice !== undefined && !dismissedNotice && (
         <Toast id="page-notice" tone="success" message={notice} onDismiss={() => setDismissedNotice(true)} />
       )}
@@ -176,80 +178,80 @@ export function OrderDetailPage() {
 
       <PageHeader
         title={order.number}
-        description={`Purchase order from ${order.supplierName}`}
+        description={t('purchasing.detail.description', { name: order.supplierName })}
         secondaryActions={[
           <div className="order-detail-page__actions" key="order-actions">
             {canConfirm && (
               <Button variant="primary" onClick={() => setConfirmOpen(true)}>
-                Confirm
+                {t('purchasing.detail.confirm')}
               </Button>
             )}
             {canReceive && (
               <Button variant="primary" onClick={openReceive}>
-                Receive goods
+                {t('purchasing.detail.receive')}
               </Button>
             )}
             {canEdit && (
               <Button variant="default" onClick={() => navigate(`/purchasing/${order.id}/edit`)}>
-                Edit
+                {t('purchasing.detail.edit')}
               </Button>
             )}
             {canCancel && (
               <Button variant="danger" onClick={() => setCancelOpen(true)}>
-                Cancel order
+                {t('purchasing.detail.cancel')}
               </Button>
             )}
             <Button variant="default" onClick={() => navigate('/purchasing')}>
-              Back to list
+              {t('purchasing.detail.backToList')}
             </Button>
           </div>,
         ]}
         primaryAction={
           <div className="order-detail-page__status">
-            <Badge status={status}>{status}</Badge>
+            <Badge status={status}>{t(`purchasing.status.${status}`)}</Badge>
           </div>
         }
       />
 
-      <Card title="Order details">
+      <Card title={t('purchasing.detail.cards.details')}>
         <dl className="order-detail-page__details">
-          <dt>Supplier</dt>
+          <dt>{t('purchasing.detail.fields.supplier')}</dt>
           <dd>{order.supplierName}</dd>
-          <dt>Warehouse</dt>
+          <dt>{t('purchasing.detail.fields.warehouse')}</dt>
           <dd>{order.warehouseName}</dd>
-          <dt>Order date</dt>
+          <dt>{t('purchasing.detail.fields.orderDate')}</dt>
           <dd>{order.orderDate}</dd>
-          <dt>Expected date</dt>
+          <dt>{t('purchasing.detail.fields.expectedDate')}</dt>
           <dd>{order.expectedDate ?? '—'}</dd>
-          <dt>Notes</dt>
+          <dt>{t('purchasing.detail.fields.notes')}</dt>
           <dd>{order.notes === '' ? '—' : order.notes}</dd>
         </dl>
       </Card>
 
-      <Card title="Lines">
+      <Card title={t('purchasing.detail.cards.lines')}>
         <DataTable<LineRow>
           columns={columns}
           data={lineRows(order)}
           total={order.lines.length}
           page={1}
           pageSize={Math.max(1, order.lines.length)}
-          emptyMessage="This order has no lines."
+          emptyMessage={t('purchasing.detail.linesEmpty')}
         />
         <div className="order-detail-page__total">
-          <span>Order total</span>
-          <strong className="qty">{formatMoneyGrouped(order.total)}</strong>
+          <span>{t('purchasing.detail.total')}</span>
+          <strong className="qty">{formatMoneyLocalized(order.total, currency, 2)}</strong>
         </div>
       </Card>
 
-      <Card title="Receipts history">
+      <Card title={t('purchasing.detail.cards.receiptsHistory')}>
         {receipts.length === 0 ? (
-          <p className="order-detail-page__receipts-empty">No goods receipts against this order yet.</p>
+          <p className="order-detail-page__receipts-empty">{t('purchasing.detail.receiptsEmpty')}</p>
         ) : (
           <ul className="order-detail-page__receipts">
             {receipts.map((receipt) => (
               <li key={receipt.id}>
                 <span className="mono">{receipt.number}</span>
-                <span>{receipt.receiptDate.replace('T', ' ').replace('Z', '')}</span>
+                <span>{receipt.receivedAt.replace('T', ' ').replace(/(\.\d+)?Z$/, '')}</span>
                 <span>
                   {receipt.lines
                     .map((line) => `${line.quantity} × ${line.productSku}`)
@@ -260,7 +262,7 @@ export function OrderDetailPage() {
             ))}
           </ul>
         )}
-        <p className="movements__note">Receipts are permanent records.</p>
+        <p className="movements__note">{t('purchasing.receipts.note')}</p>
       </Card>
 
       <DocumentTrail recordType="Purchase order" recordNumber={order.number} />
@@ -269,18 +271,18 @@ export function OrderDetailPage() {
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleConfirm}
-        title="Confirm purchase order"
-        description="Confirming locks this order. A confirmed order can no longer be edited or deleted; to change it, cancel it and create a new one."
-        actionLabel="Confirm order"
+        title={t('purchasing.confirm.title')}
+        description={t('purchasing.confirm.description')}
+        actionLabel={t('purchasing.confirm.actionLabel')}
         loading={confirm.isPending}
       />
       <ConfirmDialog
         open={cancelOpen}
         onClose={() => setCancelOpen(false)}
         onConfirm={handleCancel}
-        title="Cancel purchase order"
-        description="A cancelled order is permanent: it can no longer receive goods and cannot be reopened, and it is kept for the audit trail. An order that already has receipts cannot be cancelled."
-        actionLabel="Cancel order"
+        title={t('purchasing.cancel.title')}
+        description={t('purchasing.cancel.description')}
+        actionLabel={t('purchasing.cancel.actionLabel')}
         destructive
         loading={cancel.isPending}
       />
@@ -290,7 +292,7 @@ export function OrderDetailPage() {
           orderId={order.id}
           idempotencyKey={receiveKey}
           onClose={() => setReceiveOpen(false)}
-          onPosted={(grNumber) => pushToast('success', `Goods receipt ${grNumber} posted.`)}
+          onPosted={(grNumber) => pushToast('success', t('purchasing.detail.receiptPostedToast', { number: grNumber }))}
         />
       )}
     </section>

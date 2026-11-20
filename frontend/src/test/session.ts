@@ -24,6 +24,8 @@ import { PERMISSION_CATALOG } from '@nexuserp/shared';
 export interface SeedSignedInOptions {
   readonly email?: string;
   readonly roleKey?: string;
+  /** The member's display name in this organization; omit to fall back to the email. */
+  readonly membershipName?: string | null;
   /** The active organization; defaults to one sample-like fixture. */
   readonly organization?: Organization;
   /** Full switcher list; defaults to just the active organization. */
@@ -52,6 +54,8 @@ export const TEST_ORGANIZATION: Organization = {
   id: 'test-org-1',
   name: 'Test Organization (One)',
   currencyCode: 'USD',
+  defaultPaymentTermsDays: 30,
+  enabledModules: ['inventory', 'purchasing', 'sales', 'invoicing', 'reports'],
   roles: TEST_ROLE_ADMINISTRATOR,
 };
 /** A second membership, so a test can make the switcher real (>1 membership). */
@@ -59,6 +63,8 @@ export const TEST_ORGANIZATION_TWO: Organization = {
   id: 'test-org-2',
   name: 'Test Organization (Two)',
   currencyCode: 'USD',
+  defaultPaymentTermsDays: 30,
+  enabledModules: ['inventory', 'purchasing', 'sales', 'invoicing', 'reports'],
   roles: TEST_ROLE_ADMINISTRATOR,
 };
 
@@ -68,12 +74,16 @@ export function seedSignedInSession(options: SeedSignedInOptions = {}): SessionS
   const state: SessionState = {
     status: 'signed-in',
     user: { ...DEFAULT_USER, ...(options.email !== undefined ? { email: options.email } : {}) },
-    membership: options.roleKey !== undefined
-      ? {
-          ...DEFAULT_MEMBERSHIP,
-          roles: [{ id: 'test-role-custom', key: options.roleKey, name: options.roleKey }],
-        }
-      : DEFAULT_MEMBERSHIP,
+    membership:
+      options.roleKey !== undefined || options.membershipName !== undefined
+        ? {
+            ...DEFAULT_MEMBERSHIP,
+            ...(options.roleKey !== undefined
+              ? { roles: [{ id: 'test-role-custom', key: options.roleKey, name: options.roleKey }] }
+              : {}),
+            ...(options.membershipName !== undefined ? { name: options.membershipName } : {}),
+          }
+        : DEFAULT_MEMBERSHIP,
     organization,
     organizations: options.organizations ?? [organization],
     permissions: options.permissions ?? PERMISSION_CATALOG.map((permission) => permission.code),

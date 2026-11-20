@@ -127,11 +127,18 @@ export function prepareTestSchema(): void {
 }
 
 /**
- * Truncates the reference tables so each test starts from a known empty state.
+ * Truncates the role templates so each test starts from a known empty state.
  *
  * `CASCADE` handles foreign keys between the tables. This is a truncation rather than a
  * transaction rollback so a test that intentionally commits still leaves nothing behind.
  * Only tables in the test schema are touched; public schema is never modified.
+ *
+ * `permissions` is deliberately NOT truncated. Every tenant grant in `role_permissions`
+ * points at a permission row, and the foreign key is RESTRICT: wiping the catalogue
+ * would cascade-wipe the grants of roles that registration and the role API created,
+ * leaving every pre-existing role permission-less. The catalogue is upserted by code, so
+ * letting the rows persist keeps the ids - and with them the live grants - stable across
+ * suites while the seed still proves idempotency on every run.
  *
  * The audit log is deliberately not truncated - it is append-only at the database level
  * (feature 006) and must stay that way even in tests. Tenant rows created by earlier
@@ -143,8 +150,7 @@ export async function resetDatabase(): Promise<void> {
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
       role_template_permissions,
-      role_templates,
-      permissions
+      role_templates
     RESTART IDENTITY CASCADE
   `);
 }

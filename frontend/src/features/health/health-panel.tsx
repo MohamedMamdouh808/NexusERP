@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { Card, Skeleton, StatusBadge } from '../../components/ui';
 import { isRateLimited } from '../../lib/api-client';
 import { useHealth } from './use-health';
@@ -23,23 +25,24 @@ import { useHealth } from './use-health';
  */
 export function HealthPanel() {
   const { data, isPending, isError, refetch } = useHealth();
+  const { t } = useTranslation();
 
   if (isPending) {
     return (
-      <Card title="System health">
-        <Skeleton label="Loading the system health report" />
+      <Card title={t('health.title')}>
+        <Skeleton label={t('health.loading')} />
       </Card>
     );
   }
 
   if (isError || data === undefined) {
     return (
-      <Card title="System health">
+      <Card title={t('health.title')}>
         <div className="health-panel__error" role="alert">
-          <p>The system health report could not be read.</p>
+          <p>{t('health.loadError')}</p>
         </div>
         <button type="button" className="button" onClick={() => void refetch()}>
-          Check again
+          {t('health.tryAgain')}
         </button>
       </Card>
     );
@@ -49,23 +52,24 @@ export function HealthPanel() {
     const { failure } = data;
 
     return (
-      <Card title="System health">
+      <Card title={t('health.title')}>
         <div className="health-panel__error" role="alert">
           <p>{failure.message}</p>
 
           {isRateLimited(failure) && failure.retryAfterSeconds !== null && (
             <p className="health-panel__retry-after">
-              Too many requests. Try again in {failure.retryAfterSeconds} seconds.
+              {t('health.retryAfter', { count: failure.retryAfterSeconds })}
             </p>
           )}
 
           <p className="health-panel__request-id">
-            Request identifier: <span className="mono">{failure.requestId}</span>
+            {t('health.requestId')}
+            <span className="mono">{failure.requestId}</span> · HTTP {failure.status}
           </p>
         </div>
 
         <button type="button" className="button" onClick={() => void refetch()}>
-          Check again
+          {t('health.tryAgain')}
         </button>
       </Card>
     );
@@ -75,23 +79,23 @@ export function HealthPanel() {
   const databaseOk = report.checks.database.status === 'ok';
 
   return (
-    <Card title="System health">
+    <Card title={t('health.title')}>
       <div className="health-panel__summary">
-        <StatusBadge tone="success">Healthy</StatusBadge>
-        <span>Uptime {report.uptimeSeconds} seconds</span>
+        <StatusBadge tone="success">{t('health.healthy')}</StatusBadge>
+        <span>{t('health.uptime', { seconds: report.uptimeSeconds })}</span>
       </div>
 
       <ul className="health-panel__checks">
         <li className="health-panel__check">
-          <span>Application</span>
+          <span>{t('health.application')}</span>
           <StatusBadge tone={report.checks.application.status === 'ok' ? 'success' : 'warning'}>
             {report.checks.application.status}
           </StatusBadge>
         </li>
         <li className="health-panel__check">
-          <span>Database</span>
+          <span>{t('health.database')}</span>
           <span className="numeric-cell">
-            {databaseOk ? `${report.checks.database.latencyMs} ms` : 'unavailable'}
+            {databaseOk ? `${report.checks.database.latencyMs} ms` : t('health.unavailable')}
           </span>
         </li>
       </ul>

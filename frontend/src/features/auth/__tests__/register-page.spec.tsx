@@ -9,10 +9,11 @@ import { jsonResponse, renderWithProviders } from '../../../test/render';
 import { resetSession } from '../../../test/session';
 
 /**
- * The registration screen: email + password only (the service's schema is
- * strict; the first organization is created by the service). The password rule
- * mirrors the backend: at least 12 characters with upper/lower/digit. A
- * successful registration signs the user in and opens the shell.
+ * The registration screen: email, password and the optional organization name
+ * (the service's schema is strict; the first organization is created by the
+ * service — with the typed name when present, else named from the email). The
+ * password rule mirrors the backend: at least 12 characters with upper/lower/
+ * digit. A successful registration signs the user in and opens the shell.
  */
 
 function stubApi(handler: (path: string) => Response): void {
@@ -76,12 +77,12 @@ afterEach(() => {
 });
 
 describe('RegisterPage', () => {
-  it('asks exactly email + password, with the password rule visible', () => {
+  it('asks for email, password and an optional organization name, with the rule visible', () => {
     renderWithProviders(<RegisterPage />);
 
     expect(screen.getByRole('textbox', { name: 'Email' })).toBeInTheDocument();
     expect(screen.getByLabelText('Password', { exact: false })).toBeInTheDocument();
-    expect(screen.queryByLabelText(/organization/i)).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Organization name' })).toBeInTheDocument();
     expect(screen.getByText(PASSWORD_RULE)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument();
   });
@@ -123,6 +124,62 @@ describe('RegisterPage', () => {
 
     expect(await screen.findByText('Enter a valid email address.')).toBeInTheDocument();
     expect(vi.mocked(fetch).mock.calls.length).toBe(0);
+  });
+
+  it('rejects an invalid organization name inline and sends nothing', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<RegisterPage />);
+
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'new.user@example.com');
+    await user.type(screen.getByLabelText('Password', { exact: false }), VALID);
+    await user.type(
+      screen.getByRole('textbox', { name: 'Organization name' }),
+      'x'.repeat(101),
+    );
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+    expect(
+      await screen.findByText('Organization name must be at most 100 characters.'),
+    ).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.length).toBe(0);
+  });
+
+  it('sends the typed organization name to the register endpoint', async () => {
+    stubApi(envelopes());
+    document.cookie = 'csrf_token=csrf-123;path=/';
+    const user = userEvent.setup();
+    renderWithProviders(<RegisterPage />);
+
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'new.user@example.com');
+    await user.type(screen.getByLabelText('Password', { exact: false }), VALID);
+    await user.type(screen.getByRole('textbox', { name: 'Organization name' }), 'Acme Logistics 009');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(0));
+    const registerCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([input]) => String(input).endsWith('/auth/register'));
+    expect(registerCall).toBeDefined();
+    const body = JSON.parse(String(registerCall![1]?.body)) as { organizationName?: string };
+    expect(body.organizationName).toBe('Acme Logistics 009');
+  });
+
+  it('omits the organization name key when the field is left empty', async () => {
+    stubApi(envelopes());
+    document.cookie = 'csrf_token=csrf-123;path=/';
+    const user = userEvent.setup();
+    renderWithProviders(<RegisterPage />);
+
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'new.user@example.com');
+    await user.type(screen.getByLabelText('Password', { exact: false }), VALID);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(0));
+    const registerCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([input]) => String(input).endsWith('/auth/register'));
+    expect(registerCall).toBeDefined();
+    const body = JSON.parse(String(registerCall![1]?.body)) as Record<string, unknown>;
+    expect('organizationName' in body).toBe(false);
   });
 
   it('registers, signs the new user in, and opens the shell', async () => {

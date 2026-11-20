@@ -2,8 +2,10 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   Param,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -15,8 +17,13 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 import {
   createMemberSchema,
   type CreateMemberDto,
+  replaceRolesSchema,
+  type ReplaceRolesDto,
+  updateMemberNameSchema,
+  type UpdateMemberNameDto,
 } from './dto/memberships.dto';
-import { replaceRolesSchema, type ReplaceRolesDto } from './dto/memberships.dto';
+import { AppException } from '../../common/errors/all-exceptions.filter';
+import { ERROR_CODES } from '@nexuserp/shared';
 import { MembershipsService } from './memberships.service';
 import { AccessControlService } from './access-control.service';
 import { SessionGuard, SessionRequest } from '../../modules/auth/guards/session.guard';
@@ -40,8 +47,64 @@ export class MembershipsController {
   /** List the active organization's memberships with their roles. */
   @Get()
   @RequirePermission('users.manage')
-  async list() {
-    return this.service.list(requireOrganizationId());
+  async list(
+    @Query('search') search?: string,
+    @Query('role') role?: string,
+    @Query('status') status?: 'ACTIVE' | 'DEACTIVATED',
+    @Query('sort') sort?: 'name' | 'email' | 'status' | 'createdAt',
+    @Query('direction') direction?: 'asc' | 'desc',
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    const parsedPage = page ? Number(page) : 1;
+    const parsedPageSize = pageSize ? Number(pageSize) : 20;
+    if (
+      !Number.isInteger(parsedPage) ||
+      parsedPage < 1 ||
+      !Number.isInteger(parsedPageSize) ||
+      parsedPageSize < 1 ||
+      parsedPageSize > 100
+    ) {
+      throw new AppException(ERROR_CODES.VALIDATION_ERROR, [], 'Invalid page or pageSize (pageSize max 100).');
+    }
+    if (status && status !== 'ACTIVE' && status !== 'DEACTIVATED') {
+      throw new AppException(ERROR_CODES.VALIDATION_ERROR, [], 'Invalid status filter.');
+    }
+    if (sort && !['name', 'email', 'status', 'createdAt'].includes(sort)) {
+      throw new AppException(ERROR_CODES.VALIDATION_ERROR, [], 'Invalid sort field.');
+    }
+    if (direction && direction !== 'asc' && direction !== 'desc') {
+      throw new AppException(ERROR_CODES.VALIDATION_ERROR, [], 'Invalid sort direction.');
+    }
+    return this.service.list(requireOrganizationId(), {
+      search,
+      role,
+      status,
+      sort,
+      direction,
+      page: parsedPage,
+      pageSize: parsedPageSize,
+    });
+  }
+
+  /**
+   * Update a member's display name (per-organization). Audited with before/after;
+   * stale version -> 409 VERSION_CONFLICT.
+   */
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('users.manage')
+  async updateName(
+    @Param('id', ParseUUIDPipe) membershipId: string,
+    @Body(new ZodValidationPipe(updateMemberNameSchema)) body: UpdateMemberNameDto,
+  ) {
+    return this.service.updateName({
+      membershipId,
+      organizationId: requireOrganizationId(),
+      name: body.name,
+      version: body.version,
+      actingUserId: requireUserId(),
+    });
   }
 
   /**

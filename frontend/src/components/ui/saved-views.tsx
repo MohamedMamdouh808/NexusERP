@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button, Input } from './index';
 
 export interface SavedView<T> {
@@ -25,7 +26,9 @@ function loadViews<T>(storageKey: string): SavedView<T>[] {
   }
 }
 
-export function SavedViews<T>({ storageKey, current, nameFor, onSelect, label = 'Saved views' }: SavedViewsProps<T>) {
+export function SavedViews<T>({ storageKey, current, nameFor, onSelect, label }: SavedViewsProps<T>) {
+  const { t } = useTranslation();
+  const resolvedLabel = label ?? t('ui.savedViews.label');
   const [views, setViews] = useState<SavedView<T>[]>(() => loadViews(storageKey));
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState('');
@@ -48,7 +51,7 @@ export function SavedViews<T>({ storageKey, current, nameFor, onSelect, label = 
     }
     const next = {
       id: globalThis.crypto?.randomUUID?.() ?? `view-${Date.now()}`,
-      name: trimmed || currentName || 'View',
+      name: trimmed || currentName || t('ui.savedViews.viewFallback'),
       state: current,
     };
     persist([next, ...views.filter((entry) => entry.name !== next.name)].slice(0, 8));
@@ -57,16 +60,16 @@ export function SavedViews<T>({ storageKey, current, nameFor, onSelect, label = 
   };
 
   return (
-    <div className="saved-views" aria-label={label}>
+    <div className="saved-views" aria-label={resolvedLabel}>
       <div className="saved-views__actions">
         {editingName ? (
           <>
-            <Input id="saved-view-name" label="View name" value={name} placeholder={currentName || 'My view'} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') save(); if (event.key === 'Escape') setEditingName(false); }} />
-            <Button type="button" variant="primary" onClick={save}>Save</Button>
-            <Button type="button" onClick={() => setEditingName(false)}>Cancel</Button>
+            <Input id="saved-view-name" label={t('ui.savedViews.viewName')} value={name} placeholder={currentName || t('ui.savedViews.myView')} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') save(); if (event.key === 'Escape') setEditingName(false); }} />
+            <Button type="button" variant="primary" onClick={save}>{t('ui.savedViews.save')}</Button>
+            <Button type="button" onClick={() => setEditingName(false)}>{t('ui.savedViews.cancel')}</Button>
           </>
         ) : (
-          <Button type="button" onClick={() => setEditingName(true)}>Save view</Button>
+          <Button type="button" onClick={() => setEditingName(true)}>{t('ui.savedViews.saveView')}</Button>
         )}
       </div>
       {views.length > 0 && (
@@ -74,7 +77,7 @@ export function SavedViews<T>({ storageKey, current, nameFor, onSelect, label = 
           {views.map((view) => (
             <li key={view.id}>
               <button type="button" className="saved-views__chip" onClick={() => onSelect(view.state)}>{view.name}</button>
-              <button type="button" className="saved-views__remove" aria-label={`Delete saved view ${view.name}`} onClick={() => persist(views.filter((entry) => entry.id !== view.id))}>×</button>
+              <button type="button" className="saved-views__remove" aria-label={t('ui.savedViews.deleteSavedView', { name: view.name })} onClick={() => persist(views.filter((entry) => entry.id !== view.id))}>×</button>
             </li>
           ))}
         </ul>

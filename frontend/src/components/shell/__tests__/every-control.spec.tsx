@@ -1,10 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { routes } from '../../../app/router';
-import { sampleCatalogService } from '../../../services/sample-catalog-service';
 import { createTestQueryClient } from '../../../test/render';
 import { seedSignedInSession } from '../../../test/session';
 import { jsonResponse } from '../../../test/render';
@@ -19,21 +18,21 @@ import { QueryClientProvider } from '@tanstack/react-query';
  * Controls with no handler or that produce no observable change fail this guard.
  */
 
+let fetchMock: ReturnType<typeof vi.fn>;
+
 function renderShellRouter(initialPath = '/') {
   // Signed in: the shell's session controls exist (org switcher, user menu),
   // which is the state the guard audits. The service is stubbed so the sign
   // out the walker may click cannot hit a real network - it answers the way
   // the current backend does (403 for everyone; the store clears regardless).
   seedSignedInSession();
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () =>
-      jsonResponse(
-        { code: 'FORBIDDEN', message: "You don't have permission.", details: [], requestId: 'test-403' },
-        { status: 403 },
-      ),
+  fetchMock = vi.fn(async () =>
+    jsonResponse(
+      { code: 'FORBIDDEN', message: "You don't have permission.", details: [], requestId: 'test-403' },
+      { status: 403 },
     ),
   );
+  vi.stubGlobal('fetch', fetchMock);
   const router = createMemoryRouter(routes, { initialEntries: [initialPath] });
   const queryClient = createTestQueryClient();
   const view = render(
@@ -45,10 +44,6 @@ function renderShellRouter(initialPath = '/') {
 }
 
 describe('Every enabled control guard for the shell (T023, FR-071, SC-019)', () => {
-  beforeEach(() => {
-    sampleCatalogService.reset();
-  });
-
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -96,13 +91,13 @@ describe('Every enabled control guard for the shell (T023, FR-071, SC-019)', () 
 
       const initialUrl = router.state.location.pathname + router.state.location.search + router.state.location.hash;
       const initialDom = container.innerHTML;
-      const initialCallCount = sampleCatalogService.calls.length;
+      const initialCallCount = fetchMock.mock.calls.length;
 
       await user.click(control);
 
       const postUrl = router.state.location.pathname + router.state.location.search + router.state.location.hash;
       const postDom = container.innerHTML;
-      const postCallCount = sampleCatalogService.calls.length;
+      const postCallCount = fetchMock.mock.calls.length;
 
       const urlChanged = postUrl !== initialUrl;
       const domChanged = postDom !== initialDom;
