@@ -179,6 +179,19 @@ export interface TopCustomersResponse {
   readonly rows: readonly TopCustomerRow[];
 }
 
+/** One category row in the sales-by-category report: a decimal string the member reads, never arithmetic. */
+export interface SalesByCategoryRow {
+  readonly category: string;
+  readonly revenue: string;
+  readonly quantity: string;
+}
+
+export interface SalesByCategoryResponse {
+  readonly filters: { readonly start: string; readonly end: string };
+  readonly asOf: string;
+  readonly rows: readonly SalesByCategoryRow[];
+}
+
 /** One aging bucket: how many invoices, and their combined balance. */
 export interface AgingBucket {
   readonly count: number;
@@ -267,6 +280,12 @@ export async function getPaymentsReceivedOverTime(start: string, end: string): P
 
 export async function getTopProducts(start: string, end: string): Promise<TopProductsResponse> {
   const res = await requestJson<TopProductsResponse>(`${API_BASE}/reports/top-products?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`);
+  if (!res.ok) throw new Error(res.failure.message);
+  return res.data;
+}
+
+export async function getSalesByCategory(start: string, end: string): Promise<SalesByCategoryResponse> {
+  const res = await requestJson<SalesByCategoryResponse>(`${API_BASE}/reports/sales-by-category?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`);
   if (!res.ok) throw new Error(res.failure.message);
   return res.data;
 }

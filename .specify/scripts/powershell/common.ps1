@@ -149,6 +149,15 @@ function Test-FeatureBranch {
         return $true
     }
 
+    # When a feature directory is persisted in .specify/feature.json (the
+    # single-branch workflow: all work lands on main), branch-name validation
+    # is meaningless and must not block. The constitution requires the tooling
+    # to select the feature directory from feature.json, not from the branch.
+    $repoRoot = Get-RepoRoot
+    if (Test-Path (Join-Path $repoRoot '.specify/feature.json')) {
+        return $true
+    }
+
     $raw = $Branch
     $Branch = Get-SpecKitEffectiveBranchName $raw
     

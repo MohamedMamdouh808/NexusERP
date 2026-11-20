@@ -3,7 +3,6 @@ import {
   CanActivate,
   ExecutionContext,
 } from '@nestjs/common';
-import { PrismaService } from '../../platform/prisma/prisma.service';
 import { AppException } from '../../common/errors/all-exceptions.filter';
 import { ERROR_CODES } from '@nexuserp/shared';
 
@@ -32,11 +31,10 @@ import { ERROR_CODES } from '@nexuserp/shared';
  */
 @Injectable()
 export class PasswordChangeGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
-
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<{
       userId?: string;
+      identity?: { user?: { mustChangePassword?: boolean } };
       url?: string;
       method?: string;
     }>();
@@ -46,12 +44,11 @@ export class PasswordChangeGuard implements CanActivate {
       return true;
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { mustChangePassword: true },
-    });
-
-    if (!user || !user.mustChangePassword) {
+    // The session guard already loaded the caller's identity (including the
+    // forced-change flag) in the same round trip. Reusing it keeps the count at
+    // one query per request (FR-006).
+    const mustChangePassword = request.identity?.user?.mustChangePassword;
+    if (!mustChangePassword) {
       return true;
     }
 

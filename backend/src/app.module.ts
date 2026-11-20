@@ -1,10 +1,11 @@
 import { MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { PermissionGuard } from './common/guards/permission.guard';
 import { PasswordChangeGuard } from './common/guards/password-change.guard';
-import { SessionGuard } from './modules/auth/guards/session.guard';
 import { RequestIdMiddleware } from './common/logging/request-id.middleware';
+import { SessionGuard } from './modules/auth/guards/session.guard';
+import { PerformanceInterceptor } from './platform/observability/performance.interceptor';
 import { ConfigurationModule } from './config/configuration.module';
 import { PlatformModule } from './platform/platform.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -54,6 +55,7 @@ import { ReportsModule } from './modules/reports/reports.module';
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    { provide: APP_INTERCEPTOR, useClass: PerformanceInterceptor },
     // SessionGuard MUST run before PermissionGuard: the permission guard resolves
     // the membership from the request that the session guard binds. Global guards
     // run before controller guards, so registering the session guard only on the

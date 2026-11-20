@@ -21,7 +21,6 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 import { requireOrganizationId, requireUserId } from '../../common/logging/request-context';
 import { InvoicingModule } from '../../common/guards/invoicing-module.guard';
 import { ModuleGuard } from '../../common/guards/module.guard';
-import { SessionGuard } from '../auth/guards/session.guard';
 import { InvoicingService } from './invoicing.service';
 import { createInvoiceSchema, type CreateInvoiceDto } from './dto/create-invoice.dto';
 import {
@@ -53,7 +52,7 @@ import { reversePaymentSchema, type ReversePaymentDto } from './dto/reverse-paym
  */
 @ApiTags('Invoicing')
 @Controller()
-@UseGuards(SessionGuard, ModuleGuard)
+@UseGuards(ModuleGuard)
 export class InvoicingController {
   constructor(private readonly service: InvoicingService) {}
 

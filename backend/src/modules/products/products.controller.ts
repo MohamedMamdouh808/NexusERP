@@ -9,14 +9,12 @@ import {
   Post,
   Put,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 import { requireOrganizationId, requireUserId } from '../../common/logging/request-context';
-import { SessionGuard } from '../auth/guards/session.guard';
 import { ProductsService } from './products.service';
 import { createProductSchema, type CreateProductDto } from './dto/create-product.dto';
 import { updateProductSchema, type UpdateProductDto } from './dto/update-product.dto';
@@ -34,7 +32,6 @@ import { ProductResponseDto } from './dto/product-response.dto';
  */
 @ApiTags('Products')
 @Controller('products')
-@UseGuards(SessionGuard)
 export class ProductsController {
   constructor(private readonly service: ProductsService) {}
 
@@ -119,7 +116,6 @@ export class ProductsController {
  */
 @ApiTags('Product categories')
 @Controller('product-categories')
-@UseGuards(SessionGuard)
 export class ProductCategoriesController {
   constructor(private readonly service: ProductsService) {}
 
@@ -145,7 +141,6 @@ export class ProductCategoriesController {
  */
 @ApiTags('Units of measure')
 @Controller('units-of-measure')
-@UseGuards(SessionGuard)
 export class UnitsOfMeasureController {
   constructor(private readonly service: ProductsService) {}
 

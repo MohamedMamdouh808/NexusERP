@@ -13,7 +13,10 @@ export function createQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         retry: false,
-        refetchOnWindowFocus: true,
+        // Reference data is stable for minutes; heavy lists must not refetch on
+        // every window focus (Feature 019, FR-014).
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
       },
     },
   });

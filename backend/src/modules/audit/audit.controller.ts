@@ -2,10 +2,8 @@ import {
   Controller,
   Get,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
-import { SessionGuard } from '../../modules/auth/guards/session.guard';
 import { AuditService } from './audit.service';
 import { requireOrganizationId } from '../../common/logging/request-context';
 import { z } from 'zod';
@@ -30,7 +28,6 @@ const auditListSchema = z
  * can never match (FR-020/SC-013).
  */
 @Controller('audit-logs')
-@UseGuards(SessionGuard)
 export class AuditController {
   constructor(private readonly service: AuditService) {}
 

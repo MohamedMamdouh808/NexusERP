@@ -10,6 +10,7 @@ import {
   type TransactionClient,
 } from '../../platform/transaction/transaction.service';
 import { extendRequestContext } from '../../common/logging/request-context';
+import type { RequestIdentity } from './request-identity.service';
 import { AccessControlService } from '../access-control/access-control.service';
 import { AuditService } from '../audit/audit.service';
 import { hash as argon2Hash, verify as argon2Verify } from 'argon2';
@@ -274,7 +275,40 @@ export class AuthService {
    * Returns the current user's identity and active organization membership
    * from the session context (FR-004).
    */
-  async me(userId: string, membershipId: string) {
+  async me(userId: string, membershipId: string, identity?: RequestIdentity) {
+    if (
+      identity &&
+      identity.userId === userId &&
+      identity.membershipId === membershipId
+    ) {
+      return {
+        user: {
+          id: identity.user.id,
+          email: identity.user.email,
+          mustChangePassword: identity.user.mustChangePassword,
+        },
+        membership: {
+          id: identity.membership.id,
+          name: identity.membership.name,
+          version: identity.membership.version,
+          roles: identity.roles.map((role) => ({
+            id: role.id,
+            key: role.key,
+            name: role.name,
+          })),
+          isActive: identity.membership.isActive,
+        },
+        organization: {
+          id: identity.organization.id,
+          name: identity.organization.name,
+          currencyCode: identity.organization.currencyCode,
+          defaultPaymentTermsDays: identity.organization.defaultPaymentTermsDays,
+          enabledModules: identity.enabledModules,
+        },
+        permissions: identity.permissions,
+      };
+    }
+
     const membership = await this.prisma.membership.findUnique({
       where: { id: membershipId },
       include: {

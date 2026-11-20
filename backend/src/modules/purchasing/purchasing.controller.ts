@@ -19,7 +19,6 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 import { requireOrganizationId, requireUserId } from '../../common/logging/request-context';
 import { PurchasingModule } from '../../common/guards/purchasing-module.guard';
 import { ModuleGuard } from '../../common/guards/module.guard';
-import { SessionGuard } from '../auth/guards/session.guard';
 import { PurchasingService } from './purchasing.service';
 import {
   createPurchaseOrderSchema,
@@ -54,7 +53,7 @@ import {
  */
 @ApiTags('Purchasing')
 @Controller()
-@UseGuards(SessionGuard, ModuleGuard)
+@UseGuards(ModuleGuard)
 export class PurchasingController {
   constructor(private readonly service: PurchasingService) {}
 

@@ -133,7 +133,16 @@ export class AccessControlService {
    * Resolves the effective permission codes for a membership: the union of all
    * permissions granted through its roles (FR-003).
    */
-  async getEffectivePermissions(membershipId: string): Promise<string[]> {
+  async getEffectivePermissions(
+  membershipId: string,
+  identity?: { membershipId?: string; permissions?: readonly string[] },
+): Promise<string[]> {
+  if (
+    identity?.membershipId === membershipId &&
+    Array.isArray(identity.permissions)
+  ) {
+    return [...identity.permissions];
+  }
     const permissions = await this.prisma.permission.findMany({
       where: {
         rolePermissions: {

@@ -81,8 +81,9 @@ export class PermissionGuard implements CanActivate {
     }
 
     // Permission resolution arrives with authentication. The session guard resolves
-    // membershipId per request; no caching, so role/permission changes apply from the
-    // member's next request onward (FR-004).
+    // the full identity (including permissions) in one round trip per request; no
+    // caching beyond the request, so role/permission changes apply from the member's
+    // next request onward (FR-004, FR-006).
     const effective = await this.effectivePermissions(context);
     if (!effective.includes(required)) {
       throw new ForbiddenException('You do not have permission to perform this action.');
@@ -101,12 +102,21 @@ export class PermissionGuard implements CanActivate {
   private async effectivePermissions(context: ExecutionContext): Promise<readonly string[]> {
     const request = context.switchToHttp().getRequest<{
       membershipId?: string;
+      identity?: { permissions?: readonly string[] };
     }>();
+    // The session guard resolves the caller's permissions in the same round trip as
+    // the session. Reusing them here keeps the count at one query per request
+    // (FR-006); a missing identity (unauthenticated) falls through to default deny.
+    if (request.identity?.permissions) {
+      return request.identity.permissions;
+    }
+
     const membershipId = request.membershipId;
     if (!membershipId) return [];
 
-    // Resolve the union: membership → membership_roles → role_permissions → permissions.code,
-    // all within the membership's organization (composite FKs prevent cross-org links).
+    // Fallback for callers that bind a membership without going through the
+    // session guard (none in production). Kept so the guard never returns a
+    // stale empty set when identity loading is unavailable.
     const permissions = await this.prisma.permission.findMany({
       where: {
         rolePermissions: {

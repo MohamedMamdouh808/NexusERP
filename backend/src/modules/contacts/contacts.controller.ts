@@ -9,7 +9,6 @@ import {
   Post,
   Put,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ContactsService } from './contacts.service';
@@ -17,13 +16,11 @@ import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 import { ListContactsDto } from './dto/list-contacts.dto';
 import { ContactResponseDto } from './dto/contact-response.dto';
-import { SessionGuard } from '../auth/guards/session.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { requireOrganizationId, requireUserId } from '../../common/logging/request-context';
 
 @ApiTags('Contacts')
 @Controller('contacts')
-@UseGuards(SessionGuard)
 export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
 

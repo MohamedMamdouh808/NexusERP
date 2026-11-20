@@ -6,7 +6,6 @@ import {
   Body,
   Param,
   Query,
-  UseGuards,
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
@@ -26,7 +25,7 @@ import { AppException } from '../../common/errors/all-exceptions.filter';
 import { ERROR_CODES } from '@nexuserp/shared';
 import { MembershipsService } from './memberships.service';
 import { AccessControlService } from './access-control.service';
-import { SessionGuard, SessionRequest } from '../../modules/auth/guards/session.guard';
+import { SessionRequest } from '../auth/guards/session.guard';
 import {
   requireOrganizationId,
   requireUserId,
@@ -37,7 +36,6 @@ import {
  * Cross-organization record addressing returns 404 (FR-022).
  */
 @Controller('memberships')
-@UseGuards(SessionGuard)
 export class MembershipsController {
   constructor(
     private readonly service: MembershipsService,
@@ -143,6 +141,7 @@ export class MembershipsController {
   ) {
     const actorPermissions = await this.accessControl.getEffectivePermissions(
       request.membershipId ?? '',
+      request.identity,
     );
     return this.service.replaceRoles({
       membershipId,

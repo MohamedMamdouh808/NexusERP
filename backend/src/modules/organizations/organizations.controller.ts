@@ -1,10 +1,9 @@
-import { Body, Controller, Get, Param, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Put } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { Authenticated, RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 import { requireOrganizationId, requireUserId } from '../../common/logging/request-context';
-import { SessionGuard } from '../auth/guards/session.guard';
 import { OrganizationsService } from './organizations.service';
 import { OrganizationModulesService } from './organization-modules.service';
 import {
@@ -21,7 +20,6 @@ import { toggleModuleSchema, type ToggleModuleInput } from './dto/toggle-module.
  */
 @ApiTags('Organizations')
 @Controller('organizations')
-@UseGuards(SessionGuard)
 export class OrganizationsController {
   constructor(
     private readonly service: OrganizationsService,

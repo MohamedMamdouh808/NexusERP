@@ -243,50 +243,56 @@ export class ReportsService {
       );
     }
     return this.readTx(async (tx) => {
-      const po = await tx.$queryRaw(Prisma.sql`
-        SELECT status, count(*)::int AS "count", COALESCE(SUM(total),0)::text AS "totalAmount"
-        FROM "purchase_orders" WHERE "organization_id" = ${organizationId}::uuid AND "created_at"::date BETWEEN ${q.start}::date AND ${q.end}::date
-        GROUP BY status
-      `);
-      const so = await tx.$queryRaw(Prisma.sql`
-        SELECT status, count(*)::int AS "count", COALESCE(SUM(total),0)::text AS "totalAmount"
-        FROM "sales_orders" WHERE "organization_id" = ${organizationId}::uuid AND "created_at"::date BETWEEN ${q.start}::date AND ${q.end}::date
-        GROUP BY status
-      `);
-      const inv = await tx.$queryRaw(Prisma.sql`
-        SELECT status, count(*)::int AS "count", COALESCE(SUM(total),0)::text AS "totalAmount"
-        FROM "invoices" WHERE "organization_id" = ${organizationId}::uuid AND "created_at"::date BETWEEN ${q.start}::date AND ${q.end}::date
-        GROUP BY status
-      `);
-      const pay = await tx.$queryRaw(Prisma.sql`
+      // One set-based query for every document type (FR-019: reports ≤3 queries).
+      const rows = await tx.$queryRawUnsafe(`
         SELECT
-          CASE WHEN EXISTS (SELECT 1 FROM "payment_reversals" pr WHERE pr."organization_id" = p."organization_id" AND pr."payment_id" = p."id") THEN 'REVERSED' ELSE 'RECORDED' END AS "status",
+          "table", status,
           count(*)::int AS "count",
-          COALESCE(SUM(p."amount"),0)::text AS "totalAmount"
-        FROM "payments" p
-        WHERE p."organization_id" = ${organizationId}::uuid AND p."created_at"::date BETWEEN ${q.start}::date AND ${q.end}::date
-        GROUP BY 1
-      `);
-      const ship = await tx.$queryRaw(Prisma.sql`
-        SELECT count(*)::bigint AS "count" FROM "shipments"
-        WHERE "organization_id" = ${organizationId}::uuid AND "created_at"::date BETWEEN ${q.start}::date AND ${q.end}::date
-      `);
-      const gr = await tx.$queryRaw(Prisma.sql`
-        SELECT count(*)::bigint AS "count" FROM "goods_receipts"
-        WHERE "organization_id" = ${organizationId}::uuid AND "created_at"::date BETWEEN ${q.start}::date AND ${q.end}::date
-      `);
-      const toObj = (rows: any[]) => {
-        const o: Record<string, { count: number; totalAmount: string }> = {};
-        for (const r of rows) o[r.status] = { count: r.count, totalAmount: r.totalAmount };
-        return o;
+          COALESCE(SUM(value), 0)::text AS "totalAmount"
+        FROM (
+          SELECT 'purchase_orders' AS "table", status, total AS value
+          FROM "purchase_orders"
+          WHERE "organization_id" = $1::uuid AND "created_at"::date BETWEEN $2::date AND $3::date
+          UNION ALL
+          SELECT 'sales_orders', status, total
+          FROM "sales_orders"
+          WHERE "organization_id" = $1::uuid AND "created_at"::date BETWEEN $2::date AND $3::date
+          UNION ALL
+          SELECT 'invoices', status, total
+          FROM "invoices"
+          WHERE "organization_id" = $1::uuid AND "created_at"::date BETWEEN $2::date AND $3::date
+          UNION ALL
+          SELECT 'payments',
+                 CASE WHEN EXISTS (SELECT 1 FROM "payment_reversals" pr WHERE pr."organization_id" = p."organization_id" AND pr."payment_id" = p."id") THEN 'REVERSED' ELSE 'RECORDED' END,
+                 p."amount"
+          FROM "payments" p
+          WHERE p."organization_id" = $1::uuid AND p."created_at"::date BETWEEN $2::date AND $3::date
+          UNION ALL
+          SELECT 'shipments', NULL, NULL FROM "shipments"
+          WHERE "organization_id" = $1::uuid AND "created_at"::date BETWEEN $2::date AND $3::date
+          UNION ALL
+          SELECT 'goods_receipts', NULL, NULL FROM "goods_receipts"
+          WHERE "organization_id" = $1::uuid AND "created_at"::date BETWEEN $2::date AND $3::date
+        ) s
+        GROUP BY "table", status
+      `, organizationId, q.start, q.end);
+
+      const byTable = (table: string): Record<string, { count: number; totalAmount: string }> => {
+        const map: Record<string, { count: number; totalAmount: string }> = {};
+        for (const row of rows) {
+          if (row.table !== table || row.status === null) continue;
+          map[row.status] = { count: row.count, totalAmount: row.totalAmount };
+        }
+        return map;
       };
+
       return {
-        purchaseOrders: toObj(po),
-        salesOrders: toObj(so),
-        invoices: toObj(inv),
-        payments: toObj(pay),
-        shipments: Number(ship[0]?.count ?? 0),
-        goodsReceipts: Number(gr[0]?.count ?? 0),
+        purchaseOrders: byTable('purchase_orders'),
+        salesOrders: byTable('sales_orders'),
+        invoices: byTable('invoices'),
+        payments: byTable('payments'),
+        shipments: rows.find((r: any) => r.table === 'shipments')?.count ?? 0,
+        goodsReceipts: rows.find((r: any) => r.table === 'goods_receipts')?.count ?? 0,
         dateRange: { start: q.start, end: q.end },
       };
     });
@@ -481,7 +487,7 @@ export class ReportsService {
         FROM invoice_lines l
         JOIN invoices i ON i.organization_id = l.organization_id AND i.id = l.invoice_id
         JOIN products p ON p.organization_id = l.organization_id AND p.id = l.product_id
-        LEFT JOIN units_of_measure u ON u.organization_id = p.organization_id AND u.id = p."unitId"
+        LEFT JOIN units_of_measure u ON u.organization_id = p.organization_id AND u.id = p."unit_id"
         WHERE i.organization_id = $1::uuid AND i.issue_date BETWEEN $2::date AND $3::date AND i.status IN ('ISSUED','PARTIALLY_PAID','PAID')
         GROUP BY l.product_id, p.name, p.sku, u.abbreviation ORDER BY revenue DESC LIMIT 10
       `, organizationId, q.start, q.end);
@@ -497,6 +503,33 @@ export class ReportsService {
         JOIN contacts c ON c.organization_id = i.organization_id AND c.id = i.customer_id
         WHERE i.organization_id = $1::uuid AND i.issue_date BETWEEN $2::date AND $3::date AND i.status IN ('ISSUED','PARTIALLY_PAID','PAID')
         GROUP BY c.id, c.name ORDER BY total DESC LIMIT 10
+      `, organizationId, q.start, q.end);
+      return { filters: { start: q.start, end: q.end }, asOf: new Date().toISOString(), rows };
+    });
+  }
+
+  /**
+   * Revenue per product category over a date range, for the reports page's
+   * "Sales by category" card. One set-based aggregation over the same
+   * committed invoice window the other reports read (FR-019 budget: 1 query).
+   */
+  async salesByCategory(organizationId: string, q: { start: string; end: string }) {
+    this.assertDates(q);
+    return this.txRead(async (tx) => {
+      const rows = await tx.$queryRawUnsafe(`
+        SELECT pc.name AS "category",
+               COALESCE(SUM(l.line_total), 0)::text AS "revenue",
+               COALESCE(SUM(l.quantity), 0)::text AS "quantity"
+        FROM invoice_lines l
+        JOIN invoices i ON i.organization_id = l.organization_id AND i.id = l.invoice_id
+        JOIN products p ON p.organization_id = l.organization_id AND p.id = l.product_id
+        JOIN product_categories pc ON pc.organization_id = p.organization_id AND pc."id" = p."category_id"
+        WHERE i.organization_id = $1::uuid
+          AND i.issue_date BETWEEN $2::date AND $3::date
+          AND i.status IN ('ISSUED','PARTIALLY_PAID','PAID')
+        GROUP BY pc."id", pc.name
+        ORDER BY revenue DESC
+        LIMIT 10
       `, organizationId, q.start, q.end);
       return { filters: { start: q.start, end: q.end }, asOf: new Date().toISOString(), rows };
     });

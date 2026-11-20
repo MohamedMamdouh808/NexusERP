@@ -25,6 +25,8 @@ export interface ChartFrameProps {
   readonly focusValues?: readonly { readonly label: string; readonly value: string }[];
   /** Accessible name for the focusable values panel. */
   readonly focusValuesLabel?: string;
+  /** An optional control (e.g. a segment switch) in the card header. */
+  readonly actions?: ReactNode;
   readonly children: ReactNode;
   readonly className?: string;
 }
@@ -57,6 +59,7 @@ export function ChartFrame({
   emptyAction,
   focusValues,
   focusValuesLabel,
+  actions,
   children,
   className,
 }: ChartFrameProps) {
@@ -81,14 +84,17 @@ export function ChartFrame({
       title={title}
       description={definition}
       actions={
-        <button
-          type="button"
-          className="chart-frame__toggle"
-          aria-pressed={asTable}
-          onClick={toggleTable}
-        >
-          {asTable ? t('common.actions.showChart') : t('common.actions.showTable')}
-        </button>
+        <>
+          {actions !== undefined && actions}
+          <button
+            type="button"
+            className="chart-frame__toggle"
+            aria-pressed={asTable}
+            onClick={toggleTable}
+          >
+            {asTable ? t('common.actions.showChart') : t('common.actions.showTable')}
+          </button>
+        </>
       }
     >
       <p className="chart-frame__summary">{summary}</p>

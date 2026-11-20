@@ -4,6 +4,7 @@ import { HealthService } from './health/health.service';
 import { IdempotencyService } from './idempotency/idempotency.service';
 import { PrismaService } from './prisma/prisma.service';
 import { TransactionService } from './transaction/transaction.service';
+import { RequestIdentityService } from '../modules/auth/request-identity.service';
 
 /**
  * PlatformModule owns infrastructure: the database connection, the transaction unit of
@@ -21,7 +22,7 @@ import { TransactionService } from './transaction/transaction.service';
 @Global()
 @Module({
   controllers: [HealthController],
-  providers: [PrismaService, TransactionService, IdempotencyService, HealthService],
-  exports: [PrismaService, TransactionService, IdempotencyService, HealthService],
+  providers: [PrismaService, TransactionService, IdempotencyService, HealthService, RequestIdentityService],
+  exports: [PrismaService, TransactionService, IdempotencyService, HealthService, RequestIdentityService],
 })
 export class PlatformModule {}

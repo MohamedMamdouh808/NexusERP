@@ -34,6 +34,30 @@ export interface RequestContext {
    * shared module guard reads module state exactly once (FR-020).
    */
   readonly moduleStates?: readonly ModuleState[];
+  /**
+   * Per-request performance counters (Feature 019). One object per request, mutated in
+   * place by the Prisma query hook; never shared across requests and never persisted.
+   */
+  readonly performance?: PerformanceContext;
+}
+
+/**
+ * Counters for one request.
+ *
+ * `queryCount` is a single integer increment per database query and `dbTimeMs` is the
+ * sum of the durations Prisma reports. `startedAt` is a monotonic `performance.now()`
+ * value taken when the request entered the application, so the non-database time is
+ * `elapsed - dbTimeMs`. None of these values are derived from client input.
+ */
+export interface PerformanceContext {
+  queryCount: number;
+  dbTimeMs: number;
+  startedAt: number;
+}
+
+/** Enables the `Server-Timing`/`X-Query-Count` headers and per-query debug logging. */
+export function isPerformanceInstrumentationEnabled(): boolean {
+  return process.env.NODE_ENV !== 'production' || process.env.PERF_INSTRUMENTATION === '1';
 }
 
 const storage = new AsyncLocalStorage<MutableRequestContext>();
@@ -51,6 +75,7 @@ interface MutableRequestContext {
   userId: string | null;
   organizationId: string | null;
   moduleStates?: readonly ModuleState[];
+  performance?: PerformanceContext;
 }
 
 /**
@@ -66,6 +91,7 @@ export function runWithRequestContext<T>(context: RequestContext, work: () => T)
       userId: context.userId,
       organizationId: context.organizationId,
       ...(context.moduleStates !== undefined ? { moduleStates: context.moduleStates } : {}),
+      ...(context.performance !== undefined ? { performance: context.performance } : {}),
     },
     work,
   );
@@ -110,6 +136,37 @@ export function extendRequestContext(patch: Partial<Omit<RequestContext, 'reques
   if (patch.userId !== undefined) current.userId = patch.userId;
   if (patch.organizationId !== undefined) current.organizationId = patch.organizationId;
   if (patch.moduleStates !== undefined) current.moduleStates = patch.moduleStates;
+  if (patch.performance !== undefined) current.performance = patch.performance;
+}
+
+/**
+ * Starts the performance counters for the current request.
+ *
+ * Called once by the request-id middleware, which is the earliest point in the
+ * pipeline. Starting here (rather than in an interceptor) is what makes the count
+ * include the queries the guards issue before the controller runs.
+ */
+export function startPerformanceMeasurement(): PerformanceContext {
+  const performanceContext: PerformanceContext = {
+    queryCount: 0,
+    dbTimeMs: 0,
+    startedAt: performance.now(),
+  };
+  extendRequestContext({ performance: performanceContext });
+  return performanceContext;
+}
+
+/** The counters for the current request, or undefined outside a request. */
+export function getPerformanceContext(): PerformanceContext | undefined {
+  return storage.getStore()?.performance;
+}
+
+/** Records one completed database query. One integer add plus one float add. */
+export function recordDatabaseQuery(durationMs: number): void {
+  const performanceContext = storage.getStore()?.performance;
+  if (!performanceContext) return;
+  performanceContext.queryCount += 1;
+  performanceContext.dbTimeMs += Number.isFinite(durationMs) ? Math.max(0, durationMs) : 0;
 }
 
 /**

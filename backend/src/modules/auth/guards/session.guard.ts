@@ -7,13 +7,15 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { createHash } from 'node:crypto';
-import { PrismaService } from '../../../platform/prisma/prisma.service';
 import { IS_PUBLIC_KEY } from '../../../common/decorators/require-permission.decorator';
 import { extendRequestContext } from '../../../common/logging/request-context';
+import { RequestIdentityService } from '../request-identity.service';
+import type { RequestIdentity } from '../request-identity.service';
 
 export interface SessionRequest extends Request {
   userId?: string;
   membershipId?: string;
+  identity?: RequestIdentity;
 }
 
 /**
@@ -24,8 +26,8 @@ export interface SessionRequest extends Request {
 @Injectable()
 export class SessionGuard implements CanActivate {
   constructor(
-    private readonly prisma: PrismaService,
     private readonly reflector: Reflector,
+    private readonly identityService: RequestIdentityService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -51,40 +53,32 @@ export class SessionGuard implements CanActivate {
 
     const tokenHash = createHash('sha256').update(sessionId).digest('hex');
 
-    const session = await this.prisma.session.findUnique({
-      where: { tokenHash },
-      include: { membership: { include: { organization: true } } },
-    });
+    const result = await this.identityService.load(tokenHash);
 
-    if (!session) {
+    if (result.kind === 'expired') {
+      throw new UnauthorizedException('Session expired.');
+    }
+    if (result.kind !== 'identity') {
       throw new UnauthorizedException('Invalid session.');
     }
 
-    if (session.expiresAt < new Date()) {
-      await this.prisma.session.delete({ where: { id: session.id } });
-      throw new UnauthorizedException('Session expired.');
-    }
-
-    if (!session.membership || !session.membership.isActive) {
+    const identity = result.identity;
+    if (!identity.membership.isActive) {
       throw new UnauthorizedException('Membership not active.');
     }
 
-    // Update lastUsedAt to track idle time (best-effort, don't block on it)
-    void this.prisma.session.update({
-      where: { id: session.id },
-      data: { lastUsedAt: new Date() },
-    });
-
-    request.userId = session.userId;
-    request.membershipId = session.membershipId;
+    request.userId = identity.userId;
+    request.membershipId = identity.membershipId;
+    request.identity = identity;
 
     // Bind the caller's identity and tenant to the request context. Guards run before
     // controllers, so this is the earliest point the context can learn who is calling;
     // without it a controller reading getRequestContext() sees nulls and queries with
     // an empty organization id.
     extendRequestContext({
-      userId: session.userId,
-      organizationId: session.membership.organizationId,
+      userId: identity.userId,
+      organizationId: identity.organizationId,
+      moduleStates: identity.moduleStates,
     });
 
     return true;

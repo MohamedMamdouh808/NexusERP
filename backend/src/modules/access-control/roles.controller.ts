@@ -6,7 +6,6 @@ import {
   Delete,
   Body,
   Param,
-  UseGuards,
   HttpCode,
   HttpStatus,
   Req,
@@ -18,7 +17,7 @@ import { AppException } from '../../common/errors/all-exceptions.filter';
 import { ERROR_CODES } from '@nexuserp/shared';
 import { RolesService } from './roles.service';
 import { AccessControlService } from './access-control.service';
-import { SessionGuard, SessionRequest } from '../../modules/auth/guards/session.guard';
+import { SessionRequest } from '../auth/guards/session.guard';
 import {
   requireOrganizationId,
   requireUserId,
@@ -30,7 +29,6 @@ import {
  * System roles are read-only (FR-013).
  */
 @Controller('roles')
-@UseGuards(SessionGuard)
 export class RolesController {
   constructor(
     private readonly service: RolesService,
@@ -74,6 +72,7 @@ export class RolesController {
     // (FR-031): a role may never grant more than the actor already holds.
     const actingEffectivePermissions = await this.accessControl.getEffectivePermissions(
       request.membershipId ?? '',
+      request.identity,
     );
     return this.service.createRole({
       organizationId: requireOrganizationId(),
@@ -96,6 +95,7 @@ export class RolesController {
   ) {
     const actingEffectivePermissions = await this.accessControl.getEffectivePermissions(
       request.membershipId ?? '',
+      request.identity,
     );
     return this.service.updateRole({
       roleId,

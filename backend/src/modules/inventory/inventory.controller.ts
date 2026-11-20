@@ -19,7 +19,6 @@ import { RequireModule } from '../../common/guards/require-module.decorator';
 import { ModuleGuard } from '../../common/guards/module.guard';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 import { requireOrganizationId, requireUserId } from '../../common/logging/request-context';
-import { SessionGuard } from '../auth/guards/session.guard';
 import { InventoryService } from './inventory.service';
 import { createAdjustmentSchema, type CreateAdjustmentDto } from './dto/create-adjustment.dto';
 import { listStockBalancesSchema, type ListStockBalancesDto } from './dto/list-stock-balances.dto';
@@ -42,7 +41,7 @@ import {
  */
 @ApiTags('Inventory')
 @Controller()
-@UseGuards(SessionGuard, ModuleGuard)
+@UseGuards(ModuleGuard)
 export class InventoryController {
   constructor(private readonly service: InventoryService) {}
 

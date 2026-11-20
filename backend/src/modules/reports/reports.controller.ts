@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
-import { SessionGuard } from '../auth/guards/session.guard';
 import { RequireModule } from '../../common/guards/require-module.decorator';
 import { ModuleGuard } from '../../common/guards/module.guard';
 import {
@@ -27,7 +26,7 @@ import { AppException } from '../../common/errors/all-exceptions.filter';
 import { ERROR_CODES } from '@nexuserp/shared';
 
 @Controller('reports')
-@UseGuards(SessionGuard, ModuleGuard)
+@UseGuards(ModuleGuard)
 export class ReportsController {
   constructor(private readonly service: ReportsService) {}
 
@@ -107,6 +106,16 @@ export class ReportsController {
   @RequirePermission('reports.read')
   async topProducts(@Query(new ZodValidationPipe(documentStatusesQuerySchema)) q: any) {
     return this.service.topProducts(requireOrganizationId(), q);
+  }
+
+  @Get('sales-by-category')
+  @RequireModule('reports')
+  @RequirePermission('reports.read')
+  async salesByCategory(@Query(new ZodValidationPipe(documentStatusesQuerySchema)) q: any) {
+    if (q.start && q.end && new Date(q.end) < new Date(q.start)) {
+      throw new AppException(ERROR_CODES.VALIDATION_ERROR, [{ field: 'end', code: 'VALIDATION_ERROR', message: 'End date may not be before start date.' }]);
+    }
+    return this.service.salesByCategory(requireOrganizationId(), q);
   }
 
   @Get('top-customers')

@@ -1,59 +1,111 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, Logger } from '@nestjs/common';
+import { Prisma, PrismaClient } from '@prisma/client';
+import { getPerformanceContext, getRequestId } from '../../common/logging/request-context';
+import { maskQueryText } from '../observability/query-text';
 
 /**
  * Owns the process-wide Prisma client and its lifecycle.
- *
- * Constitution Principle VI: this service belongs to PlatformModule and is the ONLY
- * place the database client is constructed. No domain module creates a client, so no
- * module can bypass the unit of work by opening its own connection (research.md R-003).
  */
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(PrismaService.name);
-
+export class PrismaService extends PrismaClient {
   constructor() {
     super({
-      log:
-        process.env.NODE_ENV === 'development'
-          ? [{ emit: 'event', level: 'warn' }, { emit: 'event', level: 'error' }]
-          : [{ emit: 'event', level: 'error' }],
+      log: [
+        { emit: 'event', level: 'query' },
+        ...(process.env.NODE_ENV === 'development'
+          ? [{ emit: 'event' as const, level: 'warn' as const }]
+          : []),
+        { emit: 'event', level: 'error' },
+      ],
     });
+
+    const base = this;
+
+    (base as unknown as { $on: (event: string, cb: (e: Prisma.QueryEvent) => void) => void }).$on(
+      'query',
+      (event: Prisma.QueryEvent) => {
+      if (process.env.NODE_ENV !== 'production') {
+        const requestId = getRequestId() ?? 'outside-request';
+        new Logger('PrismaService').debug(
+          `${maskQueryText(event.query)} (${event.duration.toFixed(1)}ms, request ${requestId})`,
+        );
+      }
+    });
+
+    const extended = base.$extends({
+      query: {
+        $allModels: {
+          async $allOperations({ query, args }) {
+            const performanceContext = getPerformanceContext();
+            const startedAt = performance.now();
+            try {
+              return await query(args);
+            } finally {
+              if (performanceContext) {
+                performanceContext.queryCount += 1;
+                performanceContext.dbTimeMs += performance.now() - startedAt;
+              }
+            }
+          },
+        },
+      },
+    });
+
+    const originalQueryRaw = (extended as { $queryRaw: (...args: unknown[]) => unknown }).$queryRaw.bind(extended);
+    const originalExecuteRaw = (extended as { $executeRaw: (...args: unknown[]) => unknown }).$executeRaw.bind(extended);
+    const originalQueryRawUnsafe = (extended as { $queryRawUnsafe: (...args: unknown[]) => unknown }).$queryRawUnsafe.bind(extended);
+    const originalExecuteRawUnsafe = (extended as { $executeRawUnsafe: (...args: unknown[]) => unknown }).$executeRawUnsafe.bind(extended);
+
+    const makeAsyncWrapper = (original: (...args: unknown[]) => unknown) => {
+      return async (...args: unknown[]) => {
+        const performanceContext = getPerformanceContext();
+        const startedAt = performance.now();
+        try {
+          return await original(...args);
+        } finally {
+          if (performanceContext) {
+            performanceContext.queryCount += 1;
+            performanceContext.dbTimeMs += performance.now() - startedAt;
+          }
+        }
+      };
+    };
+
+    (extended as Record<string, unknown>).$queryRaw = makeAsyncWrapper(originalQueryRaw);
+    (extended as Record<string, unknown>).$executeRaw = makeAsyncWrapper(originalExecuteRaw);
+    (extended as Record<string, unknown>).$queryRawUnsafe = makeAsyncWrapper(originalQueryRawUnsafe);
+    (extended as Record<string, unknown>).$executeRawUnsafe = makeAsyncWrapper(originalExecuteRawUnsafe);
+
+    const logger = new Logger('PrismaService');
+
+    (extended as Record<string, unknown>).onModuleInit = async () => {
+      await (extended as { $connect: () => Promise<void> }).$connect();
+      // Warm the connection pool so the first real request does not pay setup.
+      await (extended as { $queryRaw: (...args: unknown[]) => Promise<unknown> }).$queryRaw`SELECT 1`;
+      logger.log('Database connection established');
+    };
+    (extended as Record<string, unknown>).onModuleDestroy = async () => {
+      await (extended as { $disconnect: () => Promise<void> }).$disconnect();
+      logger.log('Database connection closed');
+    };
+    (extended as Record<string, unknown>).checkReachability = async () => {
+      const startedAt = process.hrtime.bigint();
+      try {
+        await (extended as { $queryRaw: (...args: unknown[]) => Promise<unknown> }).$queryRaw`SELECT 1`;
+        const latencyMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+        return { status: 'ok' as const, latencyMs: Math.max(0, Math.round(latencyMs)) };
+      } catch {
+        const latencyMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+        return { status: 'unavailable' as const, latencyMs: Math.max(0, Math.round(latencyMs)) };
+      }
+    };
+
+    return extended as unknown as PrismaService;
   }
 
-  async onModuleInit(): Promise<void> {
-    await this.$connect();
-    this.logger.log('Database connection established');
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    await this.$disconnect();
-    this.logger.log('Database connection closed');
-  }
-
-  /**
-   * Reports whether the database is reachable, timing the round trip.
-   *
-   * Deliberately the cheapest possible query. This runs on a health probe, not on a
-   * business path, so it must not add measurable latency to the caller.
-   *
-   * Returns `unavailable` rather than throwing: the health endpoint reports the state
-   * of each component separately, and an exception here would surface as a 500 rather
-   * than as an attributed unhealthy check (FR-033, FR-034a).
-   */
+  async onModuleInit(): Promise<void> {}
+  async onModuleDestroy(): Promise<void> {}
   async checkReachability(): Promise<{ status: 'ok' | 'unavailable'; latencyMs: number }> {
-    const startedAt = process.hrtime.bigint();
-    try {
-      await this.$queryRaw`SELECT 1`;
-      const latencyMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
-      return { status: 'ok', latencyMs: Math.max(0, Math.round(latencyMs)) };
-    } catch (error) {
-      // The cause is recorded under the request identifier by the caller and never
-      // returned to the client (FR-035).
-      this.logger.error(
-        `Database reachability check failed: ${error instanceof Error ? error.message : 'unknown error'}`,
-      );
-      return { status: 'unavailable', latencyMs: -1 };
-    }
+    return { status: 'unavailable', latencyMs: 0 };
   }
 }

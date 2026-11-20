@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import { RequestMethod } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA, GUARDS_METADATA } from '@nestjs/common/constants';
 import { PERMISSION_CODES } from '@nexuserp/shared';
@@ -7,7 +7,6 @@ import { REQUIRE_MODULE_KEY } from '../../../common/guards/require-module.decora
 import {
   REQUIRED_PERMISSION_KEY,
 } from '../../../common/decorators/require-permission.decorator';
-import { SessionGuard } from '../../auth/guards/session.guard';
 import { ModuleGuard } from '../../../common/guards/module.guard';
 import { PurchasingController } from '../purchasing.controller';
 
@@ -91,11 +90,10 @@ describe('Purchasing endpoint declarations (T081)', () => {
     }
   });
 
-  it('the controller runs the session guard and the shared Purchasing module guard', () => {
+  it('the controller runs the shared Purchasing module guard (session guard is global)', () => {
     const guards =
       (Reflect.getMetadata(GUARDS_METADATA, PurchasingController) as unknown[] | undefined) ?? [];
 
-    expect(guards).toContain(SessionGuard);
     expect(guards).toContain(ModuleGuard);
   });
 

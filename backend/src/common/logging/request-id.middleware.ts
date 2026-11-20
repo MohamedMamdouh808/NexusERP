@@ -2,7 +2,7 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import { isValidRequestId, REQUEST_ID_HEADER } from '@nexuserp/shared';
 import { randomUUID } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
-import { runWithRequestContext } from './request-context';
+import { runWithRequestContext, startPerformanceMeasurement } from './request-context';
 
 /**
  * Assigns every request exactly one identifier and makes it available for the rest of
@@ -42,6 +42,9 @@ export class RequestIdMiddleware implements NestMiddleware {
     response.setHeader(REQUEST_ID_HEADER, requestId);
 
     runWithRequestContext({ requestId, userId: null, organizationId: null }, () => {
+      // The performance clock starts with the request, before any guard issues a
+      // query, so the count and duration cover the WHOLE request (Feature 019).
+      startPerformanceMeasurement();
       next();
     });
   }

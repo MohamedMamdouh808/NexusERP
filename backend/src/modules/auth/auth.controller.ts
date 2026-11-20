@@ -6,7 +6,6 @@ import {
   Body,
   Req,
   Res,
-  UseGuards,
   HttpCode,
   HttpStatus,
   Inject,
@@ -17,7 +16,7 @@ import { ApiOperation } from '@nestjs/swagger';
 import { ERROR_CODES } from '@nexuserp/shared';
 import { AppException } from '../../common/errors/all-exceptions.filter';
 import { AuthService } from './auth.service';
-import { SessionGuard, SessionRequest } from './guards/session.guard';
+import { SessionRequest } from './guards/session.guard';
 import { ApiOkResponse } from '@nestjs/swagger';
 import { MeResponseDto } from './dto/me-response.dto';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
@@ -98,8 +97,7 @@ export class AuthController {
    */
   @Authenticated()
   @Post('logout')
-  @UseGuards(SessionGuard)
-  @HttpCode(HttpStatus.OK)
+    @HttpCode(HttpStatus.OK)
   async logout(
     @Req() request: SessionRequest,
     @Res({ passthrough: true }) response: Response,
@@ -123,20 +121,18 @@ export class AuthController {
    */
   @Authenticated()
   @Get('me')
-  @UseGuards(SessionGuard)
-  @ApiOkResponse({ description: 'The current user, membership and organization', type: MeResponseDto })
+    @ApiOkResponse({ description: 'The current user, membership and organization', type: MeResponseDto })
   async me(@Req() request: SessionRequest) {
     if (!request.userId || !request.membershipId) {
       throw new AppException(ERROR_CODES.UNAUTHENTICATED, [], 'Not authenticated.');
     }
 
-    return this.authService.me(request.userId, request.membershipId);
+    return this.authService.me(request.userId, request.membershipId, request.identity);
   }
 
   @Authenticated()
   @Patch('me')
-  @UseGuards(SessionGuard)
-  @ApiOperation({ summary: 'Update the signed-in member\u2019s own display name' })
+    @ApiOperation({ summary: 'Update the signed-in member\u2019s own display name' })
   async updateMe(
     @Req() request: SessionRequest,
     @Body(new ZodValidationPipe(updateOwnNameSchema)) body: { name: string; version: number },
@@ -160,8 +156,7 @@ export class AuthController {
    */
   @Authenticated()
   @Post('change-password')
-  @UseGuards(SessionGuard)
-  @HttpCode(HttpStatus.OK)
+    @HttpCode(HttpStatus.OK)
   async changePassword(
     @Req() request: SessionRequest,
     @Res({ passthrough: true }) response: Response,
@@ -205,8 +200,7 @@ export class AuthController {
    */
   @Authenticated()
   @Get('organizations')
-  @UseGuards(SessionGuard)
-  async organizations(@Req() request: SessionRequest) {
+    async organizations(@Req() request: SessionRequest) {
     if (!request.userId) {
       throw new AppException(ERROR_CODES.UNAUTHENTICATED, [], 'Not authenticated.');
     }
@@ -226,8 +220,7 @@ export class AuthController {
    */
   @Authenticated()
   @Post('switch-organization')
-  @UseGuards(SessionGuard)
-  async switchOrganization(
+    async switchOrganization(
     @Body(new ZodValidationPipe(switchOrganizationSchema)) body: SwitchOrganizationDto,
     @Req() request: SessionRequest,
   ) {

@@ -21,7 +21,6 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 import { requireOrganizationId, requireUserId } from '../../common/logging/request-context';
 import { SalesModule } from '../../common/guards/sales-module.guard';
 import { ModuleGuard } from '../../common/guards/module.guard';
-import { SessionGuard } from '../auth/guards/session.guard';
 import { SalesService } from './sales.service';
 import {
   createSalesOrderSchema,
@@ -57,7 +56,7 @@ import { shipSalesOrderSchema } from './dto/ship-sales-order.dto';
  */
 @ApiTags('Sales')
 @Controller()
-@UseGuards(SessionGuard, ModuleGuard)
+@UseGuards(ModuleGuard)
 export class SalesController {
   constructor(private readonly service: SalesService) {}
 
