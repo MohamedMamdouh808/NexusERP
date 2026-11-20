@@ -77,6 +77,7 @@ export interface MeResult {
     readonly id: string;
     readonly roles: readonly MembershipRole[];
     readonly isActive: boolean;
+    readonly version: number;
     /**
      * The member's display name in THIS organization. A name belongs to a
      * membership, not to the account, so the dashboard can greet a member

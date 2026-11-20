@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   Req,
   Res,
@@ -12,6 +13,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { Authenticated, Public } from '../../common/decorators/require-permission.decorator';
+import { ApiOperation } from '@nestjs/swagger';
 import { ERROR_CODES } from '@nexuserp/shared';
 import { AppException } from '../../common/errors/all-exceptions.filter';
 import { AuthService } from './auth.service';
@@ -22,6 +24,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation-pipe';
 import { registerSchema, type RegisterDto } from './dto/register.dto';
 import { loginSchema, type LoginDto } from './dto/login.dto';
 import { changePasswordSchema, type ChangePasswordDto } from './dto/change-password.dto';
+import { updateOwnNameSchema } from './dto/update-own-name.dto';
 import { switchOrganizationSchema, type SwitchOrganizationDto } from './dto/switch-organization.dto';
 import { CONFIGURATION } from '../../config/configuration.module';
 import { Configuration } from '../../config/configuration';
@@ -128,6 +131,20 @@ export class AuthController {
     }
 
     return this.authService.me(request.userId, request.membershipId);
+  }
+
+  @Authenticated()
+  @Patch('me')
+  @UseGuards(SessionGuard)
+  @ApiOperation({ summary: 'Update the signed-in member\u2019s own display name' })
+  async updateMe(
+    @Req() request: SessionRequest,
+    @Body(new ZodValidationPipe(updateOwnNameSchema)) body: { name: string; version: number },
+  ) {
+    if (!request.userId || !request.membershipId) {
+      throw new AppException(ERROR_CODES.UNAUTHENTICATED, [], 'Not authenticated.');
+    }
+    return this.authService.updateOwnName(request.userId, request.membershipId, body.name, body.version);
   }
 
   /**

@@ -311,6 +311,7 @@ export class AuthService {
         // membership, not to the account, so the dashboard can greet a member
         // without asking for a permission the member may not hold.
         name: membership.name,
+        version: membership.version,
         roles: membershipRoles.map((mr) => ({
           id: mr.role.id,
           key: mr.role.key,
@@ -338,6 +339,44 @@ export class AuthService {
       },
       permissions,
     };
+  }
+
+  /**
+   * Updates the signed-in member's own display name (FR-026). Requires the
+   * membership's current version so a stale write is refused. Audits the
+   * change in the same transaction.
+   */
+  async updateOwnName(userId: string, membershipId: string, name: string, version: number) {
+    return this.transaction.runInTransaction(async (tx) => {
+      const membership = await tx.membership.findUnique({
+        where: { id: membershipId },
+        select: { id: true, userId: true, organizationId: true, name: true, version: true },
+      });
+      if (!membership || membership.userId !== userId) {
+        throw new AppException(ERROR_CODES.NOT_FOUND, [], 'Membership not found.');
+      }
+      if (membership.version !== version) {
+        throw new AppException(ERROR_CODES.STALE_VERSION, [{ field: 'version', code: 'STALE_VERSION', message: `This member changed since you opened it (it is now version ${membership.version}). Reload and try again.` }], 'Stale version.');
+      }
+      const before = { name: membership.name };
+      const updated = await tx.membership.update({
+        where: { id: membershipId, version },
+        data: { name, version: { increment: 1 } },
+        select: { id: true, name: true, version: true },
+      });
+      await tx.auditLog.create({
+        data: {
+          organization: { connect: { id: membership.organizationId } },
+          user: { connect: { id: userId } },
+          action: AUDIT_ACTIONS.membersNameChanged,
+          recordType: 'membership',
+          recordId: membershipId,
+          before,
+          after: { name },
+        },
+      });
+      return updated;
+    });
   }
 
   /**

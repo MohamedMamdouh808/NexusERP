@@ -20,6 +20,7 @@ export class MeResponseMembershipRoleDto {
 
 export class MeResponseMembershipDto {
   @ApiProperty() id!: string;
+  @ApiProperty() version!: number;
   @ApiProperty({ type: [MeResponseMembershipRoleDto] }) roles!: MeResponseMembershipRoleDto[];
   @ApiProperty({ nullable: true }) name!: string | null;
   @ApiProperty() isActive!: boolean;

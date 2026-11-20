@@ -54,6 +54,7 @@ export interface SessionMembership {
    * the email address.
    */
   readonly name?: string | null;
+  readonly version?: number;
 }
 
 /** The organization the session is scoped to, as /auth/me describes it. */
@@ -221,7 +222,7 @@ function loadSignedInSession(): Promise<void> {
       hydrateSession({
         status: 'signed-in',
         user: meData.user,
-        membership: { id: meData.membership.id, roles: meData.membership.roles, name: meData.membership.name ?? null },
+        membership: { id: meData.membership.id, roles: meData.membership.roles, name: meData.membership.name ?? null, version: meData.membership.version ?? 1 },
         organization: meData.organization,
         organizations: orgsResult.ok ? orgsResult.data : [],
         permissions: meData.permissions ?? [],

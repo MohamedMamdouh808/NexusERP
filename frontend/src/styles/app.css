@@ -1766,6 +1766,15 @@
 .settings-fields { align-items: start; }
 .settings-notice { margin: var(--spacing-sm) 0; padding: var(--spacing-sm) var(--spacing-md); border-inline-start: 3px solid var(--color-primary); background: var(--color-muted); color: var(--color-muted-foreground); }
 .module-table { width: 100%; }
+.profile-page__grid { display: grid; gap: var(--spacing-lg); grid-template-columns: 1fr; }
+@media (min-width: 960px) { .profile-page__grid { grid-template-columns: 1fr 1fr; } }
+.profile-page__column { display: flex; flex-direction: column; gap: var(--spacing-lg); }
+.profile-avatar { display: inline-flex; align-items: center; justify-content: center; width: 3.5rem; height: 3.5rem; border-radius: 9999px; background: var(--color-primary); color: var(--color-on-primary); font-weight: 700; font-size: 1.25rem; margin-block-end: var(--spacing-md); }
+.profile-activity { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.profile-activity__item { display: flex; flex-direction: column; gap: var(--spacing-xxs, var(--spacing-xs)); }
+.profile-activity__time { font-size: 0.85rem; color: var(--color-muted-foreground); }
+.profile-activity__action { font-weight: 500; }
+.settings-actions { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; margin-block-start: var(--spacing-md); }
 .server-enforced-note { margin: var(--spacing-sm) 0; padding: var(--spacing-sm) var(--spacing-md); border-inline-start: 3px solid var(--color-primary); background: var(--color-muted); color: var(--color-muted-foreground); border-radius: var(--radius-sm); }
 .stale-prompt { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; margin: var(--spacing-sm) 0; padding: var(--spacing-sm) var(--spacing-md); border: 1px solid var(--color-warning); border-radius: var(--radius-sm); color: var(--color-foreground); }
 .module-inline-error { margin: var(--spacing-sm) 0; padding: var(--spacing-sm) var(--spacing-md); border-inline-start: 3px solid var(--color-destructive); color: var(--color-destructive); }
